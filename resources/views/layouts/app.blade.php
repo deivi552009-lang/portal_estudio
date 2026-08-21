@@ -21,13 +21,13 @@
 
     </header>
 
-
     <main>
 
         @yield('contenido')
 
-    </main>
+        {{ $slot ?? '' }}
 
+    </main>
 
     <footer>
 
