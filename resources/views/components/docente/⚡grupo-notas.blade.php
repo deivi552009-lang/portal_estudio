@@ -1,161 +1,568 @@
-<?php
+<div style="
+    padding: 20px;
+    font-family: sans-serif;
+    max-width: 1400px;
+    margin: 0 auto;
+">
 
-use App\Models\Grupo;
-use App\Models\Evaluacion;
-use App\Models\Calificacion;
-use Livewire\Component;
+```
+<!-- ENCABEZADO -->
 
-new class extends Component {
-    public Grupo $grupo;
-    public array $notas = [];
+<div style="
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+">
 
-    public function mount($grupoId): void
-    {
-        $this->grupo = Grupo::with([
-            'materia',
-            'docente.user',
-            'estudiantes.user',
-            'evaluaciones.calificaciones'
-        ])->findOrFail($grupoId);
+    <div>
 
-        $this->cargarNotas();
-    }
+        <h2 style="margin: 0;">
+            Planilla de Notas:
+            {{ $grupo->materia->nombre }}
+        </h2>
 
-    public function cargarNotas(): void
-    {
-        $evaluaciones = $this->grupo->evaluaciones;
+        <p style="margin: 5px 0 0;">
 
-        foreach ($this->grupo->estudiantes as $estudiante) {
-            foreach (['P1', 'P2', 'P3', 'P4', 'A'] as $nombreEvaluacion) {
-                $evaluacion = $evaluaciones->firstWhere('nombre', $nombreEvaluacion);
+            <strong>Docente:</strong>
+            {{ $grupo->docente->user->name }}
 
-                if ($evaluacion) {
-                    $calificacion = $evaluacion->calificaciones
-                        ->firstWhere('estudiante_id', $estudiante->id);
+            |
 
-                    $this->notas[$estudiante->id][$nombreEvaluacion] = $calificacion ? $calificacion->nota : '';
-                } else {
-                    $this->notas[$estudiante->id][$nombreEvaluacion] = '';
+            <strong>Semestre:</strong>
+            {{ $grupo->semestre }} - {{ $grupo->anio }}
+
+        </p>
+
+    </div>
+
+    <div>
+
+        <a
+            href="/docente/grupo/{{ $grupo->id }}/asistencia"
+            style="
+                background-color: #28a745;
+                color: white;
+                padding: 8px 14px;
+                text-decoration: none;
+                border-radius: 4px;
+                font-weight: bold;
+                margin-right: 10px;
+            "
+        >
+            📅 Asistencia
+        </a>
+
+        <a
+            href="/docente/grupo/{{ $grupo->id }}/asistencia/historial"
+            style="
+                background-color: #17a2b8;
+                color: white;
+                padding: 8px 14px;
+                text-decoration: none;
+                border-radius: 4px;
+                font-weight: bold;
+            "
+        >
+            📊 Historial
+        </a>
+
+    </div>
+
+</div>
+
+
+<!-- AGREGAR ACTIVIDAD -->
+
+<div style="
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+">
+
+    <h4 style="
+        margin: 0 0 5px 0;
+    ">
+        ➕ Añadir Nueva Actividad
+    </h4>
+
+    <p style="
+        font-size: 13px;
+        color: #666;
+        margin: 5px 0 12px;
+    ">
+        Talleres, tareas, quizzes y otras actividades.
+        No afectan automáticamente la definitiva.
+    </p>
+
+    <form
+        wire:submit.prevent="agregarEvaluacion"
+        style="
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        "
+    >
+
+        <input
+            type="text"
+            wire:model="nuevaEvaluacionNombre"
+            placeholder="Ej: Taller Factura"
+            style="
+                padding: 8px 10px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                width: 280px;
+            "
+            required
+        >
+
+        <button
+            type="submit"
+            wire:loading.attr="disabled"
+            wire:target="agregarEvaluacion"
+            style="
+                background-color: #0d6efd;
+                color: white;
+                border: none;
+                padding: 8px 14px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+            "
+        >
+            <span
+                wire:loading.remove
+                wire:target="agregarEvaluacion"
+            >
+                + Agregar Actividad
+            </span>
+
+            <span
+                wire:loading
+                wire:target="agregarEvaluacion"
+            >
+                Agregando...
+            </span>
+        </button>
+
+    </form>
+
+    @error('nuevaEvaluacionNombre')
+
+        <div style="
+            color: #dc3545;
+            margin-top: 8px;
+            font-size: 13px;
+        ">
+            {{ $message }}
+        </div>
+
+    @enderror
+
+</div>
+
+
+<!-- TABLA DE NOTAS -->
+
+<div
+    wire:key="tabla-notas-{{ $grupo->evaluaciones->pluck('id')->implode('-') }}"
+    x-data="{
+
+        notas: @js($matrizNotas),
+
+        notasModificadas: {},
+
+        evaluaciones: @js($grupo->evaluaciones->toArray()),
+
+
+        calcularDefinitiva(estudianteId) {
+
+            let total = 0;
+
+            this.evaluaciones.forEach(ev => {
+
+                if (ev.porcentaje === null) {
+                    return;
                 }
+
+                let nota = parseFloat(
+                    this.notas[estudianteId]?.[ev.id] || 0
+                );
+
+                let porcentaje = parseFloat(
+                    ev.porcentaje
+                );
+
+                total +=
+                    (nota * porcentaje) / 100;
+
+            });
+
+            return total.toFixed(2);
+        },
+
+
+        marcarNotaModificada(
+            estudianteId,
+            evaluacionId,
+            valor
+        ) {
+
+            this.notasModificadas[estudianteId] ??= {};
+
+            this.notasModificadas[
+                estudianteId
+            ][evaluacionId] = valor;
+
+        },
+
+
+        async guardarNotas() {
+
+            if (
+                Object.keys(
+                    this.notasModificadas
+                ).length === 0
+            ) {
+                return;
             }
-        }
-    }
 
-    public function guardarNota($estudianteId, $nombreEvaluacion): void
-    {
-        $porcentajes = ['P1' => 20, 'P2' => 20, 'P3' => 20, 'P4' => 30, 'A' => 10];
-        $tipos = ['P1' => 'parcial', 'P2' => 'parcial', 'P3' => 'parcial', 'P4' => 'parcial', 'A' => 'asistencia_final'];
-
-        $evaluacion = Evaluacion::firstOrCreate(
-            ['grupo_id' => $this->grupo->id, 'nombre' => $nombreEvaluacion],
-            [
-                'tipo' => $tipos[$nombreEvaluacion] ?? 'parcial',
-                'porcentaje' => $porcentajes[$nombreEvaluacion] ?? 0,
-                'fecha' => now()->toDateString(),
-            ]
-        );
-
-        $valorNota = $this->notas[$estudianteId][$nombreEvaluacion];
-
-        if ($valorNota === '' || $valorNota === null) {
-            Calificacion::where('evaluacion_id', $evaluacion->id)
-                ->where('estudiante_id', $estudianteId)
-                ->delete();
-        } else {
-            $notaNumerica = (float) $valorNota;
-            if ($notaNumerica < 0) $notaNumerica = 0;
-            if ($notaNumerica > 5) $notaNumerica = 5;
-
-            $this->notas[$estudianteId][$nombreEvaluacion] = $notaNumerica;
-
-            Calificacion::updateOrCreate(
-                ['evaluacion_id' => $evaluacion->id, 'estudiante_id' => $estudianteId],
-                ['nota' => $notaNumerica]
+            await $wire.guardarNotas(
+                this.notasModificadas
             );
+
+            this.notasModificadas = {};
+
         }
-    }
-};
-?>
 
-<div style="padding: 20px; font-family: sans-serif;">
+    }"
+>
 
-    <h2>{{ $this->grupo->materia->nombre }}</h2>
+    <div style="
+        overflow-x: auto;
+        overflow-y: hidden;
+        width: 100%;
+        border: 1px solid #dee2e6;
+    ">
 
-    <p><strong>Docente:</strong> {{ $this->grupo->docente->user->name }}</p>
-    <p><strong>Semestre:</strong> {{ $this->grupo->semestre }} - {{ $this->grupo->anio }}</p>
+        <table
+            cellspacing="0"
+            cellpadding="0"
+            style="
+                border-collapse: collapse;
+                width: max-content;
+                min-width: 100%;
+            "
+        >
 
-    <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; text-align: center;">
+            <!-- ENCABEZADO -->
 
-        <thead>
-            <tr style="background-color: #f2f2f2;">
-                <th style="text-align: left;">Estudiante</th>
-                <th>P1<br><small>(20%)</small></th>
-                <th>P2<br><small>(20%)</small></th>
-                <th>P3<br><small>(20%)</small></th>
-                <th>P4<br><small>(30%)</small></th>
-                <th>A<br><small>(10%)</small></th>
-                <th>Nota final</th>
-            </tr>
-        </thead>
+            <thead>
 
-        <tbody>
+                <tr style="
+                    background-color: #0d6efd;
+                    color: white;
+                ">
 
-            @foreach ($this->grupo->estudiantes as $estudiante)
+                    <!-- ESTUDIANTE -->
 
-                <tr x-data="{
-                    p1: @entangle('notas.' . $estudiante->id . '.P1'),
-                    p2: @entangle('notas.' . $estudiante->id . '.P2'),
-                    p3: @entangle('notas.' . $estudiante->id . '.P3'),
-                    p4: @entangle('notas.' . $estudiante->id . '.P4'),
-                    a:  @entangle('notas.' . $estudiante->id . '.A'),
+                    <th style="
+                        width: 210px;
+                        min-width: 210px;
+                        max-width: 210px;
+                        padding: 8px;
+                        text-align: left;
+                        position: sticky;
+                        left: 0;
+                        z-index: 3;
+                        background-color: #0d6efd;
+                    ">
+                        Estudiante
+                    </th>
 
-                    get notaFinal() {
-                        let total = 0;
-                        if (this.p1) total += parseFloat(this.p1) * 0.20;
-                        if (this.p2) total += parseFloat(this.p2) * 0.20;
-                        if (this.p3) total += parseFloat(this.p3) * 0.20;
-                        if (this.p4) total += parseFloat(this.p4) * 0.30;
-                        if (this.a)  total += parseFloat(this.a)  * 0.10;
-                        return total.toFixed(2);
-                    }
-                }">
 
-                    <td style="text-align: left;">
-                        <strong>{{ $estudiante->user->name }}</strong>
-                    </td>
+                    <!-- EVALUACIONES -->
 
-                    @foreach ([
-                        'P1' => 'p1',
-                        'P2' => 'p2',
-                        'P3' => 'p3',
-                        'P4' => 'p4',
-                        'A'  => 'a'
-                    ] as $nombre => $varAlpine)
+                    @foreach ($grupo->evaluaciones as $eval)
 
-                        <td>
-                            <input
-                                type="number"
-                                min="0"
-                                max="5"
-                                step="0.1"
-                                x-model="{{ $varAlpine }}"
-                                wire:change="guardarNota({{ $estudiante->id }}, '{{ $nombre }}')"
-                                style="width: 55px; text-align: center;"
+                        <th style="
+                            width: 58px;
+                            min-width: 58px;
+                            max-width: 58px;
+                            height: 170px;
+                            padding: 0;
+                            text-align: center;
+                            vertical-align: bottom;
+                            position: relative;
+                            border-left: 1px solid rgba(255,255,255,0.25);
+                        ">
+
+                            <!-- X ELIMINAR -->
+
+                            <button
+                                type="button"
+                                wire:click="eliminarEvaluacion({{ $eval->id }})"
+                                wire:confirm="¿Borrar esta columna y todas sus calificaciones?"
+                                title="Eliminar {{ $eval->nombre }}"
+                                style="
+                                    position: absolute;
+                                    top: 3px;
+                                    right: 3px;
+                                    width: 18px;
+                                    height: 18px;
+                                    padding: 0;
+                                    border: none;
+                                    border-radius: 50%;
+                                    background: rgba(255,255,255,0.18);
+                                    color: white;
+                                    cursor: pointer;
+                                    font-size: 13px;
+                                    font-weight: bold;
+                                    line-height: 18px;
+                                "
                             >
-                        </td>
+                                ×
+                            </button>
+
+
+                            <!-- NOMBRE VERTICAL -->
+
+                            <div style="
+                                height: 125px;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                padding-bottom: 4px;
+                            ">
+
+                                <span style="
+                                    writing-mode: vertical-rl;
+                                    transform: rotate(180deg);
+                                    font-size: 12px;
+                                    font-weight: bold;
+                                    white-space: nowrap;
+                                    max-height: 115px;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                ">
+                                    {{ $eval->nombre }}
+                                </span>
+
+                            </div>
+
+
+                            <!-- PORCENTAJE / ACTIVIDAD -->
+
+                            <div style="
+                                height: 25px;
+                                font-size: 10px;
+                                opacity: 0.9;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+
+                                @if($eval->porcentaje !== null)
+
+                                    {{ $eval->porcentaje }}%
+
+                                @else
+
+                                    ACT.
+
+                                @endif
+
+                            </div>
+
+                        </th>
 
                     @endforeach
 
-                    <td>
-                        <strong style="color: #0056b3;" x-text="notaFinal"></strong>
-                    </td>
+
+                    <!-- DEFINITIVA -->
+
+                    <th style="
+                        width: 75px;
+                        min-width: 75px;
+                        max-width: 75px;
+                        text-align: center;
+                        padding: 5px;
+                        background-color: #0b5ed7;
+                    ">
+                        Definitiva
+                    </th>
 
                 </tr>
 
-            @endforeach
+            </thead>
 
-        </tbody>
 
-    </table>
+            <!-- CUERPO -->
+
+            <tbody>
+
+                @foreach ($grupo->estudiantes as $estudiante)
+
+                    <tr>
+
+                        <!-- ESTUDIANTE -->
+
+                        <td style="
+                            width: 210px;
+                            min-width: 210px;
+                            max-width: 210px;
+                            padding: 7px 8px;
+                            background-color: white;
+                            border-right: 2px solid #dee2e6;
+                            position: sticky;
+                            left: 0;
+                            z-index: 2;
+                        ">
+
+                            <strong style="
+                                font-size: 13px;
+                            ">
+                                {{ $estudiante->user->name }}
+                            </strong>
+
+                        </td>
+
+
+                        <!-- NOTAS -->
+
+                        @foreach ($grupo->evaluaciones as $eval)
+
+                            <td style="
+                                width: 58px;
+                                min-width: 58px;
+                                max-width: 58px;
+                                padding: 4px;
+                                text-align: center;
+                                background-color: white;
+                            ">
+
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="5"
+                                    x-model.number="
+                                        notas[
+                                            {{ $estudiante->id }}
+                                        ][
+                                            {{ $eval->id }}
+                                        ]
+                                    "
+                                    @input="
+                                        marcarNotaModificada(
+                                            {{ $estudiante->id }},
+                                            {{ $eval->id }},
+                                            $event.target.value
+                                        )
+                                    "
+                                    style="
+                                        width: 42px;
+                                        height: 30px;
+                                        box-sizing: border-box;
+                                        text-align: center;
+                                        padding: 2px;
+                                        border: 1px solid #ccc;
+                                        border-radius: 4px;
+                                        font-weight: bold;
+                                        font-size: 13px;
+                                    "
+                                >
+
+                            </td>
+
+                        @endforeach
+
+
+                        <!-- DEFINITIVA -->
+
+                        <td style="
+                            width: 75px;
+                            min-width: 75px;
+                            max-width: 75px;
+                            padding: 5px;
+                            text-align: center;
+                            font-weight: bold;
+                            font-size: 15px;
+                            background-color: #f8f9fa;
+                        ">
+
+                            <span
+                                x-text="
+                                    calcularDefinitiva(
+                                        {{ $estudiante->id }}
+                                    )
+                                "
+                            ></span>
+
+                        </td>
+
+                    </tr>
+
+                @endforeach
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- GUARDAR -->
+
+    <div style="
+        margin-top: 15px;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    ">
+
+        <button
+            type="button"
+            @click="guardarNotas()"
+            wire:loading.attr="disabled"
+            wire:target="guardarNotas"
+            style="
+                background-color: #0d6efd;
+                color: white;
+                border: none;
+                padding: 11px 22px;
+                border-radius: 6px;
+                font-size: 15px;
+                cursor: pointer;
+                font-weight: bold;
+            "
+        >
+
+            <span
+                wire:loading.remove
+                wire:target="guardarNotas"
+            >
+                💾 Guardar Calificaciones
+            </span>
+
+            <span
+                wire:loading
+                wire:target="guardarNotas"
+            >
+                ⏳ Guardando...
+            </span>
+
+        </button>
+
+    </div>
+
+</div>
+```
 
 </div>

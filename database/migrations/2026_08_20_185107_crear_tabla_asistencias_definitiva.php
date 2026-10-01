@@ -8,9 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Si no existe 'asistencia', la creamos con la estructura correcta
-        if (!Schema::hasTable('asistencia')) {
-            Schema::create('asistencia', function (Blueprint $table) {
+        // El modelo Asistencia usa el nombre plural por convención de Laravel.
+        if (!Schema::hasTable('asistencias') && !Schema::hasTable('asistencia')) {
+            Schema::create('asistencias', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('grupo_id')->constrained('grupos')->cascadeOnDelete();
                 $table->foreignId('estudiante_id')->constrained('estudiantes')->cascadeOnDelete();
@@ -25,6 +25,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('asistencia');
+        Schema::dropIfExists('asistencias');
     }
 };

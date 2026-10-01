@@ -22,4 +22,5 @@ class Docente extends Model
     {
         return $this->hasMany(Grupo::class);
     }
+
 }

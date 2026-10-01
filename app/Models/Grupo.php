@@ -15,6 +15,8 @@ class Grupo extends Model
         'semestre',
         'anio',
         'fecha_creacion',
+        'hora_inicio',
+        'hora_fin',
     ];
 
     protected $casts = [
@@ -50,4 +52,11 @@ class Grupo extends Model
     {
         return $this->hasMany(Asistencia::class);
     }
+
+    public function actividades(): HasMany
+    {
+        return $this->hasMany(Actividad::class);
+    }
+
+
 }
