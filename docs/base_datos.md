@@ -1,7 +1,7 @@
 # Modelo de Base de Datos
 
 > Documentación generada a partir de las migraciones de `database/migrations/` y los modelos de `app/Models/`.
-> Última actualización: 2026-10-01.
+> Última actualización: 2026-10-03.
 
 ## Contenido
 
@@ -195,7 +195,7 @@ Leyenda de tipos (definidos en Laravel → tipo físico en MySQL):
 |---|---|---|
 | `id` | `id()` | Clave primaria |
 | `grupo_id` | `foreignId` | FK → `grupos.id`, `ON DELETE CASCADE` |
-| `tipo` | `string(30)` | NO NULL |
+| `tipo` | `string(30)` | NO NULL; texto libre (p. ej., `taller`, `tarea`, `guía`). Contrato de la aplicación: se guarda normalizado a minúsculas (`mb_strtolower` en `GrupoActividades`) y se compara de forma insensible a mayúsculas (conteo de talleres del dashboard docente) |
 | `titulo` | `string` | NO NULL |
 | `descripcion` | `text` | NULLABLE |
 | `fecha_limite` | `date` | NO NULL |

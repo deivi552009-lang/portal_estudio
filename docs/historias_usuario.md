@@ -1,7 +1,7 @@
 # Historias de Usuario
 
 > Inferidas a partir de las rutas de `routes/web.php` y `routes/auth.php`, los controladores de `app/Http/Controllers/` (Breeze + `ProfileController`) y los componentes Livewire a los que apuntan las rutas de negocio.
-> Última actualización: 2026-10-01.
+> Última actualización: 2026-10-03.
 
 ## Roles
 
@@ -166,7 +166,7 @@
 
 - Solo se muestran los grupos del docente autenticado (con su materia y estudiantes).
 - El total de estudiantes es el número único de estudiantes de todos sus grupos.
-- El total de talleres cuenta las actividades de tipo `taller` de sus grupos.
+- El total de talleres cuenta las actividades de tipo `taller` de sus grupos; la comparación es insensible a mayúsculas (un taller guardado como "Taller" también cuenta), porque la base de datos (PostgreSQL) distingue mayúsculas al comparar texto.
 
 ### HU-014 — Crear un grupo
 
@@ -304,6 +304,7 @@
 #### Criterios de aceptación
 
 - Valida: grupo seleccionado (existente), tipo (máx. 30), título (máx. 255), fecha y hora límite; el archivo es opcional.
+- El tipo de la actividad se guarda normalizado a minúsculas (p. ej., "Taller" se almacena como "taller") para que los conteos no dependan de la mayúscula con la que se escribió.
 - Solo se aceptan archivos PDF, Word, Excel, PowerPoint y ZIP, de hasta 10 MB.
 - El archivo se guarda en el disco público bajo `actividades/`.
 - El mensaje "La actividad fue creada correctamente." se muestra al docente.
@@ -338,6 +339,7 @@
 - Se puede filtrar por grupo.
 - "Próximas a vencer" incluye actividades cuyo límite está entre ahora y 3 días después.
 - También existe la vista filtrada por grupo (`/docente/grupo/{grupoId}/actividades`).
+- El enlace "Ver archivo" abre el archivo adjunto en línea (`docente.actividad.archivo`); solo se puede ver si la actividad pertenece a un grupo del docente autenticado (de lo contrario el sistema responde 403, o 404 si el archivo no existe en el disco).
 
 ---
 

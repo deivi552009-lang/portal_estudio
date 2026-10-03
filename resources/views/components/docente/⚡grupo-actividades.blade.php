@@ -481,7 +481,7 @@
 
         {{-- VER ARCHIVO --}}
         <a
-            href="{{ asset('storage/' . $actividad->archivo) }}"
+            href="{{ route('docente.actividad.archivo', $actividad) }}"
             target="_blank"
             title="Ver archivo"
             class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100"

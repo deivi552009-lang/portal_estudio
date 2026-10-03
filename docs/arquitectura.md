@@ -1,7 +1,7 @@
 # Arquitectura
 
 > Documentación generada a partir de la estructura de `app/`, `routes/`, `config/` y `resources/`.
-> Última actualización: 2026-10-01.
+> Última actualización: 2026-10-03.
 
 ## Contenido
 
@@ -55,8 +55,9 @@ Capas y cómo se relacionan:
 | `app/Http/Controllers/Controller.php` | `Controller` | Base abstracta vacía (Laravel 12) |
 | `app/Http/Controllers/ProfileController.php` | `ProfileController` | Breeze: ver/editar/eliminar perfil de usuario |
 | `app/Http/Controllers/Auth/*` | 9 controladores | Breeze: registro, login/logout, verificación de email, recuperación y confirmación de contraseña |
+| `app/Http/Controllers/ActividadArchivoController.php` | `ActividadArchivoController` | Controlador *invokable*: visualización en línea del archivo adjunto de una actividad (valida que el grupo pertenezca al docente autenticado) |
 
-> No hay controladores de negocio: todas las páginas de dominio (grupos, notas, asistencia, actividades, dashboards) son **componentes Livewire** apuntados directamente por las rutas.
+> No hay controladores de negocio: todas las páginas de dominio (grupos, notas, asistencia, actividades, dashboards) son **componentes Livewire** apuntados directamente por las rutas. La única excepción es `ActividadArchivoController`, que solo sirve archivos adjuntos en línea (no define vistas ni flujos de página).
 
 ### 2.2 Middlewares
 
@@ -84,6 +85,7 @@ No existe `routes/api.php`: **toda la aplicación es web** (solo hay un endpoint
 | `GET` | `docente/grupo/{grupoId}/asistencia` | `docente.grupo.asistencia` | `auth`, `role:docente` | `Livewire\Docente\GrupoAsistencia` |
 | `GET` | `docente/grupo/{grupoId}/asistencia/historial` | `docente.grupo.asistencia.historial` | `auth`, `role:docente` | `Livewire\Docente\HistorialAsistencia` |
 | `GET` | `docente/actividades` | `docente.actividades` | `auth`, `role:docente` | `Livewire\Docente\GrupoActividades` |
+| `GET` | `docente/actividad/{actividad}/archivo` | `docente.actividad.archivo` | `auth`, `role:docente` | `ActividadArchivoController` (archivo adjunto en línea) |
 | `GET` | `docente/grupo/{grupoId}/actividades` | `docente.grupo.actividades` | `auth`, `role:docente` | `Livewire\Docente\GrupoActividades` |
 | `GET` | `estudiante/dashboard` | `estudiante.dashboard` | `auth`, `role:estudiante` | `Livewire\Estudiante\Dashboard` |
 
@@ -120,7 +122,7 @@ Archivos estándar de Laravel 12: `app`, `auth` (guard `web`, proveedor de usuar
 |---|---|
 | `layouts/app` | Breeze: navegación superior (`layouts/navigation`), slot `$header` + `@yield('contenido')`, usa `x-app-layout` / `AppLayout` (componente Blade de `app/View/Components/`) |
 | `layouts/guest` | Breeze: páginas de autenticación (`GuestLayout`) |
-| `layouts/docente` | Propio ("Aula Digital – Panel Docente"): sidebar oscuro con navegación (Dashboard, Actividades, etc.), barra superior con usuario y slot de contenido. **No incluye** `@livewireStyles`/`@livewireScripts` (confía en la autoinyección de Livewire 3 para componentes-página) |
+| `layouts/docente` | Propio ("Aula Digital – Panel Docente"): sidebar oscuro con navegación (Dashboard, Grupos, Actividades, etc.), barra superior con usuario y slot de contenido. **No incluye** `@livewireStyles`/`@livewireScripts` (confía en la autoinyección de Livewire 3 para componentes-página) |
 | `layouts/estudiante` | Propio: cabecera "Portal Estudio – Panel del estudiante" e incluye explícitamente `@livewireStyles` / `@livewireScripts` |
 
 Los componentes de negocio renderizan su vista y aplican el layout con `view('components.docente.⚡grupo-notas')->layout('layouts.docente')`.
@@ -139,6 +141,7 @@ Los componentes de negocio renderizan su vista y aplican el layout con `view('co
 - Validación de formularios en el componente con `$this->validate()`.
 - Mensajes al usuario con `session()->flash('mensaje', ...)`.
 - Carga de archivos (`GrupoActividades`): trait `WithFileUploads`, guardado en disco `public` bajo `actividades/` (tipos permitidos: pdf, doc, docx, xls, xlsx, ppt, pptx, zip; máximo 10 MB); el archivo se elimina del disco al borrar o reemplazar la actividad.
+- Visualización en línea de archivos (`ActividadArchivoController`): la ruta `docente.actividad.archivo` (`/docente/actividad/{actividad}/archivo`) responde el archivo con `Content-Disposition: inline` y `X-Content-Type-Options: nosniff`; antes valida que la actividad pertenezca a un grupo del docente autenticado (403) y que el archivo exista en el disco `public` (404). El enlace "Ver archivo" de `⚡grupo-actividades` apunta a esta ruta.
 
 ---
 
@@ -215,8 +218,11 @@ Decisiones registradas previamente en este documento:
 - **Decisión 002** — Cada grupo se crea con un conjunto de evaluaciones oficiales P1, P2, P3, P4 y A con porcentajes predefinidos.
 - **Decisión 003** — El docente puede crear evaluaciones adicionales personalizadas, siempre que no utilice los nombres reservados de las evaluaciones oficiales.
 - **Decisión 004** — Solo Administración y Superadministrador pueden cerrar un grupo.
+- **Decisión 005** — El `tipo` de las actividades es texto libre: se normaliza a minúsculas al guardar y se compara siempre de forma insensible a mayúsculas (el dashboard docente lo convierte a minúsculas antes de buscar `taller`).
 
 Nota: la Decisión 002 se implementa en `GrupoEstudiantes::crearNuevoGrupo()`, que inserta automáticamente las evaluaciones `P1`–`P4` y `A` (20%, 20%, 20%, 30%, 10%) al crear un grupo; `GrupoNotas::agregarEvaluacion()` impide renombrar evaluaciones con esos nombres y crea evaluaciones `personalizada` para el resto.
+
+Nota: la Decisión 005 surgió porque la base de datos es PostgreSQL, que distingue mayúsculas al comparar texto: un taller creado como "Taller" no coincidía con `where('tipo', 'taller')` y el dashboard docente lo contaba como 0. Se implementa en `GrupoActividades` (guarda el `tipo` con `mb_strtolower`) y en `Docente\Dashboard` (filtra con `mb_strtolower($actividad->tipo) === 'taller'`), la misma convención que ya usaba el dashboard del estudiante.
 
 ---
 

@@ -62,6 +62,22 @@
                 </a>
 
 
+                {{-- Grupos --}}
+                <a href="{{ route('docente.grupos') }}"
+                   class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl
+                          {{ request()->routeIs('docente.grupos')
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}
+                          transition">
+
+                    <span class="w-5 text-center">▣</span>
+
+                    <span class="text-sm font-medium">
+                        Grupos
+                    </span>
+                </a>
+
+
                 {{-- Estudiantes --}}
                 <a href="#"
                    class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl

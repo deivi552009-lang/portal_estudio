@@ -57,7 +57,9 @@ if ($this->archivo) {
 
 
         $grupo->actividades()->create([
-            'tipo' => trim($datos['tipo']),
+            // Se guarda en minúscula para que los conteos
+            // (p. ej. el dashboard) no dependan de mayúsculas.
+            'tipo' => mb_strtolower(trim($datos['tipo']), 'UTF-8'),
             'titulo' => trim($datos['titulo']),
             'descripcion' => $datos['descripcion'] !== ''
                 ? trim($datos['descripcion'])
@@ -135,7 +137,7 @@ if ($this->archivo) {
 
     $actividad->update([
         'grupo_id' => $grupo->id,
-        'tipo' => trim($datos['tipo']),
+        'tipo' => mb_strtolower(trim($datos['tipo']), 'UTF-8'),
         'titulo' => trim($datos['titulo']),
         'descripcion' => $datos['descripcion'] !== ''
             ? trim($datos['descripcion'])

@@ -33,11 +33,17 @@ class Dashboard extends Component
             ->count();
 
         $this->totalTalleres = Actividad::query()
-            ->where('tipo', 'taller')
             ->whereHas('grupo', function ($query) {
                 $query->whereHas('docente', function ($query) {
                     $query->where('user_id', Auth::id());
                 });
+            })
+            ->get()
+            ->filter(function (Actividad $actividad) {
+                // La comparación es insensible a mayúsculas
+                // (PostgreSQL distingue 'Taller' de 'taller').
+                // Usa la misma convención que el dashboard del estudiante.
+                return mb_strtolower($actividad->tipo, 'UTF-8') === 'taller';
             })
             ->count();
     }

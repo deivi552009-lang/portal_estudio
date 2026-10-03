@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActividadArchivoController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\Docente\Dashboard;
 use App\Livewire\Docente\GrupoAsistencia;
@@ -67,7 +68,13 @@ Route::middleware(['auth', 'role:docente'])->group(function () {
 
     // Actividades
     Route::get('/docente/actividades', GrupoActividades::class)
-    ->name('docente.actividades');
+        ->name('docente.actividades');
+
+    // Visualización inline de archivos adjuntos
+    Route::get(
+        '/docente/actividad/{actividad}/archivo',
+        ActividadArchivoController::class
+    )->name('docente.actividad.archivo');
 
     Route::get('/docente/grupo/{grupoId}/actividades', GrupoActividades::class)
         ->name('docente.grupo.actividades');
