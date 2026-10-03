@@ -109,7 +109,7 @@ Archivos estándar de Laravel 12: `app`, `auth` (guard `web`, proveedor de usuar
 | Tecnología | Uso |
 |---|---|
 | **Blade** | Plantillas de todas las vistas (`resources/views/`) |
-| **Livewire 3** (clásico, basado en clases) | Componentes interactivos de las páginas de negocio |
+| **Livewire 4.3.5** (clásico, basado en clases) | Componentes interactivos de las páginas de negocio |
 | **Laravel Volt** | Instalado (`livewire/volt`) y montado en `VoltServiceProvider` (`views/livewire`, `views/pages`), pero **no se usan páginas Volt**; el directorio `views/livewire` está vacío (`.gitkeep`) |
 | **Tailwind CSS** | Estilos, compilado con Vite (`resources/css/app.css`) |
 | **Vite** | Bundling de JS/CSS (`@vite` en los layouts) |
@@ -122,7 +122,7 @@ Archivos estándar de Laravel 12: `app`, `auth` (guard `web`, proveedor de usuar
 |---|---|
 | `layouts/app` | Breeze: navegación superior (`layouts/navigation`), slot `$header` + `@yield('contenido')`, usa `x-app-layout` / `AppLayout` (componente Blade de `app/View/Components/`) |
 | `layouts/guest` | Breeze: páginas de autenticación (`GuestLayout`) |
-| `layouts/docente` | Propio ("Aula Digital – Panel Docente"): sidebar oscuro con navegación (Dashboard, Grupos, Actividades, etc.), barra superior con usuario y slot de contenido. **No incluye** `@livewireStyles`/`@livewireScripts` (confía en la autoinyección de Livewire 3 para componentes-página) |
+| `layouts/docente` | Propio ("Aula Digital – Panel Docente"): sidebar oscuro con navegación (Dashboard, Grupos, Actividades, etc.), barra superior con usuario y slot de contenido. **No incluye** `@livewireStyles`/`@livewireScripts` (confía en la autoinyección de Livewire 4.3.5 para componentes-página) |
 | `layouts/estudiante` | Propio: cabecera "Portal Estudio – Panel del estudiante" e incluye explícitamente `@livewireStyles` / `@livewireScripts` |
 
 Los componentes de negocio renderizan su vista y aplican el layout con `view('components.docente.⚡grupo-notas')->layout('layouts.docente')`.
@@ -232,4 +232,4 @@ Nota: la Decisión 005 surgió porque la base de datos es PostgreSQL, que distin
 - **SQL no portable en servicios**: `GrupoEstudiantesService` usa `ilike` (PostgreSQL) y `LOWER(nombre) = ?`; además filtra por `role_id = 4` hardcodeado (número mágico del rol "estudiante") en lugar de comparar el nombre del rol.
 - **Volt instalado pero inactivo**: `VoltServiceProvider` y `views/livewire`/`views/pages` están listos para páginas Volt, pero el proyecto usa componentes Livewire clásicos; se puede documentar/eliminar para evitar confusión.
 - **Alpine.js desactivado**: está en `package.json` pero `resources/js/app.js` lo tiene comentado; el intermezzo UI lo cubre Livewire (e.g., el modal se controla con propiedades booleanas del componente).
-- **Panel docente sin `@livewireScripts` explícito**: `layouts/docente` no declara `@livewireStyles`/`@livewireScripts`; funciona porque Livewire 3 autoinyecta sus recursos cuando renderiza un componente-página por ruta. Si en el futuro se añaden componentes anidados (`<livewire: ...>`), conviene declararlos en el layout.
+- **Panel docente sin `@livewireScripts` explícito**: `layouts/docente` no declara `@livewireStyles`/`@livewireScripts`; funciona porque Livewire 4.3.5 autoinyecta sus recursos cuando renderiza un componente-página por ruta. Si en el futuro se añaden componentes anidados (`<livewire: ...>`), conviene declararlos en el layout.

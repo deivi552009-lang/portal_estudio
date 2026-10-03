@@ -2,7 +2,7 @@
 
 Portal académico web para la gestión de grupos de estudio: docentes gestionan grupos, estudiantes, calificaciones, asistencias y actividades, mientras los estudiantes consultan sus grupos, el estado de las clases y las actividades de sus materias.
 
-La aplicación es un sistema web (sin API REST por el momento) construida sobre **Laravel 12** y **Livewire 3**, con base de datos **PostgreSQL** (despliegue de referencia en **Supabase**, schema `portal_estudio`).
+La aplicación es un sistema web (sin API REST por el momento) construida sobre **Laravel 12** y **Livewire 4.3.5**, con base de datos **PostgreSQL** (despliegue de referencia en **Supabase**, schema `portal_estudio`).
 
 > Nombre de referencia del proyecto: **Portal  Estudio** — ver `docs/README.md`.
 

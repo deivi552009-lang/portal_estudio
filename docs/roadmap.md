@@ -7,7 +7,7 @@
 
 ## Contexto técnico actual
 
-- Laravel 12 + Livewire 3 (componentes clásicos; Volt instalado pero sin uso).
+- Laravel 12 + Livewire 4.3.5 (componentes clásicos; Volt instalado pero sin uso).
 - Base de datos: **PostgreSQL en Supabase** (schema `portal_estudio`).
 - Frontend: Blade + Tailwind (Vite).
 - Documentación de referencia: `docs/base_datos.md`, `docs/arquitectura.md`, `docs/historias_usuario.md`.
