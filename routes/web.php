@@ -7,6 +7,8 @@ use App\Livewire\Docente\GrupoAsistencia;
 use App\Livewire\Docente\GrupoEstudiantes;
 use App\Livewire\Docente\GrupoNotas;
 use App\Livewire\Estudiante\Dashboard as EstudianteDashboard;
+use App\Livewire\Estudiante\Notas;
+use App\Livewire\Estudiante\Talleres;
 use App\Livewire\Docente\HistorialAsistencia;
 use App\Livewire\Docente\GrupoActividades;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +18,16 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
+    $rol = strtolower(auth()->user()->role?->nombre ?? '');
+
+    if ($rol === 'estudiante') {
+        return redirect()->route('estudiante.dashboard');
+    }
+
+    if ($rol === 'docente') {
+        return redirect()->route('docente.dashboard');
+    }
+
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -81,9 +93,20 @@ Route::middleware(['auth', 'role:docente'])->group(function () {
 
 });
 
+// ============================================================
+// RUTAS DEL ESTUDIANTE
+// ============================================================
+
 Route::middleware(['auth', 'role:estudiante'])->group(function () {
+
     Route::get('/estudiante/dashboard', EstudianteDashboard::class)
         ->name('estudiante.dashboard');
+
+    Route::get('/estudiante/notas', Notas::class)
+        ->name('estudiante.notas');
+
+    Route::get('/estudiante/talleres', Talleres::class)
+        ->name('estudiante.talleres');
 });
 
 
