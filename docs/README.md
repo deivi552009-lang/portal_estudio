@@ -16,7 +16,7 @@ La aplicación es un sistema web (sin API REST por el momento) construida sobre 
   - Matriz de calificaciones con evaluaciones dinámicas y notas 0–5.
   - Registro de asistencia por fecha (presente/ausente/excusa/tarde) e historial semestral con nota final ponderada.
   - Actividades (talleres, tareas, guías) con carga de archivos y seguimiento de vencimientos.
-- **Panel estudiante**: sus grupos, estado de cada clase (próxima/en curso/finalizada con progreso) y listado de actividades de sus materias.
+- **Panel estudiante**: sus grupos, estado de cada clase (próxima/en curso/finalizada con progreso), listado de actividades de sus materias, **consulta de notas** (evaluaciones y promedio ponderado por asignatura) y **listado de talleres** con filtros; el layout incorpora un sidebar de navegación con las secciones del panel.
 
 ## Requisitos previos
 
@@ -142,6 +142,7 @@ La documentación del proyecto vive en la carpeta `docs/`:
 | [docs/base_datos.md](docs/base_datos.md) | Modelo de base de datos: tablas, columnas y tipos, claves/índices, relaciones Eloquent e historial de migraciones |
 | [docs/historias_usuario.md](docs/historias_usuario.md) | Historias de usuario por épicas, con criterios de aceptación |
 | [docs/roadmap.md](docs/roadmap.md) | Estado de las funcionalidades (completadas, en progreso) y plan de mejora/seguridad |
+| [docs/changelog.md](docs/changelog.md) | Registro de cambios recientes del código (archivos nuevos/modificados) y de la documentación que los describe |
 
 ## Licencia
 

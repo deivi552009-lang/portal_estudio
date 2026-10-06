@@ -1,7 +1,7 @@
 # Roadmap
 
 > Elaborado a partir del estado real del código (`app/`, `routes/`, `database/`, `resources/`, `.env`).
-> Última actualización: 2026-10-01.
+> Última actualización: 2026-10-05.
 >
 > Leyenda: ✅ completado · 🚧 en progreso · ⬜ pendiente
 
@@ -47,7 +47,10 @@
 
 ### Panel estudiante (`/estudiante/*`)
 
-- ✅ Dashboard: grupos en los que está inscrito, estado de cada clase (próxima / en curso con progreso / finalizada / sin horario) y listado de actividades de sus materias (con materia y docente).
+- ✅ Dashboard: grupos en los que está inscrito, estado de cada clase (próxima / en curso con progreso / finalizada / sin horario) y listado de actividades de sus materias (con materia y docente). Rediseñado con tarjetas de resumen (promedio, talleres pendientes, guías y próxima entrega), saludo personalizado y `wire:poll.30s`.
+- ✅ Mis Notas (`/estudiante/notas`): evaluaciones de cada grupo con la calificación del estudiante y promedio ponderado por asignatura (`nota × porcentaje / 100`).
+- ✅ Talleres (`/estudiante/talleres`): listado de actividades de sus grupos con materia, fecha/hora límite, estado (vencida/pendiente) y filtro `pendientes` / `entregados` / `todos`.
+- 🚧 Sidebar del panel estudiante: `Mis Notas` y `Talleres` tienen ruta propia; `Guías de Estudio`, `Calendario` y `Mensajes` siguen siendo enlaces marcadores (`href="#"`).
 
 ---
 
@@ -78,13 +81,16 @@ El layout `layouts/docente` y el dashboard docente exponen enlaces marcadores (`
 
 ### 2.3 Ampliación del panel estudiante
 
-- ⬜ Consulta de sus calificaciones (hoy solo el docente ve notas y nota final).
+- ✅ Consulta de sus calificaciones (`/estudiante/notas`: evaluaciones y promedio ponderado por asignatura).
+- ✅ Listado de sus talleres/actividades (`/estudiante/talleres`, con filtro pendientes/entregados/todos).
 - ⬜ Consulta de su historial personal de asistencias.
-- ⬜ Descarga/visualización de los archivos de las actividades (el enlace ya está disponible vía disco público).
+- ⬜ Entrega de talleres: el filtro "Entregados" existe en la interfaz pero no hay sistema de entregas (marcar/adjuntar entrega); el botón "Ver taller" aún no tiene destino.
+- ⬜ Descarga/visualización de los archivos de las actividades desde el panel estudiante (el enlace ya está disponible vía disco público).
+- 🚧 Sincronizar el dashboard del estudiante con las páginas nuevas: la tarjeta "Promedio General" y la sección "Mis Notas" muestran `—` en lugar de usar los datos que ya calcula `/estudiante/notas`.
 
 ### 2.4 Integración y pulido
 
-- 🚧 Ruta `/dashboard` genérica (Breeze) sin relación con los paneles por rol; debería redirigir según el rol del usuario.
+- ✅ Ruta `/dashboard` redirige según el rol del usuario (`estudiante` → `estudiante.dashboard`, `docente` → `docente.dashboard`); los roles sin panel propio siguen viendo la vista genérica Breeze.
 - ⬜ Marca y localización: `APP_NAME=Laravel`, `APP_LOCALE=en` frente a una interfaz en español ("Aula Digital – Portal Estudio").
 - ⬪ Limpieza técnica: decidir uso definitivo de Volt (desinstalar o usarlo), retiro de `welcome.blade.php` (no referenciada).
 

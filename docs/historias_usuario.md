@@ -1,7 +1,7 @@
 # Historias de Usuario
 
 > Inferidas a partir de las rutas de `routes/web.php` y `routes/auth.php`, los controladores de `app/Http/Controllers/` (Breeze + `ProfileController`) y los componentes Livewire a los que apuntan las rutas de negocio.
-> Última actualización: 2026-10-03.
+> Última actualización: 2026-10-05.
 
 ## Roles
 
@@ -19,7 +19,7 @@
 3. [Evaluaciones y calificaciones (docente)](#epica-3-evaluaciones-y-calificaciones-docente) — HU-019 a HU-022
 4. [Asistencia (docente)](#epica-4-asistencia-docente) — HU-023 a HU-024
 5. [Actividades (docente)](#epica-5-actividades-docente) — HU-025 a HU-028
-6. [Panel del estudiante](#epica-6-panel-del-estudiante) — HU-029 a HU-030
+6. [Panel del estudiante](#epica-6-panel-del-estudiante) — HU-029 a HU-033
 
 ---
 
@@ -61,7 +61,8 @@
 #### Criterios de aceptación
 
 - Un usuario con rol `docente` accede a `/docente/dashboard` y a las rutas del panel docente.
-- Un usuario con rol `estudiante` accede a `/estudiante/dashboard`.
+- Un usuario con rol `estudiante` accede a `/estudiante/dashboard` (y a `/estudiante/notas` y `/estudiante/talleres`).
+- Al entrar a `/dashboard`, el sistema redirige al panel del rol: `estudiante` → `estudiante.dashboard`, `docente` → `docente.dashboard`; si el rol no tiene panel propio, se muestra la vista genérica de Breeze.
 - Si el usuario intenta acceder a un panel de otro rol, el sistema muestra error 403 ("No tienes permisos para acceder a esta sección.").
 - Las rutas del panel requieren sesión activa (`auth`); sin sesión se redirige a login.
 
@@ -364,6 +365,40 @@
 - Solo se ven actividades de los grupos del estudiante.
 - Cada actividad muestra su materia y el nombre del docente del grupo.
 - El listado está ordenado por fecha y hora límite.
+
+### HU-031 — Consultar mis notas
+
+**Como** estudiante, **quiero** ver mis calificaciones y mi promedio por asignatura, **para** saber cómo voy en cada materia.
+
+#### Criterios de aceptación
+
+- La ruta `/estudiante/notas` solo responde a usuarios con rol `estudiante` y con perfil de estudiante (si no tiene perfil, responde 403).
+- Se listan los grupos donde el estudiante está inscritos, con su materia, ordenados por año (desc) y semestre.
+- Cada grupo muestra todas sus evaluaciones (ordenadas por fecha) con la nota registrada para el estudiante; las evaluaciones sin nota muestran `—`.
+- El promedio por materia se calcula con la suma ponderada (`nota × porcentaje / 100`) redondeada a 1 decimal; si ninguna evaluación tiene nota, el promedio queda vacío.
+- Si el estudiante no tiene ninguna inscripción, la vista muestra el estado vacío "No hay materias registradas".
+
+### HU-032 — Consultar mis talleres y actividades
+
+**Como** estudiante, **quiero** ver todos los talleres y actividades de mis materias con su fecha límite y estado, **para** organizarme con las entregas.
+
+#### Criterios de aceptación
+
+- La ruta `/estudiante/talleres` solo responde a usuarios con rol `estudiante` y con perfil de estudiante (si no tiene perfil, responde 403).
+- Cada fila muestra el taller (título y descripción), la asignatura, la fecha y hora de entrega y el estado: `Vencida` si la fecha ya pasó, `Pendiente` en caso contrario.
+- La lista incluye todas las actividades de los grupos del estudiante, ordenadas por fecha y hora límite (sin fecha → al final).
+- Se puede filtrar con los botones `Pendientes`, `Entregados` y `Todos`. **Nota de estado**: `Entregados` aún no está conectado al sistema de entregas y siempre muestra el estado vacío.
+
+### HU-033 — Navegar entre las secciones del panel
+
+**Como** estudiante, **quiero** desplazarme entre las secciones del panel desde el menú lateral, **para** acceder rápidamente a mis notas y talleres.
+
+#### Criterios de aceptación
+
+- El sidebar (`layouts/estudiante`) ofrece los enlaces `Inicio` (`estudiante.dashboard`), `Mis Notas` (`estudiante.notas`) y `Talleres` (`estudiante.talleres`), resaltando el activo según `request()->routeIs(...)`.
+- Incluye los accesos `Mi Perfil` (`profile.edit`) y `Cerrar sesión`.
+- En pantallas pequeñas (`< md`) el sidebar se oculta y se muestra una navegación horizontal equivalente (Inicio / Mis Notas / Talleres).
+- Las secciones `Guías de Estudio`, `Calendario` y `Mensajes` aún son enlaces marcadores (`href="#"`) sin ruta definida.
 
 ---
 

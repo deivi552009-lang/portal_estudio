@@ -1,7 +1,7 @@
 # Arquitectura
 
 > Documentación generada a partir de la estructura de `app/`, `routes/`, `config/` y `resources/`.
-> Última actualización: 2026-10-03.
+> Última actualización: 2026-10-05.
 
 ## Contenido
 
@@ -75,7 +75,7 @@ No existe `routes/api.php`: **toda la aplicación es web** (solo hay un endpoint
 | Método | URI | Nombre | Middlewares | Destino |
 |---|---|---|---|---|
 | `GET` | `/` | — | — | Vista `inicio` (pública) |
-| `GET` | `/dashboard` | `dashboard` | `auth`, `verified` | Vista `dashboard` (genérica Breeze) |
+| `GET` | `/dashboard` | `dashboard` | `auth`, `verified` | **Redirige por rol**: `estudiante` → `estudiante.dashboard`, `docente` → `docente.dashboard`; si el rol no coincide, muestra la vista `dashboard` (genérica Breeze) |
 | `GET` | `profile` | `profile.edit` | `auth` | `ProfileController@edit` |
 | `PATCH` | `profile` | `profile.update` | `auth` | `ProfileController@update` |
 | `DELETE` | `profile` | `profile.destroy` | `auth` | `ProfileController@destroy` |
@@ -88,6 +88,10 @@ No existe `routes/api.php`: **toda la aplicación es web** (solo hay un endpoint
 | `GET` | `docente/actividad/{actividad}/archivo` | `docente.actividad.archivo` | `auth`, `role:docente` | `ActividadArchivoController` (archivo adjunto en línea) |
 | `GET` | `docente/grupo/{grupoId}/actividades` | `docente.grupo.actividades` | `auth`, `role:docente` | `Livewire\Docente\GrupoActividades` |
 | `GET` | `estudiante/dashboard` | `estudiante.dashboard` | `auth`, `role:estudiante` | `Livewire\Estudiante\Dashboard` |
+| `GET` | `estudiante/notas` | `estudiante.notas` | `auth`, `role:estudiante` | `Livewire\Estudiante\Notas` |
+| `GET` | `estudiante/talleres` | `estudiante.talleres` | `auth`, `role:estudiante` | `Livewire\Estudiante\Talleres` |
+
+> **Redirección de `/dashboard`**: la ruta genérica de Breeze resuelve el rol con `strtolower(auth()->user()->role?->nombre ?? '')` y redirige a `estudiante.dashboard` o `docente.dashboard` cuando coincide; cualquier otro rol (o ninguno) cae en la vista `dashboard` original. Esto evita que un usuario de panel vea la página genérica tras iniciar sesión.
 
 `routes/auth.php` (Breeze, requerido desde `web.php`):
 
@@ -123,14 +127,14 @@ Archivos estándar de Laravel 12: `app`, `auth` (guard `web`, proveedor de usuar
 | `layouts/app` | Breeze: navegación superior (`layouts/navigation`), slot `$header` + `@yield('contenido')`, usa `x-app-layout` / `AppLayout` (componente Blade de `app/View/Components/`) |
 | `layouts/guest` | Breeze: páginas de autenticación (`GuestLayout`) |
 | `layouts/docente` | Propio ("Aula Digital – Panel Docente"): sidebar oscuro con navegación (Dashboard, Grupos, Actividades, etc.), barra superior con usuario y slot de contenido. **No incluye** `@livewireStyles`/`@livewireScripts` (confía en la autoinyección de Livewire 4.3.5 para componentes-página) |
-| `layouts/estudiante` | Propio: cabecera "Portal Estudio – Panel del estudiante" e incluye explícitamente `@livewireStyles` / `@livewireScripts` |
+| `layouts/estudiante` | Propio ("Aula Digital – Panel del estudiante"): reestructurado con **sidebar** oscuro fijo (`Inicio`, `Mis Notas`, `Talleres` y enlaces marcadores `Guías de Estudio`, `Calendario`, `Mensajes`, más `Mi Perfil` y `Cerrar sesión`), barra superior *sticky* con usuario y campana de notificaciones (contador 0), y navegación inferior horizontal para móvil (`md:hidden`). Marca activa con `request()->routeIs(...)`. Renderiza `{{ $slot ?? '' }}` **y** `@yield('contenido')`, y sí incluye `@livewireStyles` / `@livewireScripts` |
 
 Los componentes de negocio renderizan su vista y aplican el layout con `view('components.docente.⚡grupo-notas')->layout('layouts.docente')`.
 
 ### 3.3 Vistas y componentes
 
 - `resources/views/components/docente/`: 6 vistas del panel docente (`dashboard` + páginas interactivas).
-- `resources/views/components/estudiante/`: 1 vista interactiva (`⚡dashboard`).
+- `resources/views/components/estudiante/`: 3 vistas interactivas (`⚡dashboard`, `⚡notas`, `⚡talleres`).
 - **Convención de nombres**: las vistas de páginas Livewire llevan el prefijo `⚡` (ej. `⚡grupo-notas.blade.php`) para distinguirlas de las vistas estáticas (ej. `dashboard.blade.php`).
 - Componentes UI reutilizables en `resources/views/components/`: `modal`, `primary-button`, `secondary-button`, `danger-button`, `text-input`, `input-label`, `input-error`, `dropdown*`, `nav-link`, `responsive-nav-link`, `application-logo`, `auth-session-status` y `ui/icon-button` (con `wire:click`).
 - Vistas sueltas: `inicio.blade.php` (página pública), `dashboard.blade.php` (genérico Breeze), `welcome.blade.php`, `auth/*` (6 vistas Breeze), `profile/*`.
@@ -142,6 +146,23 @@ Los componentes de negocio renderizan su vista y aplican el layout con `view('co
 - Mensajes al usuario con `session()->flash('mensaje', ...)`.
 - Carga de archivos (`GrupoActividades`): trait `WithFileUploads`, guardado en disco `public` bajo `actividades/` (tipos permitidos: pdf, doc, docx, xls, xlsx, ppt, pptx, zip; máximo 10 MB); el archivo se elimina del disco al borrar o reemplazar la actividad.
 - Visualización en línea de archivos (`ActividadArchivoController`): la ruta `docente.actividad.archivo` (`/docente/actividad/{actividad}/archivo`) responde el archivo con `Content-Disposition: inline` y `X-Content-Type-Options: nosniff`; antes valida que la actividad pertenezca a un grupo del docente autenticado (403) y que el archivo exista en el disco `public` (404). El enlace "Ver archivo" de `⚡grupo-actividades` apunta a esta ruta.
+
+### 3.5 Páginas del panel estudiante
+
+Componentes de solo lectura (sin escrituras ni formularios), todos con la misma salvaguarda inicial: si `Auth::user()->estudiante` es `null` responden `abort(403, 'El usuario no tiene un registro de estudiante.')`, y todos usan `->layout('layouts.estudiante')`.
+
+| Componente | Vista | Qué muestra |
+|---|---|---|
+| `Estudiante\Dashboard` | `⚡dashboard` | Saludo personalizado (primer nombre), 4 tarjetas resumen, sus grupos con estado/progreso de clase y actividades próximas. Se actualiza con `wire:poll.30s` |
+| `Estudiante\Notas` | `⚡notas` | Tabla "Mis Notas": por cada grupo inscrito, sus evaluaciones (fecha/id) con la calificación propia y el **promedio ponderado** (`nota × porcentaje / 100`, redondeado a 1 decimal; `null` si no hay ninguna nota) |
+| `Estudiante\Talleres` | `⚡talleres` | Tabla "Mis talleres": todas las actividades de sus grupos con materia, fecha/hora límite y estado (`Vencida`/`Pendiente`), más un conmutador de filtro (`pendientes` / `entregados` / `todos`) |
+
+Patrones propios de estas páginas:
+
+- Consultas con `whereHas('estudiantes', ...)` sobre `Grupo` (o `$estudiante->grupos()`) para limitar los datos al estudiante autenticado, ordenadas por `anio` desc y `semestre`.
+- Carga *eager* de `materia`, `evaluaciones` y `evaluaciones.calificaciones` filtradas por `estudiante_id` (en `Notas`) y de `docente.user`/`actividades` (en `Dashboard` y `Talleres`).
+- El filtrado de `Talleres` se resuelve en la vista con `@php` según la propiedad pública `$filtro`; la opción `entregados` aún **no está conectada** a un sistema de entregas y siempre devuelve vacío.
+- Las tarjetas "Promedio General" y "Guías Disponibles" del dashboard muestran `—` (marcadores de posición: "Disponible cuando se integren las notas" / "Próximamente"), al igual que las notas de la sección "Mis Notas" del dashboard.
 
 ---
 
@@ -162,7 +183,7 @@ app/
 ├── Livewire/
 │   ├── Docente/                      # Dashboard, GrupoEstudiantes, GrupoNotas,
 │   │                                 # GrupoAsistencia, HistorialAsistencia, GrupoActividades
-│   └── Estudiante/                   # Dashboard
+│   └── Estudiante/                   # Dashboard, Notas, Talleres
 ├── Models/                           # 11 modelos Eloquent (ver docs/base_datos.md)
 ├── Providers/
 │   ├── AppServiceProvider.php        # Vacío (placeholder)
@@ -194,13 +215,13 @@ resources/
     │   ├── guest.blade.php           # Breeze (páginas de auth)
     │   ├── navigation.blade.php      # Menú superior de layouts.app
     │   ├── docente.blade.php         # Panel docente (sidebar)
-    │   └── estudiante.blade.php      # Panel estudiante (cabecera)
+    │   └── estudiante.blade.php      # Panel estudiante (sidebar + barra sticky + nav móvil)
     ├── auth/                         # 6 vistas Breeze
     ├── profile/                      # edit + partials
     ├── components/
     │   ├── ui/icon-button.blade.php  # Botón de ícono con wire:click
     │   ├── docente/                  # dashboard + 5 páginas ⚡ (Livewire)
-    │   ├── estudiante/               # ⚡dashboard (Livewire)
+    │   ├── estudiante/               # ⚡dashboard, ⚡notas, ⚡talleres (Livewire)
     │   └── *.blade.php               # Componentes UI reutilizables (botones, modal, inputs...)
     ├── dashboard.blade.php           # Dashboard genérico Breeze
     ├── inicio.blade.php              # Página pública
@@ -219,6 +240,8 @@ Decisiones registradas previamente en este documento:
 - **Decisión 003** — El docente puede crear evaluaciones adicionales personalizadas, siempre que no utilice los nombres reservados de las evaluaciones oficiales.
 - **Decisión 004** — Solo Administración y Superadministrador pueden cerrar un grupo.
 - **Decisión 005** — El `tipo` de las actividades es texto libre: se normaliza a minúsculas al guardar y se compara siempre de forma insensible a mayúsculas (el dashboard docente lo convierte a minúsculas antes de buscar `taller`).
+- **Decisión 006** — El layout `layouts/estudiante` soporta los dos estilos de renderizado: `{{ $slot ?? '' }}` para los componentes Livewire-página (que inyectan el HTML en el slot) y `@yield('contenido')` para vistas que se rendericen con `@section('contenido', ...)`. Así el layout no se rompe si alguna página futura deja de ser un componente Livewire.
+- **Decisión 007** — La ruta `/dashboard` de Breeze redirige al panel del rol correspondiente (`estudiante`/`docente`) resolviendo el nombre del rol en minúsculas; los usuarios sin rol compatible siguen cayendo en la vista genérica, sin perder el comportamiento original.
 
 Nota: la Decisión 002 se implementa en `GrupoEstudiantes::crearNuevoGrupo()`, que inserta automáticamente las evaluaciones `P1`–`P4` y `A` (20%, 20%, 20%, 30%, 10%) al crear un grupo; `GrupoNotas::agregarEvaluacion()` impide renombrar evaluaciones con esos nombres y crea evaluaciones `personalizada` para el resto.
 
@@ -233,3 +256,5 @@ Nota: la Decisión 005 surgió porque la base de datos es PostgreSQL, que distin
 - **Volt instalado pero inactivo**: `VoltServiceProvider` y `views/livewire`/`views/pages` están listos para páginas Volt, pero el proyecto usa componentes Livewire clásicos; se puede documentar/eliminar para evitar confusión.
 - **Alpine.js desactivado**: está en `package.json` pero `resources/js/app.js` lo tiene comentado; el intermezzo UI lo cubre Livewire (e.g., el modal se controla con propiedades booleanas del componente).
 - **Panel docente sin `@livewireScripts` explícito**: `layouts/docente` no declara `@livewireStyles`/`@livewireScripts`; funciona porque Livewire 4.3.5 autoinyecta sus recursos cuando renderiza un componente-página por ruta. Si en el futuro se añaden componentes anidados (`<livewire: ...>`), conviene declararlos en el layout.
+- **Placeholders sin conectar en el panel estudiante**: el dashboard muestra "Promedio General" y "Guías Disponibles" como `—` y su tarjeta "Mis Notas" no carga calificaciones (aunque ya existe la página `/estudiante/notas` que sí las calcula); el filtro "Entregados" de `/estudiante/talleres` siempre devuelve vacío porque aún no hay sistema de entregas. Conviene enlazar esos accesos directos a las páginas ya implementadas.
+- **Notas de los archivos de la vista `⚡notas`**: la vista vive en `resources/views/components/estudiante/⚡notas.blade.php` (el prefijo `⚡` es U+26A1), por lo que en shells/terminales puede mostrarse codificado como `\342\232\241` al listar los cambios de Git.
