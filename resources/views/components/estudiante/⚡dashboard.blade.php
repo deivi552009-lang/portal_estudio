@@ -6,9 +6,6 @@
 
         $proximaActividad = $actividades->first();
         $talleresPendientes = $actividades->count();
-        $estrellasLlenas = $promedioGeneral !== null
-            ? min(5, max(0, (int) round($promedioGeneral)))
-            : 0;
     @endphp
 
     {{-- =========================================================
@@ -47,9 +44,17 @@
                     {{ number_format($promedioGeneral, 1) }}
                 </p>
 
-                <div class="mt-2 flex gap-1 text-lg" aria-label="{{ $estrellasLlenas }} de 5 estrellas">
+                <div class="mt-2 flex gap-1 text-lg" aria-label="{{ number_format($promedioGeneral, 1) }} de 5 estrellas">
                     @for ($i = 1; $i <= 5; $i++)
-                        <span class="{{ $i <= $estrellasLlenas ? 'text-amber-400' : 'text-slate-300' }}">★</span>
+                        @php
+                            $progresoEstrella = max(0, min(1, (float) $promedioGeneral - ($i - 1)));
+                        @endphp
+                        <span class="relative inline-block h-5 w-5" aria-hidden="true">
+                            <span class="absolute inset-0 text-slate-300">★</span>
+                            <span class="absolute inset-y-0 left-0 overflow-hidden text-amber-400" style="width: {{ round($progresoEstrella * 100, 2) }}%">
+                                <span class="inline-block w-5">★</span>
+                            </span>
+                        </span>
                     @endfor
                 </div>
 

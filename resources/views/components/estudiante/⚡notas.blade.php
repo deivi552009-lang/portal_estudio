@@ -57,14 +57,29 @@
                                     @if ($materia['evaluaciones']->isEmpty())
                                         <span class="text-sm text-slate-400">Sin evaluaciones</span>
                                     @else
-                                        <div class="flex flex-wrap gap-2">
+                                        <div class="flex flex-nowrap gap-2 overflow-x-auto pb-1">
                                             @foreach ($materia['evaluaciones'] as $index => $evaluacion)
-                                                <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                                    <div class="text-[10px] font-semibold uppercase text-slate-400">
-                                                        {{ $evaluacion['nombre'] ?: 'Nota ' . ($index + 1) }}
+                                                @php
+                                                    $nombreEvaluacion = $evaluacion['nombre'] ?: 'Nota ' . ($index + 1);
+                                                    $nota = $evaluacion['nota'] !== null ? (float) $evaluacion['nota'] : null;
+                                                    $claseNota = $nota === null
+                                                        ? 'border-slate-200 bg-slate-50 text-slate-400'
+                                                        : ($nota >= 4
+                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                            : ($nota >= 3
+                                                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                                                : 'border-red-200 bg-red-50 text-red-700'));
+                                                @endphp
+                                                <div
+                                                    class="w-24 shrink-0 rounded-lg border px-2.5 py-2 text-center {{ $claseNota }}"
+                                                    title="{{ $nombreEvaluacion }}"
+                                                    aria-label="{{ $nombreEvaluacion }}"
+                                                >
+                                                    <div class="truncate text-[10px] font-semibold uppercase">
+                                                        {{ \Illuminate\Support\Str::limit($nombreEvaluacion, 8, '...') }}
                                                     </div>
-                                                    <div class="mt-0.5 text-sm font-bold {{ $evaluacion['nota'] !== null ? 'text-slate-700' : 'text-slate-300' }}">
-                                                        {{ $evaluacion['nota'] !== null ? number_format((float) $evaluacion['nota'], 1) : '—' }}
+                                                    <div class="mt-0.5 text-sm font-bold">
+                                                        {{ $nota !== null ? number_format($nota, 1) : '—' }}
                                                     </div>
                                                 </div>
                                             @endforeach
@@ -74,8 +89,16 @@
 
                                 <td class="px-6 py-5 text-center">
                                     @if ($materia['promedio'] !== null)
-                                        <span class="inline-flex min-w-14 justify-center rounded-lg px-3 py-2 text-sm font-bold {{ $materia['promedio'] < 3.0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600' }}">
-                                            {{ number_format($materia['promedio'], 1) }}
+                                        @php
+                                            $promedio = (float) $materia['promedio'];
+                                            $clasePromedio = $promedio >= 4
+                                                ? 'bg-emerald-50 text-emerald-700'
+                                                : ($promedio >= 3
+                                                    ? 'bg-amber-50 text-amber-700'
+                                                    : 'bg-red-50 text-red-700');
+                                        @endphp
+                                        <span class="inline-flex min-w-14 justify-center rounded-lg px-3 py-2 text-sm font-bold {{ $clasePromedio }}">
+                                            {{ number_format($promedio, 1) }}
                                         </span>
                                     @else
                                         <span class="text-sm text-slate-300">—</span>
