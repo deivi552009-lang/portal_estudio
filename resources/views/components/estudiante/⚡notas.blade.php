@@ -1,4 +1,4 @@
-﻿<div class="space-y-6">
+<div class="space-y-6">
 
     <div>
         <h2 class="text-2xl font-bold text-slate-900">Mis Notas</h2>
@@ -74,7 +74,7 @@
 
                                 <td class="px-6 py-5 text-center">
                                     @if ($materia['promedio'] !== null)
-                                        <span class="inline-flex min-w-14 justify-center rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-600">
+                                        <span class="inline-flex min-w-14 justify-center rounded-lg px-3 py-2 text-sm font-bold {{ $materia['promedio'] < 3.0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600' }}">
                                             {{ number_format($materia['promedio'], 1) }}
                                         </span>
                                     @else

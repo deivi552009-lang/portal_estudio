@@ -23,6 +23,8 @@ class Dashboard extends Component
                 'materia',
                 'docente.user',
                 'actividades',
+                'evaluaciones' => fn ($query) => $query->orderBy('fecha')->orderBy('id'),
+                'evaluaciones.calificaciones' => fn ($query) => $query->where('estudiante_id', $estudiante->id),
             ])
             ->whereHas('estudiantes', function ($query) use ($estudiante) {
                 $query->where('estudiantes.id', $estudiante->id);
@@ -36,6 +38,32 @@ class Dashboard extends Component
         | Actividades de las materias del estudiante
         |--------------------------------------------------------------------------
         */
+
+        $grupos->each(function ($grupo) {
+            $ponderado = $grupo->evaluaciones->sum(function ($evaluacion) {
+                $calificacion = $evaluacion->calificaciones->first();
+
+                if (!$calificacion || $calificacion->nota === null || $evaluacion->porcentaje === null) {
+                    return 0;
+                }
+
+                return (float) $calificacion->nota * ((float) $evaluacion->porcentaje / 100);
+            });
+
+            $tieneNotas = $grupo->evaluaciones->contains(function ($evaluacion) {
+                return $evaluacion->calificaciones->whereNotNull('nota')->isNotEmpty();
+            });
+
+            $grupo->nota_final = $tieneNotas ? round($ponderado, 1) : null;
+        });
+
+        $notasFinales = $grupos
+            ->pluck('nota_final')
+            ->filter(fn ($nota) => $nota !== null);
+
+        $promedioGeneral = $notasFinales->isNotEmpty()
+            ? round($notasFinales->avg(), 1)
+            : null;
 
         $actividades = $grupos
             ->flatMap(function ($grupo) {
@@ -70,6 +98,7 @@ class Dashboard extends Component
                 'estudiante' => $estudiante,
                 'grupos' => $grupos,
                 'actividades' => $actividades,
+                'promedioGeneral' => $promedioGeneral,
             ]
         )->layout('layouts.estudiante');
     }

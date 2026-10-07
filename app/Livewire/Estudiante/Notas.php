@@ -48,10 +48,15 @@ class Notas extends Component
                 return (float) $evaluacion['nota'] * ((float) $evaluacion['porcentaje'] / 100);
             });
 
+            $promedio = $evaluaciones->whereNotNull('nota')->isEmpty()
+                ? null
+                : round($ponderado, 1);
+
             return [
                 'materia' => $grupo->materia->nombre,
                 'evaluaciones' => $evaluaciones,
-                'promedio' => $evaluaciones->whereNotNull('nota')->isEmpty() ? null : round($ponderado, 1),
+                'promedio' => $promedio,
+                'aprobada' => $promedio !== null && $promedio >= 3.0,
             ];
         });
 

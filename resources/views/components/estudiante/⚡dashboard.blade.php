@@ -6,6 +6,9 @@
 
         $proximaActividad = $actividades->first();
         $talleresPendientes = $actividades->count();
+        $estrellasLlenas = $promedioGeneral !== null
+            ? min(5, max(0, (int) round($promedioGeneral)))
+            : 0;
     @endphp
 
     {{-- =========================================================
@@ -38,15 +41,32 @@
             </div>
 
             <p class="mt-4 text-sm font-medium text-slate-600">Promedio General</p>
-            <p class="mt-1 text-3xl font-bold text-slate-800">—</p>
 
-            <div class="mt-2 flex gap-1 text-slate-300" aria-hidden="true">
-                <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
-            </div>
+            @if ($promedioGeneral !== null)
+                <p class="mt-1 text-3xl font-bold text-slate-800">
+                    {{ number_format($promedioGeneral, 1) }}
+                </p>
 
-            <p class="mt-1 text-xs text-slate-400">
-                Disponible cuando se integren las notas.
-            </p>
+                <div class="mt-2 flex gap-1 text-lg" aria-label="{{ $estrellasLlenas }} de 5 estrellas">
+                    @for ($i = 1; $i <= 5; $i++)
+                        <span class="{{ $i <= $estrellasLlenas ? 'text-amber-400' : 'text-slate-300' }}">★</span>
+                    @endfor
+                </div>
+
+                <p class="mt-1 text-xs text-slate-400">
+                    Promedio de tus asignaturas con calificación.
+                </p>
+            @else
+                <p class="mt-1 text-3xl font-bold text-slate-800">—</p>
+
+                <div class="mt-2 flex gap-1 text-lg text-slate-300" aria-hidden="true">
+                    <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+                </div>
+
+                <p class="mt-1 text-xs text-slate-400">
+                    Aún no tienes calificaciones registradas.
+                </p>
+            @endif
         </div>
 
         {{-- Talleres --}}
@@ -125,7 +145,7 @@
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h3 class="text-base font-bold text-slate-800">Mis Notas</h3>
-                <a href="#" class="text-sm font-semibold text-blue-600 hover:text-blue-700">
+                <a href="{{ route('estudiante.notas') }}" class="text-sm font-semibold text-blue-600 hover:text-blue-700">
                     Ver todas
                 </a>
             </div>
@@ -144,9 +164,15 @@
                             {{ $grupo->materia->nombre }}
                         </p>
 
-                        <span class="rounded-lg bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-400">
-                            —
-                        </span>
+                        @if ($grupo->nota_final !== null)
+                            <span class="rounded-lg px-3 py-1.5 text-sm font-bold {{ $grupo->nota_final < 3.0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600' }}">
+                                {{ number_format($grupo->nota_final, 1) }}
+                            </span>
+                        @else
+                            <span class="rounded-lg bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-400">
+                                —
+                            </span>
+                        @endif
                     </div>
                 @empty
                     <div class="px-5 py-8 text-center text-sm text-slate-500">
