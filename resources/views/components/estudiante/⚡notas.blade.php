@@ -71,14 +71,14 @@
                                                                 : 'border-red-200 bg-red-50 text-red-700'));
                                                 @endphp
                                                 <div
-                                                    class="w-24 shrink-0 rounded-lg border px-2.5 py-2 text-center {{ $claseNota }}"
-                                                    title="{{ $nombreEvaluacion }}"
+                                                    class="flex h-14 w-16 shrink-0 flex-col items-center justify-center rounded-lg border px-1 text-center {{ $claseNota }}"
+                                                    title="{{ $nombreEvaluacion }}{{ $nota !== null ? ': ' . number_format($nota, 1) : '' }}"
                                                     aria-label="{{ $nombreEvaluacion }}"
                                                 >
-                                                    <div class="truncate text-[10px] font-semibold uppercase">
-                                                        {{ \Illuminate\Support\Str::limit($nombreEvaluacion, 8, '...') }}
+                                                    <div class="w-full truncate text-[10px] font-semibold uppercase leading-tight">
+                                                        {{ $nombreEvaluacion }}
                                                     </div>
-                                                    <div class="mt-0.5 text-sm font-bold">
+                                                    <div class="mt-0.5 text-sm font-bold leading-tight">
                                                         {{ $nota !== null ? number_format($nota, 1) : '—' }}
                                                     </div>
                                                 </div>

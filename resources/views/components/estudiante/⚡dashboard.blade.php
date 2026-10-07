@@ -44,18 +44,28 @@
                     {{ number_format($promedioGeneral, 1) }}
                 </p>
 
-                <div class="mt-2 flex gap-1 text-lg" aria-label="{{ number_format($promedioGeneral, 1) }} de 5 estrellas">
+                <div class="mt-2 flex items-center gap-1" aria-label="{{ number_format($promedioGeneral, 1) }} de 5 estrellas">
+                    @php $idBase = 'est-' . uniqid(); @endphp
                     @for ($i = 1; $i <= 5; $i++)
                         @php
-                            $progresoEstrella = max(0, min(1, (float) $promedioGeneral - ($i - 1)));
+                            $relleno = max(0, min(1, (float) $promedioGeneral - ($i - 1)));
+                            $porcentaje = round($relleno * 100, 2);
+                            $gradId = $idBase . '-' . $i;
                         @endphp
-                        <span class="relative inline-block h-5 w-5" aria-hidden="true">
-                            <span class="absolute inset-0 text-slate-300">★</span>
-                            <span class="absolute inset-y-0 left-0 overflow-hidden text-amber-400" style="width: {{ round($progresoEstrella * 100, 2) }}%">
-                                <span class="inline-block w-5">★</span>
-                            </span>
-                        </span>
+                        <svg class="h-6 w-6" viewBox="0 0 24 24" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="{{ $gradId }}" x1="0" x2="1" y1="0" y2="0">
+                                    <stop offset="{{ $porcentaje }}%" stop-color="#fbbf24" />
+                                    <stop offset="{{ $porcentaje }}%" stop-color="#cbd5e1" />
+                                </linearGradient>
+                            </defs>
+                            <path fill="url(#{{ $gradId }})"
+                                  d="M12 2.5l2.94 5.96 6.56.95-4.75 4.63 1.12 6.54L12 17.5l-5.87 3.08 1.12-6.54L2.5 9.41l6.56-.95L12 2.5z" />
+                        </svg>
                     @endfor
+                    <span class="ml-1 text-xs font-semibold text-slate-500">
+                        {{ number_format($promedioGeneral, 1) }}/5
+                    </span>
                 </div>
 
                 <p class="mt-1 text-xs text-slate-400">
