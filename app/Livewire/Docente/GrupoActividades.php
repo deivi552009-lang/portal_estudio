@@ -4,7 +4,11 @@ namespace App\Livewire\Docente;
 
 use App\Models\Grupo;
 use App\Models\Actividad;
+use App\Models\ActividadRespuesta;
+use App\Models\Evaluacion;
+use App\Models\Calificacion;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -24,10 +28,14 @@ class GrupoActividades extends Component
 
     public $archivo = null;
 
+    public ?array $detalleRespuesta = null;
     public ?int $actividadEditandoId = null;
     public ?int $actividadEliminarId = null;
-
+    public ?int $actividadRespuestasId = null;
+    public ?int $respuestaSeleccionadaId = null;
+    public bool $mostrarDetalleRespuesta = false;
     public bool $mostrarConfirmacionEliminar = false;
+    public bool $mostrarRespuestas = false;
 
     public function mount(?int $grupoId = null): void
     {
@@ -40,27 +48,29 @@ class GrupoActividades extends Component
     }
 
 
-    public function crearActividad(): void
-    {
-        $datos = $this->validarFormulario();
+public function crearActividad(): void
+{
+    $datos = $this->validarFormulario();
 
-        $grupo = $this->obtenerGrupoSeleccionado();
+    $grupo = $this->obtenerGrupoSeleccionado();
 
-$rutaArchivo = null;
+    DB::transaction(function () use ($datos, $grupo) {
 
-if ($this->archivo) {
-    $rutaArchivo = $this->archivo->store(
-        'actividades',
-        'public'
-    );
-}
+        $rutaArchivo = null;
 
+        if ($this->archivo) {
+            $rutaArchivo = $this->archivo->store(
+                'actividades',
+                'public'
+            );
+        }
 
-        $grupo->actividades()->create([
-            // Se guarda en minúscula para que los conteos
-            // (p. ej. el dashboard) no dependan de mayúsculas.
-            'tipo' => mb_strtolower(trim($datos['tipo']), 'UTF-8'),
-            'titulo' => trim($datos['titulo']),
+        $tipo = mb_strtolower(trim($datos['tipo']), 'UTF-8');
+        $titulo = trim($datos['titulo']);
+
+        $actividad = $grupo->actividades()->create([
+            'tipo' => $tipo,
+            'titulo' => $titulo,
             'descripcion' => $datos['descripcion'] !== ''
                 ? trim($datos['descripcion'])
                 : null,
@@ -69,13 +79,28 @@ if ($this->archivo) {
             'archivo' => $rutaArchivo,
         ]);
 
-        $this->limpiarFormulario();
+        /*
+         * Si la actividad es un taller,
+         * se crea automáticamente su evaluación.
+         */
+        if ($tipo === 'taller') {
+            Evaluacion::create([
+                'grupo_id' => $grupo->id,
+                'actividad_id' => $actividad->id,
+                'nombre' => $titulo,
+                'porcentaje' => 0,
+                'tipo' => 'taller',
+            ]);
+        }
+    });
 
-        session()->flash(
-            'mensaje',
-            'La actividad fue creada correctamente.'
-        );
-    }
+    $this->limpiarFormulario();
+
+    session()->flash(
+        'mensaje',
+        'La actividad fue creada correctamente.'
+    );
+}
 
     public function editar(int $actividadId): void
     {
@@ -100,7 +125,7 @@ if ($this->archivo) {
         $this->archivo = null;
     }
 
-    public function actualizarActividad(): void
+public function actualizarActividad(): void
 {
     if (!$this->actividadEditandoId) {
         return;
@@ -121,40 +146,129 @@ if ($this->archivo) {
     // también pertenezca al docente.
     $grupo = $this->obtenerGrupoSeleccionado();
 
-    $rutaArchivo = $actividad->archivo;
+    DB::transaction(function () use ($datos, $actividad, $grupo) {
 
-    if ($this->archivo) {
+        $tipoAnterior = mb_strtolower(
+            trim($actividad->tipo),
+            'UTF-8'
+        );
 
-        if ($rutaArchivo) {
-            Storage::disk('public')->delete($rutaArchivo);
+        $tipoNuevo = mb_strtolower(
+            trim($datos['tipo']),
+            'UTF-8'
+        );
+
+        $tituloNuevo = trim($datos['titulo']);
+
+        $rutaArchivo = $actividad->archivo;
+
+        if ($this->archivo) {
+            if ($rutaArchivo) {
+                Storage::disk('public')->delete($rutaArchivo);
+            }
+
+            $rutaArchivo = $this->archivo->store(
+                'actividades',
+                'public'
+            );
         }
 
-        $rutaArchivo = $this->archivo->store(
-            'actividades',
-            'public'
-        );
-    }
+        $actividad->update([
+            'grupo_id' => $grupo->id,
+            'tipo' => $tipoNuevo,
+            'titulo' => $tituloNuevo,
+            'descripcion' => $datos['descripcion'] !== ''
+                ? trim($datos['descripcion'])
+                : null,
+            'fecha_limite' => $datos['fechaLimite'],
+            'hora_limite' => $datos['horaLimite'],
+            'archivo' => $rutaArchivo,
+        ]);
 
-    $actividad->update([
-        'grupo_id' => $grupo->id,
-        'tipo' => mb_strtolower(trim($datos['tipo']), 'UTF-8'),
-        'titulo' => trim($datos['titulo']),
-        'descripcion' => $datos['descripcion'] !== ''
-            ? trim($datos['descripcion'])
-            : null,
-        'fecha_limite' => $datos['fechaLimite'],
-        'hora_limite' => $datos['horaLimite'],
-        'archivo' => $rutaArchivo,
-    ]);
+        /*
+         * Si la actividad ya era un taller, buscamos su evaluación
+         * vinculada mediante actividad_id.
+         */
+        $evaluacion = Evaluacion::query()
+            ->where('actividad_id', $actividad->id)
+            ->first();
+
+        /*
+         * Caso 1:
+         * Sigue siendo taller.
+         *
+         * Se conserva la evaluación y se actualiza su nombre
+         * si cambió el título.
+         */
+        if ($tipoNuevo === 'taller') {
+
+            if ($evaluacion) {
+                $evaluacion->update([
+                    'grupo_id' => $grupo->id,
+                    'nombre' => $tituloNuevo,
+                ]);
+            } else {
+                Evaluacion::create([
+                    'grupo_id' => $grupo->id,
+                    'actividad_id' => $actividad->id,
+                    'nombre' => $tituloNuevo,
+                    'porcentaje' => 0,
+                    'tipo' => 'taller',
+                ]);
+            }
+        }
+
+        /*
+         * Caso 2:
+         * Si deja de ser taller, NO eliminamos la evaluación.
+         *
+         * Esto conserva las notas existentes y permite que el docente
+         * decida posteriormente qué hacer con ellas.
+         */
+        if (
+            $tipoAnterior === 'taller'
+            && $tipoNuevo !== 'taller'
+            && $evaluacion
+        ) {
+            $evaluacion->update([
+                'grupo_id' => $grupo->id,
+            ]);
+        }
+
+        /*
+         * Si cambió de grupo, cualquier evaluación vinculada debe
+         * quedar asociada al nuevo grupo.
+         */
+    });
 
     $this->actividadEditandoId = null;
-
     $this->limpiarFormulario();
 
     session()->flash(
         'mensaje',
         'La actividad fue actualizada correctamente.'
     );
+}
+
+    public function verRespuestas(int $actividadId): void
+{
+    Actividad::query()
+        ->whereKey($actividadId)
+        ->whereHas('grupo', function ($query) {
+            $query->whereHas('docente', function ($q) {
+                $q->where('user_id', Auth::id());
+            });
+        })
+        ->firstOrFail();
+
+    $this->actividadRespuestasId = $actividadId;
+    $this->mostrarRespuestas = true;
+}
+
+public function cerrarRespuestas(): void
+{
+    $this->actividadRespuestasId = null;
+    $this->mostrarRespuestas = false;
 }
 
     public function solicitarEliminacion(int $actividadId): void
@@ -179,38 +293,43 @@ if ($this->archivo) {
     }
 
     public function eliminarActividad(): void
-    {
-        if (!$this->actividadEliminarId) {
-            return;
-        }
-
-        $actividad = Actividad::query()
-            ->whereKey($this->actividadEliminarId)
-            ->whereHas('grupo', function ($query) {
-                $query->whereHas('docente', function ($q) {
-                    $q->where('user_id', Auth::id());
-                });
-            })
-            ->firstOrFail();
-
-        if ($actividad->archivo) {
-            Storage::disk('public')->delete($actividad->archivo);
-        }
-
-        $actividad->delete();
-
-        $this->actividadEliminarId = null;
-        $this->mostrarConfirmacionEliminar = false;
-
-        if ($this->actividadEditandoId === $actividad->id) {
-            $this->limpiarFormulario();
-        }
-
-        session()->flash(
-            'mensaje',
-            'La actividad fue eliminada correctamente.'
-        );
+{
+    if (!$this->actividadEliminarId) {
+        return;
     }
+
+    $actividad = Actividad::query()
+        ->whereKey($this->actividadEliminarId)
+        ->whereHas('grupo', function ($query) {
+            $query->whereHas('docente', function ($q) {
+                $q->where('user_id', Auth::id());
+            });
+        })
+        ->firstOrFail();
+
+    $archivo = $actividad->archivo;
+    $actividadId = $actividad->id;
+
+    DB::transaction(function () use ($actividad) {
+        $actividad->delete();
+    });
+
+    if ($archivo) {
+        Storage::disk('public')->delete($archivo);
+    }
+
+    $this->actividadEliminarId = null;
+    $this->mostrarConfirmacionEliminar = false;
+
+    if ($this->actividadEditandoId === $actividadId) {
+        $this->limpiarFormulario();
+    }
+
+    session()->flash(
+        'mensaje',
+        'La actividad fue eliminada correctamente.'
+    );
+}
 
     private function validarFormulario(): array
     {
@@ -281,6 +400,99 @@ if ($this->archivo) {
         $this->archivo = null;
         $this->actividadEditandoId = null;
     }
+
+    public function verRespuesta(int $respuestaId): ActividadRespuesta
+{
+    return ActividadRespuesta::query()
+        ->with(['actividad', 'estudiante'])
+        ->whereKey($respuestaId)
+        ->whereHas('actividad.grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+}
+
+public function abrirDetalleRespuesta(int $respuestaId): void
+{
+    $respuesta = ActividadRespuesta::query()
+        ->with(['actividad.evaluacion', 'estudiante'])
+        ->whereKey($respuestaId)
+        ->whereHas('actividad.grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+
+    $this->respuestaSeleccionadaId = $respuesta->id;
+    $this->detalleRespuesta = [
+        'asunto' => $respuesta->asunto,
+        'respuesta' => $respuesta->respuesta,
+        'archivo' => $respuesta->archivo,
+        'estudiante' => $respuesta->estudiante->nombre
+            ?? $respuesta->estudiante->user->name
+            ?? 'Estudiante',
+        'actividad' => $respuesta->actividad->titulo,
+    ];
+
+    $this->mostrarDetalleRespuesta = true;
+}
+
+public function cerrarDetalleRespuesta(): void
+{
+    $this->respuestaSeleccionadaId = null;
+    $this->detalleRespuesta = null;
+    $this->mostrarDetalleRespuesta = false;
+}
+
+public function guardarNota(int $respuestaId, $nota): void
+{
+    $respuesta = ActividadRespuesta::query()
+        ->with('actividad')
+        ->whereKey($respuestaId)
+        ->whereHas('actividad.grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+
+    if (
+    mb_strtolower($respuesta->actividad->tipo, 'UTF-8') !== 'taller'
+) {
+    throw \Illuminate\Validation\ValidationException::withMessages([
+        'nota' => 'Solo se pueden calificar talleres desde esta sección.',
+    ]);
+}
+
+    if (!$respuesta->actividad || !$respuesta->actividad->evaluacion) {
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'nota' => 'Esta actividad no tiene una evaluación vinculada.',
+        ]);
+    }
+
+    $datos = validator(
+        ['nota' => $nota],
+        ['nota' => ['required', 'numeric', 'min:0', 'max:5']]
+    )->validate();
+
+    $estudianteId = $respuesta->estudiante_id;
+    $evaluacionId = $respuesta->actividad->evaluacion->id;
+
+    DB::transaction(function () use (
+        $estudianteId,
+        $evaluacionId,
+        $datos
+    ) {
+        Calificacion::updateOrCreate(
+            [
+                'evaluacion_id' => $evaluacionId,
+                'estudiante_id' => $estudianteId,
+            ],
+            [
+                'nota' => $datos['nota'],
+            ]
+        );
+    });
+
+    session()->flash('mensaje', 'La nota se guardó correctamente.');
+}
 
 public function render()
 {
@@ -357,14 +569,30 @@ public function render()
             })
             ->values();
     }
+$actividadSeleccionada = null;
+$respuestas = collect();
 
-    return view(
-        'components.docente.⚡grupo-actividades',
-        [
-            'grupos' => $grupos,
-            'actividades' => $actividadesPublicadas,
-            'actividadesProximas' => $actividadesProximas,
-        ]
-    )->layout('layouts.docente');
+if ($this->mostrarRespuestas && $this->actividadRespuestasId) {
+    $actividadSeleccionada = $actividades
+        ->firstWhere('id', $this->actividadRespuestasId);
+
+    if ($actividadSeleccionada) {
+        $respuestas = $actividadSeleccionada->respuestas()
+    ->with(['estudiante', 'actividad.evaluacion.calificaciones'])
+    ->latest()
+    ->get();
+    }
+}
+
+return view(
+    'components.docente.⚡grupo-actividades',
+    [
+        'grupos' => $grupos,
+        'actividades' => $actividadesPublicadas,
+        'actividadesProximas' => $actividadesProximas,
+        'actividadSeleccionada' => $actividadSeleccionada,
+        'respuestas' => $respuestas,
+    ]
+)->layout('layouts.docente');
 }
 }

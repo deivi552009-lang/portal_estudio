@@ -33,6 +33,11 @@ class Estudiante extends Model
         return $this->hasMany(Calificacion::class);
     }
 
+    public function actividadRespuestas(): HasMany
+    {
+    return $this->hasMany(ActividadRespuesta::class);
+    }
+
     /**
      * Calcula la nota final del estudiante.
      */

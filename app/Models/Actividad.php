@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Actividad extends Model
@@ -25,5 +27,15 @@ class Actividad extends Model
     public function grupo(): BelongsTo
     {
         return $this->belongsTo(Grupo::class);
+    }
+
+    public function respuestas(): HasMany
+    {
+        return $this->hasMany(ActividadRespuesta::class);
+    }
+
+    public function evaluacion(): HasOne
+    {
+        return $this->hasOne(Evaluacion::class);
     }
 }

@@ -584,7 +584,28 @@
                                 />
                             </svg>
                         </button>
+<button
+    type="button"
+    wire:click="verRespuestas({{ $actividad->id }})"
+    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+>
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+    >
+        <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M8 10h8m-8 4h5m5-9H6a2 2 0 00-2 2v10a2 2 0 002 2h5l3 3 3-3h3a2 2 0 002-2V7a2 2 0 00-2-2z"
+        />
+    </svg>
 
+    Respuestas
+</button>
 
                         <button
                             type="button"
@@ -692,5 +713,50 @@
         </div>
 
     @endif
+
+@if ($mostrarDetalleRespuesta && $detalleRespuesta)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div class="mb-5 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-800">
+                    Detalle de la entrega
+                </h2>
+
+                <button
+                    type="button"
+                    wire:click="cerrarDetalleRespuesta"
+                    class="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100"
+                >
+                    Cerrar
+                </button>
+            </div>
+
+            <p class="mb-2 text-sm text-gray-500">
+                Actividad: {{ $detalleRespuesta['actividad'] }}
+            </p>
+
+            <p class="mb-4 text-sm text-gray-500">
+                Estudiante: {{ $detalleRespuesta['estudiante'] }}
+            </p>
+
+            <h3 class="mb-2 font-semibold text-gray-800">
+                {{ $detalleRespuesta['asunto'] ?: 'Sin asunto' }}
+            </h3>
+
+            <div class="mb-5 whitespace-pre-wrap rounded-xl bg-gray-50 p-4 text-gray-700">{{ $detalleRespuesta['respuesta'] ?: 'El estudiante no escribió una respuesta.' }}</div>
+
+            @if ($detalleRespuesta['archivo'])
+                <a
+                    href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($detalleRespuesta['archivo']) }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 text-indigo-700 hover:bg-indigo-100"
+                >
+                    Ver archivo adjunto
+                </a>
+            @endif
+        </div>
+    </div>
+@endif
 
 </div>
