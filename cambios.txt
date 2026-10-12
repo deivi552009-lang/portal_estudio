@@ -1,0 +1,222 @@
+========================================================================
+CAMBIOS DESPUES DEL ULTIMO COMMIT (633949e)
+Flujo: talleres -> evaluacion -> calificaciones y respuestas de estudiantes
+========================================================================
+
+Los cambios listados a continuacion corresponden solo a lo nuevo/editado
+despues del ultimo commit. NO se incluye codigo sin cambios.
+
+
+========================================================================
+1. app/Livewire/Docente/GrupoActividades.php  (MODIFICADO)
+========================================================================
+
+IMPORTS - Se agregaron nuevos use:
+  - use App\Models\ActividadRespuesta;
+  - use App\Models\Evaluacion;
+  - use App\Models\Calificacion;
+  - use Illuminate\Support\Facades\DB;
+
+PROPIEDADES - Se agregaron nuevas propiedades publicas:
+  - public ?array $detalleRespuesta = null;
+  - public ?int $actividadRespuestasId = null;
+  - public ?int $respuestaSeleccionadaId = null;
+  - public bool $mostrarDetalleRespuesta = false;
+  - public bool $mostrarRespuestas = false;
+
+METODO crearActividad() - Reescrito:
+  - Todo el flujo ahora va dentro de DB::transaction(...).
+  - Se calculan $tipo y $titulo una sola vez.
+  - Se guarda el resultado de $grupo->actividades()->create(...) en $actividad.
+  - NUEVO BLOQUE: si $tipo === 'taller', se crea automaticamente la evaluacion:
+        Evaluacion::create([
+            'grupo_id'     => $grupo->id,
+            'actividad_id' => $actividad->id,
+            'nombre'       => $titulo,
+            'porcentaje'   => 0,
+            'tipo'         => 'taller',
+        ]);
+  - El $this->limpiarFormulario() y el flash de mensaje quedan fuera de la transaccion.
+
+METODO actualizarActividad() - Reescrito:
+  - Todo el flujo ahora va dentro de DB::transaction(...).
+  - Se calculan $tipoAnterior, $tipoNuevo y $tituloNuevo.
+  - Se mueve la gestion del archivo dentro de la transaccion.
+  - NUEVO BLOQUE: se busca la evaluacion vinculada:
+        Evaluacion::query()->where('actividad_id', $actividad->id)->first();
+  - NUEVO BLOQUE (Caso 1): si sigue siendo taller:
+        - Si ya existe evaluacion -> se actualiza (grupo_id, nombre).
+        - Si NO existe -> se crea la evaluacion con actividad_id.
+  - NUEVO BLOQUE (Caso 2): si era taller y dejo de serlo -> NO se elimina
+    la evaluacion (solo se reasigna grupo_id si aplica) para conservar notas.
+
+METODO verRespuestas(int $actividadId): void  - NUEVO:
+  - Valida que la actividad pertenezca al docente autenticado (firstOrFail).
+  - Setea $this->actividadRespuestasId y $this->mostrarRespuestas = true.
+
+METODO cerrarRespuestas(): void  - NUEVO:
+  - Resetea $actividadRespuestasId = null y $mostrarRespuestas = false.
+
+METODO eliminarActividad() - Reescrito:
+  - Se guarda $archivo y $actividadId antes de borrar.
+  - El $actividad->delete() ahora va dentro de DB::transaction(...).
+  - La eliminacion fisica del archivo se hace despues de la transaccion.
+  - Se usa $actividadId (variable local) para comparar con actividadEditandoId.
+  - (La evaluacion y sus calificaciones caen por ON DELETE CASCADE).
+
+METODO verRespuesta(int $respuestaId): ActividadRespuesta  - NUEVO:
+  - Busca la respuesta con ['actividad', 'estudiante'].
+  - Valida propiedad con whereHas('actividad.grupo.docente', user_id = Auth::id()).
+
+METODO abrirDetalleRespuesta(int $respuestaId): void  - NUEVO:
+  - Busca la respuesta con ['actividad.evaluacion', 'estudiante'].
+  - Llena $this->detalleRespuesta con asunto, respuesta, archivo, estudiante, actividad.
+  - Setea $this->respuestaSeleccionadaId y $this->mostrarDetalleRespuesta = true.
+
+METODO cerrarDetalleRespuesta(): void  - NUEVO:
+  - Resetea respuestaSeleccionadaId, detalleRespuesta y mostrarDetalleRespuesta.
+
+METODO guardarNota(int $respuestaId, $nota): void  - NUEVO:
+  - Busca la respuesta validando propiedad del docente.
+  - Valida que la actividad sea tipo 'taller' (si no, lanza ValidationException).
+  - Valida que exista evaluacion vinculada (actividad->evaluacion).
+  - Valida la nota con: required, numeric, min:0, max:5.
+  - DB::transaction: Calificacion::updateOrCreate por (evaluacion_id, estudiante_id).
+  - Flash: 'La nota se guardo correctamente.'
+  - NOTA: la nota se guarda en calificaciones, NO en actividad_respuestas.
+
+METODO render() - Modificado:
+  - NUEVO BLOQUE al final: si $mostrarRespuestas && $actividadRespuestasId:
+        $actividadSeleccionada = $actividades->firstWhere('id', ...);
+        $respuestas = $actividadSeleccionada->respuestas()
+            ->with(['estudiante', 'actividad.evaluacion.calificaciones'])
+            ->latest()->get();
+  - La vista ahora recibe ademas:
+        'actividadSeleccionada' => $actividadSeleccionada,
+        'respuestas'            => $respuestas,
+
+
+========================================================================
+2. app/Models/Actividad.php  (MODIFICADO)
+========================================================================
+
+IMPORTS - Se agregaron:
+  - use Illuminate\Database\Eloquent\Relations\HasMany;
+  - use Illuminate\Database\Eloquent\Relations\HasOne;
+
+NUEVO BLOQUE de relaciones:
+  - public function respuestas(): HasMany
+        return $this->hasMany(ActividadRespuesta::class);
+
+  - public function evaluacion(): HasOne
+        return $this->hasOne(Evaluacion::class);
+
+
+========================================================================
+3. app/Models/Estudiante.php  (MODIFICADO)
+========================================================================
+
+NUEVO BLOQUE de relacion:
+  - public function actividadRespuestas(): HasMany
+        return $this->hasMany(ActividadRespuesta::class);
+
+
+========================================================================
+4. app/Models/Evaluacion.php  (MODIFICADO)
+========================================================================
+
+IMPORTS - Se agrego:
+  - use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+$fillable - Modificado (se agrego 'actividad_id'):
+  Antes: ['grupo_id', 'nombre', 'porcentaje', 'tipo','fecha',]
+  Ahora:
+    [
+        'grupo_id',
+        'actividad_id',
+        'nombre',
+        'porcentaje',
+        'tipo',
+        'fecha',
+    ]
+
+NUEVO BLOQUE de relacion:
+  - public function actividad(): BelongsTo
+        return $this->belongsTo(Actividad::class);
+
+
+========================================================================
+5. resources/views/components/docente/⚡grupo-actividades.blade.php  (MODIFICADO)
+========================================================================
+
+NUEVO BLOQUE - Boton "Respuestas" en cada actividad:
+  - <button wire:click="verRespuestas({{ $actividad->id }})" ...>
+  - Icono SVG y texto "Respuestas".
+  - Ubicado junto a los botones de Editar / Eliminar.
+
+NUEVO BLOQUE - Modal "Detalle de la entrega" (al final del archivo):
+  - Se muestra con @if ($mostrarDetalleRespuesta && $detalleRespuesta).
+  - Muestra: actividad, estudiante, asunto, respuesta.
+  - Boton "Cerrar" -> wire:click="cerrarDetalleRespuesta".
+  - Si hay archivo: enlace "Ver archivo adjunto" usando
+    Storage::disk('public')->url($detalleRespuesta['archivo']).
+
+
+========================================================================
+6. app/Models/ActividadRespuesta.php  (NUEVO)
+========================================================================
+
+- Modelo nuevo.
+- $fillable:
+    ['actividad_id', 'estudiante_id', 'asunto', 'respuesta', 'archivo']
+  (SIN 'nota': la nota vive en calificaciones).
+- Relaciones:
+    public function actividad(): BelongsTo  -> Actividad::class
+    public function estudiante(): BelongsTo -> Estudiante::class
+
+
+========================================================================
+7. database/migrations/2026_10_08_043138_create_actividad_respuestas_table.php  (NUEVA)
+========================================================================
+
+- Crea la tabla 'actividad_respuestas' con:
+    id
+    actividad_id  -> FK actividades (cascadeOnDelete)
+    estudiante_id -> FK estudiantes (cascadeOnDelete)
+    asunto        (string, nullable)
+    respuesta     (text, nullable)
+    archivo       (string, nullable)
+    timestamps
+- UNIQUE: ['actividad_id', 'estudiante_id']
+    nombre: actividad_respuestas_actividad_estudiante_unique
+- Sin columna 'nota'.
+- down(): dropIfExists('actividad_respuestas').
+
+
+========================================================================
+8. database/migrations/2026_10_08_043257_add_actividad_id_to_evaluaciones_table.php  (NUEVA)
+========================================================================
+
+- Agrega a 'evaluaciones':
+    actividad_id (foreignId, nullable, after('grupo_id'),
+                  constrained('actividades'), cascadeOnDelete)
+- UNIQUE: 'actividad_id' nombre 'evaluaciones_actividad_id_unique'
+- down():
+    dropUnique('evaluaciones_actividad_id_unique')
+    dropForeign(['actividad_id'])
+    dropColumn('actividad_id')
+
+
+========================================================================
+RESUMEN DE COMPORTAMIENTO
+========================================================================
+
+- Crear un taller -> crea automaticamente su evaluacion (transaction).
+- Editar un taller -> sincroniza el nombre de la evaluacion; si pasa a taller
+  y no existia, la crea; si deja de ser taller, NO borra la evaluacion.
+- Eliminar un taller -> evaluacion y calificaciones caen por ON DELETE CASCADE.
+- El docente ve un boton "Respuestas" y un modal con el detalle de la entrega.
+- La nota se guarda en 'calificaciones' (via evaluaciones.actividad_id),
+  nunca en 'actividad_respuestas'.
+- Todas las operaciones del docente validan propiedad del grupo/actividad.
+========================================================================

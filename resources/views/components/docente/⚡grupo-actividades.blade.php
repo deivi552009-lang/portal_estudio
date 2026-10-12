@@ -407,7 +407,187 @@
     </div>
 
 @endif
-                    @if ($actividades->isEmpty())
+
+
+
+@if ($mostrarRespuestas && $actividadSeleccionada)
+
+    <div class="px-6 py-5">
+
+        <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="text-sm font-medium text-indigo-600">
+                    Entregas de la actividad
+                </p>
+
+                <h2 class="mt-1 text-xl font-bold text-slate-800">
+                    {{ $actividadSeleccionada->titulo }}
+                </h2>
+
+                <p class="mt-1 text-sm text-slate-500">
+                    {{ $actividadSeleccionada->materia_nombre }}
+                    · {{ $respuestas->count() }}
+                    {{ $respuestas->count() === 1 ? 'entrega' : 'entregas' }}
+                </p>
+            </div>
+
+            <button
+                type="button"
+                wire:click="cerrarRespuestas"
+                class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            >
+                ← Volver a actividades
+            </button>
+        </div>
+
+        @if ($respuestas->isEmpty())
+
+            <div class="rounded-xl border border-dashed border-slate-300 px-6 py-10 text-center">
+                <p class="font-semibold text-slate-700">
+                    Todavía no hay entregas
+                </p>
+
+                <p class="mt-1 text-sm text-slate-500">
+                    Las respuestas de los estudiantes aparecerán aquí.
+                </p>
+            </div>
+
+        @else
+
+            <div class="space-y-4">
+
+                @foreach ($respuestas as $respuesta)
+
+                    @php
+                        $evaluacionRespuesta = $respuesta->actividad->evaluacion;
+                        $calificacionActual = $evaluacionRespuesta?->calificaciones
+                            ->firstWhere('estudiante_id', $respuesta->estudiante_id);
+                        $notaActual = $calificacionActual?->nota;
+                    @endphp
+
+                    <div
+                        wire:key="entrega-{{ $respuesta->id }}"
+                        class="rounded-xl border border-slate-200 p-4"
+                    >
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+
+                            <div class="min-w-0">
+                                <h3 class="font-semibold text-slate-800">
+                                    {{ $respuesta->estudiante->user->name
+                                        ?? $respuesta->estudiante->nombre
+                                        ?? 'Estudiante' }}
+                                </h3>
+
+                                <p class="mt-1 text-sm text-slate-500">
+                                    {{ $respuesta->asunto ?: 'Entrega sin asunto' }}
+                                </p>
+
+                                <p class="mt-1 text-xs text-slate-400">
+                                    Enviada:
+                                    {{ $respuesta->created_at?->format('d/m/Y H:i') }}
+                                </p>
+
+                                @if ($respuesta->archivo)
+                                    <p class="mt-2 text-sm">
+                                        <a
+                                            href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($respuesta->archivo) }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="font-medium text-indigo-600 hover:underline"
+                                        >
+                                            Ver archivo adjunto
+                                        </a>
+                                    </p>
+                                @endif
+                            </div>
+
+                            <button
+                                type="button"
+                                wire:click="abrirDetalleRespuesta({{ $respuesta->id }})"
+                                class="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                            >
+                                Ver entrega completa
+                            </button>
+
+                        </div>
+
+                        <div class="mt-4 border-t border-slate-100 pt-4">
+
+                            @if ($evaluacionRespuesta)
+
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+
+                                    <div class="w-full sm:max-w-xs">
+                                        <label
+                                            for="nota-{{ $respuesta->id }}"
+                                            class="mb-1 block text-sm font-medium text-slate-700"
+                                        >
+                                            Nota (0 a 5)
+                                        </label>
+
+                                        <input
+                                            id="nota-{{ $respuesta->id }}"
+                                            type="number"
+                                            min="0"
+                                            max="5"
+                                            step="0.1"
+                                            wire:model="notas.{{ $respuesta->id }}"
+                                            placeholder="Ej. 4.5"
+                                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                        >
+
+                                        @error('nota')
+                                            <p class="mt-1 text-xs text-red-600">
+                                                {{ $message }}
+                                            </p>
+                                        @enderror
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        wire:click="guardarNota({{ $respuesta->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="guardarNota({{ $respuesta->id }})"
+                                        class="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                    >
+                                        Guardar nota
+                                    </button>
+
+                                </div>
+
+                                <p class="mt-2 text-xs text-slate-500">
+                                    Nota actual:
+                                    <strong>
+                                        {{ $notaActual !== null ? number_format((float) $notaActual, 1) : 'Sin calificar' }}
+                                    </strong>
+                                </p>
+
+                            @else
+
+                                <p class="text-sm text-amber-700">
+                                    Esta actividad no tiene una evaluación vinculada;
+                                    no se puede asignar una nota desde aquí.
+                                </p>
+
+                            @endif
+
+                        </div>
+                    </div>
+
+                @endforeach
+
+            </div>
+
+        @endif
+
+
+    </div>
+
+@else
+
+
+
+    @if ($actividades->isEmpty())
 
     <div class="px-6 py-12 text-center">
 
@@ -639,7 +819,7 @@
     </div>
 
 @endif
-
+@endif
                 </div>
 
             </div>

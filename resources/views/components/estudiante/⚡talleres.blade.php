@@ -34,14 +34,6 @@
 
         @php
             $lista = $actividades;
-
-            if ($filtro === 'pendientes') {
-                $lista = $actividades;
-            }
-
-            if ($filtro === 'entregados') {
-                $lista = collect();
-            }
         @endphp
 
         @if ($lista->isEmpty())
@@ -53,7 +45,13 @@
                     {{ $filtro === 'entregados' ? 'No tienes talleres entregados' : 'No tienes talleres pendientes' }}
                 </h4>
                 <p class="mx-auto mt-1 max-w-md text-sm text-slate-400">
-                    En la siguiente etapa conectaremos este apartado con el sistema real de entregas.
+                    @if ($filtro === 'entregados')
+                    Aquí aparecerán los talleres que ya hayas entregado.
+                    @elseif ($filtro === 'pendientes')
+                        No tienes talleres pendientes de entrega.
+                    @else
+                        Todavía no tienes talleres asignados.
+                    @endif
                 </p>
             </div>
         @else
@@ -75,6 +73,7 @@
                                     ? \Carbon\Carbon::parse($actividad->fecha_limite->format('Y-m-d') . ' ' . ($actividad->hora_limite ?? '23:59'))
                                     : null;
                                 $vencida = $fecha?->isPast() ?? false;
+                                $entregada = (bool) $actividad->respuestaEstudiante;
                             @endphp
 
                             <tr class="hover:bg-slate-50">
@@ -100,16 +99,20 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
-                                        {{ $vencida
-                                            ? 'bg-slate-100 text-slate-500'
-                                            : 'bg-amber-50 text-amber-600' }}">
-                                        {{ $vencida ? 'Vencida' : 'Pendiente' }}
+                                                {{ $entregada
+                                                    ? 'bg-emerald-50 text-emerald-700'
+                                                    : ($vencida
+                                                        ? 'bg-slate-100 text-slate-500'
+                                                        : 'bg-amber-50 text-amber-600') }}">
+                                                {{ $entregada ? 'Entregado' : ($vencida ? 'Vencido' : 'Pendiente') }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex items-center justify-end gap-2">
                                         {{-- Ver detalle del taller (funcionalidad pendiente) --}}
                                         <button type="button"
+                                                wire:click="verTaller({{ $actividad->id }})"
+                                                wire:loading.attr="disabled"
                                                 title="Ver taller"
                                                 class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
                                             <svg class="h-4 w-4"
@@ -130,7 +133,11 @@
 
                                         {{-- Responder el taller (funcionalidad pendiente) --}}
                                         <button type="button"
-                                                title="Responder taller"
+                                                wire:click="abrirRespuesta({{ $actividad->id }})"
+                                                wire:loading.attr="disabled"
+                                                @disabled($vencida && !$entregada)
+                                                title="{{ $vencida && !$entregada ? 'Plazo vencido' : 'Responder taller' }}"
+
                                                 class="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100">
                                             <svg class="h-4 w-4"
                                                  fill="none"
@@ -155,5 +162,191 @@
                 </table>
             </div>
         @endif
+
+
+@if ($mostrarModalDetalleTaller && $detalleTaller)
+    <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4">
+        <section class="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+            <div class="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">
+                        {{ $detalleTaller['titulo'] }}
+                    </h3>
+                    <p class="mt-1 text-sm text-slate-500">
+                        {{ $detalleTaller['materia'] }}
+                    </p>
+                </div>
+
+                <button type="button"
+                        wire:click="cerrarModalDetalleTaller"
+                        class="rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100"
+                        aria-label="Cerrar">
+                    ✕
+                </button>
+            </div>
+
+            <div class="space-y-4 px-6 py-6">
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-700">
+                        Descripción del taller
+                    </h4>
+                    <p class="mt-1 whitespace-pre-line text-sm text-slate-600">
+                        {{ $detalleTaller['descripcion'] ?: 'El docente no agregó una descripción.' }}
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-700">
+                        Fecha y hora límite
+                    </h4>
+                    <p class="mt-1 text-sm text-slate-600">
+                        {{ $detalleTaller['fecha_limite'] ?? 'Sin fecha límite' }}
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-700">
+                        Estado
+                    </h4>
+                    <p class="mt-1 text-sm text-slate-600">
+                        @if ($detalleTaller['entregada'])
+                            Ya entregaste este taller.
+                        @elseif ($detalleTaller['vencida'])
+                            El plazo de entrega ha finalizado.
+                        @else
+                            Tienes pendiente esta entrega.
+                        @endif
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex justify-end border-t border-slate-100 px-6 py-4">
+                <button type="button"
+                        wire:click="cerrarModalDetalleTaller"
+                        class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Cerrar
+                </button>
+            </div>
+        </section>
+    </div>
+@endif
+
+
+@if ($mostrarModalRespuesta)
+    <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4"
+         wire:keydown.escape.window="cerrarModalRespuesta">
+        <section class="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+            <div class="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">
+                        {{ $respuestaSoloLectura ? 'Detalle de tu entrega' : 'Responder taller' }}
+                    </h3>
+                    <p class="mt-1 text-sm text-slate-500">
+                        @if ($respuestaSoloLectura)
+                            El plazo terminó. Puedes consultar tu entrega, pero no modificarla.
+                        @else
+                            Escribe tu respuesta y adjunta un archivo si lo necesitas.
+                        @endif
+                    </p>
+                </div>
+
+                <button type="button"
+                        wire:click="cerrarModalRespuesta"
+                        class="rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100"
+                        aria-label="Cerrar">
+                    ✕
+                </button>
+            </div>
+
+            <form wire:submit.prevent="guardarRespuesta" class="space-y-5 px-6 py-6">
+                <div>
+                    <label for="asuntoRespuesta" class="mb-1 block text-sm font-semibold text-slate-700">
+                        Asunto
+                    </label>
+                    <input id="asuntoRespuesta"
+                           type="text"
+                           wire:model="asuntoRespuesta"
+                           @disabled($respuestaSoloLectura)
+                           maxlength="255"
+                           class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100">
+                    @error('asuntoRespuesta')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="textoRespuesta" class="mb-1 block text-sm font-semibold text-slate-700">
+                        Tu respuesta
+                    </label>
+                    <textarea id="textoRespuesta"
+                              wire:model="textoRespuesta"
+                              @disabled($respuestaSoloLectura)
+                              rows="6"
+                              maxlength="20000"
+                              class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
+                              placeholder="Escribe aquí tu respuesta..."></textarea>
+                    @error('textoRespuesta')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                @if ($archivoRespuestaExistente)
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-700">Archivo entregado</p>
+                        <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($archivoRespuestaExistente) }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="mt-1 inline-block text-sm font-medium text-blue-600 hover:underline">
+                            Ver o descargar archivo adjunto
+                        </a>
+                    </div>
+                @endif
+
+                @unless ($respuestaSoloLectura)
+                    <div>
+                        <label for="archivoRespuesta" class="mb-1 block text-sm font-semibold text-slate-700">
+                            Archivo adjunto (opcional)
+                        </label>
+                        <input id="archivoRespuesta"
+                               type="file"
+                               wire:model="archivoRespuesta"
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                               class="block w-full text-sm text-slate-600">
+                        <p class="mt-1 text-xs text-slate-400">
+                            Formatos permitidos: PDF, Word, Excel, PowerPoint o ZIP. Máximo 10 MB.
+                        </p>
+                        @error('archivoRespuesta')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+
+                        <div wire:loading wire:target="archivoRespuesta"
+                             class="mt-2 text-sm text-blue-600">
+                            Cargando archivo...
+                        </div>
+                    </div>
+                @endunless
+
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                    <button type="button"
+                            wire:click="cerrarModalRespuesta"
+                            class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cerrar
+                    </button>
+
+                    @unless ($respuestaSoloLectura)
+                        <button type="submit"
+                                wire:loading.attr="disabled"
+                                wire:target="guardarRespuesta,archivoRespuesta"
+                                class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                            <span wire:loading.remove wire:target="guardarRespuesta">Guardar entrega</span>
+                            <span wire:loading wire:target="guardarRespuesta">Guardando...</span>
+                        </button>
+                    @endunless
+                </div>
+            </form>
+        </section>
+    </div>
+@endif
+
     </section>
 </div>

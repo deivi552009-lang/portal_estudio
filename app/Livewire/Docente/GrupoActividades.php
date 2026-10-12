@@ -36,6 +36,7 @@ class GrupoActividades extends Component
     public bool $mostrarDetalleRespuesta = false;
     public bool $mostrarConfirmacionEliminar = false;
     public bool $mostrarRespuestas = false;
+    public array $notas = [];
 
     public function mount(?int $grupoId = null): void
     {
@@ -443,8 +444,9 @@ public function cerrarDetalleRespuesta(): void
     $this->mostrarDetalleRespuesta = false;
 }
 
-public function guardarNota(int $respuestaId, $nota): void
+public function guardarNota(int $respuestaId): void
 {
+    $nota = $this->notas[$respuestaId] ?? null;
     $respuesta = ActividadRespuesta::query()
         ->with('actividad')
         ->whereKey($respuestaId)
