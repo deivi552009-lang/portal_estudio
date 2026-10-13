@@ -4,55 +4,70 @@ namespace App\Livewire\Estudiante;
 
 use App\Models\Actividad;
 use App\Models\ActividadRespuesta;
-use Illuminate\Support\Facades\Storage;
-use Livewire\WithFileUploads;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Talleres extends Component
 {
-    public string $filtro = 'pendientes';
     use WithFileUploads;
+
+    public string $filtro = 'pendientes';
+
     public ?int $actividadRespondiendoId = null;
     public string $asuntoRespuesta = '';
     public string $textoRespuesta = '';
     public $archivoRespuesta = null;
-//controlan la ventana, cargar la entrega existente y decidir si puede editarse.
+
     public bool $mostrarModalRespuesta = false;
     public bool $mostrarModalDetalleTaller = false;
+    public bool $mostrarModalVerRespuesta = false;
     public bool $respuestaSoloLectura = false;
+
     public ?array $detalleTaller = null;
+    public ?array $respuestaDetalle = null;
     public ?string $archivoRespuestaExistente = null;
 
+    public function guardarRespuesta(): void
+    {
+        $estudiante = Auth::user()?->estudiante;
 
-public function guardarRespuesta(): void
-{
-    $estudiante = auth()->user()->estudiante;
+        if (!$estudiante) {
+            abort(403, 'El usuario no tiene un registro de estudiante.');
+        }
 
-    if (!$estudiante) {
-        abort(403, 'El usuario no tiene un registro de estudiante.');
-    }
+        $this->resetErrorBag();
 
-    $this->resetErrorBag();
+        $actividad = Actividad::query()
+            ->whereKey($this->actividadRespondiendoId)
+            ->where('tipo', 'taller')
+            ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
+                $query->where('estudiantes.id', $estudiante->id);
+            })
+            ->with('evaluacion')
+            ->firstOrFail();
 
-    // Solo permite responder talleres de grupos del estudiante.
-    $actividad = Actividad::query()
-        ->whereKey($this->actividadRespondiendoId)
-        ->where('tipo', 'taller')
-        ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
-            $query->where('estudiantes.id', $estudiante->id);
-        })
-        ->firstOrFail();
+        // No permitir cambios si la entrega ya fue calificada.
+        $entrega = ActividadRespuesta::query()
+            ->where('actividad_id', $actividad->id)
+            ->where('estudiante_id', $estudiante->id)
+            ->first();
 
-    // Comprobar la fecha y hora límite en el servidor.
-    if ($actividad->fecha_limite) {
-        $fechaLimite = \Illuminate\Support\Carbon::parse(
-            $actividad->fecha_limite->format('Y-m-d')
-            . ' '
-            . ($actividad->hora_limite ?? '23:59')
-        );
+        if ($this->estaCalificada($actividad, $estudiante->id)) {
+            $this->addError(
+                'textoRespuesta',
+                'Esta entrega ya fue calificada y no se puede editar.'
+            );
 
-        if (now()->greaterThan($fechaLimite)) {
+            return;
+        }
+
+        // Comprobar la fecha y hora límite en el servidor.
+        $fechaLimite = $this->obtenerFechaLimite($actividad);
+
+        if ($fechaLimite && now()->greaterThan($fechaLimite)) {
             $this->addError(
                 'textoRespuesta',
                 'El plazo de entrega de este taller ha finalizado.'
@@ -60,253 +75,293 @@ public function guardarRespuesta(): void
 
             return;
         }
-    }
 
-    $datos = $this->validate([
-        'asuntoRespuesta' => ['nullable', 'string', 'max:255'],
-        'textoRespuesta' => ['nullable', 'string', 'max:20000'],
-        'archivoRespuesta' => [
-            'nullable',
-            'file',
-            'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,zip',
-            'max:10240',
-        ],
-    ]);
+        $datos = $this->validate([
+            'asuntoRespuesta' => ['nullable', 'string', 'max:255'],
+            'textoRespuesta' => ['nullable', 'string', 'max:20000'],
+            'archivoRespuesta' => [
+                'nullable',
+                'file',
+                'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,zip',
+                'max:10240',
+            ],
+        ]);
 
-    // Buscar exclusivamente la entrega de este estudiante.
-    $entrega = ActividadRespuesta::query()
-        ->where('actividad_id', $actividad->id)
-        ->where('estudiante_id', $estudiante->id)
-        ->first();
+        // Puede entregarse texto, archivo o ambos; al editar se puede conservar
+        // el archivo anterior si no se adjunta uno nuevo.
+        if (
+            trim($datos['textoRespuesta'] ?? '') === ''
+            && !$this->archivoRespuesta
+            && !$entrega?->archivo
+        ) {
+            $this->addError(
+                'textoRespuesta',
+                'Escribe una respuesta o adjunta un archivo antes de entregar.'
+            );
 
-    // Puede entregarse texto, archivo o ambos.
-    // Si ya había un archivo guardado, también se permite conservarlo.
-    if (
-        trim($datos['textoRespuesta'] ?? '') === ''
-        && !$this->archivoRespuesta
-        && !$entrega?->archivo
-    ) {
-        $this->addError(
+            return;
+        }
+
+        $archivoAnterior = $entrega?->archivo;
+        $rutaArchivo = $archivoAnterior;
+
+        if ($this->archivoRespuesta) {
+            $rutaArchivo = $this->archivoRespuesta->store('entregas', 'public');
+        }
+
+        ActividadRespuesta::updateOrCreate(
+            [
+                'actividad_id' => $actividad->id,
+                'estudiante_id' => $estudiante->id,
+            ],
+            [
+                'asunto' => trim($datos['asuntoRespuesta'] ?? '') ?: null,
+                'respuesta' => trim($datos['textoRespuesta'] ?? '') ?: null,
+                'archivo' => $rutaArchivo,
+            ]
+        );
+
+        // Elimina el archivo anterior solo si se guardó uno nuevo.
+        if (
+            $this->archivoRespuesta
+            && $archivoAnterior
+            && $archivoAnterior !== $rutaArchivo
+        ) {
+            Storage::disk('public')->delete($archivoAnterior);
+        }
+
+        $this->reset([
+            'asuntoRespuesta',
             'textoRespuesta',
-            'Escribe una respuesta o adjunta un archivo antes de entregar.'
-        );
+            'archivoRespuesta',
+        ]);
+        $this->archivoRespuestaExistente = null;
+        $this->mostrarModalRespuesta = false;
+        $this->respuestaSoloLectura = false;
+        $this->actividadRespondiendoId = null;
 
-        return;
+        session()->flash('mensaje', 'Tu entrega se guardó correctamente.');
     }
 
-    $archivoAnterior = $entrega?->archivo;
-    $rutaArchivo = $archivoAnterior;
+    public function abrirRespuesta(int $actividadId): void
+    {
+        $estudiante = Auth::user()?->estudiante;
 
-    if ($this->archivoRespuesta) {
-        $rutaArchivo = $this->archivoRespuesta->store(
-            'entregas',
-            'public'
-        );
+        if (!$estudiante) {
+            abort(403, 'El usuario no tiene un registro de estudiante.');
+        }
+
+        $actividad = Actividad::query()
+            ->whereKey($actividadId)
+            ->where('tipo', 'taller')
+            ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
+                $query->where('estudiantes.id', $estudiante->id);
+            })
+            ->with('evaluacion.calificaciones')
+            ->firstOrFail();
+
+        $entrega = ActividadRespuesta::query()
+            ->where('actividad_id', $actividad->id)
+            ->where('estudiante_id', $estudiante->id)
+            ->first();
+
+        $calificada = $this->estaCalificada($actividad, $estudiante->id);
+        $fechaLimite = $this->obtenerFechaLimite($actividad);
+        $vencida = $fechaLimite && now()->greaterThan($fechaLimite);
+
+        $this->respuestaSoloLectura = $calificada || $vencida;
+        $this->actividadRespondiendoId = $actividad->id;
+        $this->asuntoRespuesta = $entrega?->asunto ?? '';
+        $this->textoRespuesta = $entrega?->respuesta ?? '';
+        $this->archivoRespuestaExistente = $entrega?->archivo;
+        $this->archivoRespuesta = null;
+        $this->mostrarModalRespuesta = true;
+
+        $this->resetErrorBag();
     }
 
-    $entrega = ActividadRespuesta::updateOrCreate(
-        [
-            'actividad_id' => $actividad->id,
-            'estudiante_id' => $estudiante->id,
-        ],
-        [
-            'asunto' => trim($datos['asuntoRespuesta'] ?? '') ?: null,
-            'respuesta' => trim($datos['textoRespuesta'] ?? '') ?: null,
-            'archivo' => $rutaArchivo,
-        ]
-    );
+    public function cerrarModalRespuesta(): void
+    {
+        $this->mostrarModalRespuesta = false;
+        $this->respuestaSoloLectura = false;
+        $this->actividadRespondiendoId = null;
+        $this->asuntoRespuesta = '';
+        $this->textoRespuesta = '';
+        $this->archivoRespuesta = null;
+        $this->archivoRespuestaExistente = null;
 
-    // Elimina el archivo anterior solo si se guardó uno nuevo.
-    if (
-        $this->archivoRespuesta
-        && $archivoAnterior
-        && $archivoAnterior !== $rutaArchivo
-    ) {
-        Storage::disk('public')->delete($archivoAnterior);
+        $this->resetErrorBag();
     }
 
-    $this->reset([
-        'asuntoRespuesta',
-        'textoRespuesta',
-        'archivoRespuesta',
-    ]);
+    public function verTaller(int $actividadId): void
+    {
+        $estudiante = Auth::user()?->estudiante;
 
-    session()->flash(
-        'mensaje',
-        'Tu entrega se guardó correctamente.'
-    );
-}
+        if (!$estudiante) {
+            abort(403, 'El usuario no tiene un registro de estudiante.');
+        }
 
-//Con esto, al abrir un taller se cargará la respuesta previa, si existe.
-//Cuando ya haya vencido el plazo, el modal se marcará como solo lectura.
-public function abrirRespuesta(int $actividadId): void
-{
-    $estudiante = auth()->user()->estudiante;
+        $actividad = Actividad::query()
+            ->whereKey($actividadId)
+            ->where('tipo', 'taller')
+            ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
+                $query->where('estudiantes.id', $estudiante->id);
+            })
+            ->with('grupo.materia')
+            ->firstOrFail();
 
-    if (!$estudiante) {
-        abort(403, 'El usuario no tiene un registro de estudiante.');
+        $fechaLimite = $this->obtenerFechaLimite($actividad);
+
+        $entregada = ActividadRespuesta::query()
+            ->where('actividad_id', $actividad->id)
+            ->where('estudiante_id', $estudiante->id)
+            ->exists();
+
+        $this->detalleTaller = [
+            'titulo' => $actividad->titulo,
+            'descripcion' => $actividad->descripcion,
+            'materia' => $actividad->grupo?->materia?->nombre ?? 'Sin asignatura',
+            'fecha_limite' => $fechaLimite?->format('d/m/Y H:i'),
+            'vencida' => $fechaLimite ? now()->greaterThan($fechaLimite) : false,
+            'entregada' => $entregada,
+        ];
+
+        $this->mostrarModalDetalleTaller = true;
     }
 
-    $actividad = Actividad::query()
-        ->whereKey($actividadId)
-        ->where('tipo', 'taller')
-        ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
-            $query->where('estudiantes.id', $estudiante->id);
-        })
-        ->firstOrFail();
+    public function cerrarModalDetalleTaller(): void
+    {
+        $this->mostrarModalDetalleTaller = false;
+        $this->detalleTaller = null;
+    }
 
-    $entrega = ActividadRespuesta::query()
-        ->where('actividad_id', $actividad->id)
-        ->where('estudiante_id', $estudiante->id)
-        ->first();
+    public function verRespuesta(int $actividadId): void
+    {
+        $estudiante = Auth::user()?->estudiante;
 
-    $this->actividadRespondiendoId = $actividad->id;
-    $this->asuntoRespuesta = $entrega?->asunto ?? '';
-    $this->textoRespuesta = $entrega?->respuesta ?? '';
-    $this->archivoRespuestaExistente = $entrega?->archivo;
-    $this->archivoRespuesta = null;
+        if (!$estudiante) {
+            abort(403, 'El usuario no tiene un registro de estudiante.');
+        }
 
-    $this->respuestaSoloLectura = false;
+        $actividad = Actividad::query()
+            ->whereKey($actividadId)
+            ->where('tipo', 'taller')
+            ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
+                $query->where('estudiantes.id', $estudiante->id);
+            })
+            ->with('evaluacion.calificaciones')
+            ->firstOrFail();
 
-    if ($actividad->fecha_limite) {
-        $fechaLimite = \Illuminate\Support\Carbon::parse(
+        $entrega = ActividadRespuesta::query()
+            ->where('actividad_id', $actividad->id)
+            ->where('estudiante_id', $estudiante->id)
+            ->firstOrFail();
+
+        $calificacion = $actividad->evaluacion?->calificaciones
+            ->firstWhere('estudiante_id', $estudiante->id);
+
+        $this->respuestaDetalle = [
+            'titulo' => $actividad->titulo,
+            'asunto' => $entrega->asunto,
+            'respuesta' => $entrega->respuesta,
+            'archivo' => $entrega->archivo,
+            'nota' => $calificacion?->nota,
+            'comentario' => $calificacion?->comentario,
+        ];
+
+        $this->mostrarModalVerRespuesta = true;
+    }
+
+    public function cerrarModalVerRespuesta(): void
+    {
+        $this->mostrarModalVerRespuesta = false;
+        $this->respuestaDetalle = null;
+    }
+
+    private function estaCalificada(Actividad $actividad, int $estudianteId): bool
+    {
+        return $actividad->evaluacion
+            ?->calificaciones()
+            ->where('estudiante_id', $estudianteId)
+            ->exists() ?? false;
+    }
+
+    private function obtenerFechaLimite(Actividad $actividad): ?Carbon
+    {
+        if (!$actividad->fecha_limite) {
+            return null;
+        }
+
+        return Carbon::parse(
             $actividad->fecha_limite->format('Y-m-d')
             . ' '
             . ($actividad->hora_limite ?? '23:59')
         );
-
-        $this->respuestaSoloLectura = now()->greaterThan($fechaLimite);
     }
 
-    $this->mostrarModalRespuesta = true;
+    public function render()
+    {
+        $estudiante = Auth::user()?->estudiante;
 
-    $this->resetErrorBag();
-}
+        if (!$estudiante) {
+            abort(403, 'El usuario no tiene un registro de estudiante.');
+        }
 
-public function cerrarModalRespuesta(): void
-{
-    $this->mostrarModalRespuesta = false;
-    $this->respuestaSoloLectura = false;
-    $this->actividadRespondiendoId = null;
-    $this->asuntoRespuesta = '';
-    $this->textoRespuesta = '';
-    $this->archivoRespuesta = null;
-    $this->archivoRespuestaExistente = null;
+        $grupos = $estudiante->grupos()
+            ->with([
+                'materia',
+                'docente.user',
+                'actividades' => function ($query) use ($estudiante) {
+                    $query->where('tipo', 'taller')
+                        ->with([
+                            'evaluacion.calificaciones',
+                            'respuestas' => function ($respuestaQuery) use ($estudiante) {
+                                $respuestaQuery->where(
+                                    'estudiante_id',
+                                    $estudiante->id
+                                );
+                            },
+                        ]);
+                },
+            ])
+            ->orderByDesc('anio')
+            ->orderBy('semestre')
+            ->get();
 
-    $this->resetErrorBag();
-}
+        $actividades = $grupos
+            ->flatMap(function ($grupo) {
+                return $grupo->actividades->map(function ($actividad) use ($grupo) {
+                    $actividad->materia_nombre = $grupo->materia->nombre;
+                    $actividad->respuestaEstudiante = $actividad->respuestas->first();
+                    $actividad->calificacionEstudiante = $actividad->evaluacion
+                        ?->calificaciones
+                        ?->firstWhere(
+                            'estudiante_id',
+                            Auth::user()->estudiante->id
+                        );
 
-
-
-public function verTaller(int $actividadId): void
-{
-    $estudiante = auth()->user()->estudiante;
-
-    if (!$estudiante) {
-        abort(403, 'El usuario no tiene un registro de estudiante.');
-    }
-
-    $actividad = Actividad::query()
-        ->whereKey($actividadId)
-        ->where('tipo', 'taller')
-        ->whereHas('grupo.estudiantes', function ($query) use ($estudiante) {
-            $query->where('estudiantes.id', $estudiante->id);
-        })
-        ->with('grupo.materia')
-        ->firstOrFail();
-
-    $fechaLimite = null;
-
-    if ($actividad->fecha_limite) {
-        $fechaLimite = \Illuminate\Support\Carbon::parse(
-            $actividad->fecha_limite->format('Y-m-d')
-            . ' '
-            . ($actividad->hora_limite ?? '23:59')
-        );
-    }
-
-    $entregada = ActividadRespuesta::query()
-        ->where('actividad_id', $actividad->id)
-        ->where('estudiante_id', $estudiante->id)
-        ->exists();
-
-    $this->detalleTaller = [
-        'titulo' => $actividad->titulo,
-        'descripcion' => $actividad->descripcion,
-        'materia' => $actividad->grupo?->materia?->nombre ?? 'Sin asignatura',
-        'fecha_limite' => $fechaLimite?->format('d/m/Y H:i'),
-        'vencida' => $fechaLimite?->isPast() ?? false,
-        'entregada' => $entregada,
-    ];
-
-    $this->mostrarModalDetalleTaller = true;
-}
-
-public function cerrarModalDetalleTaller(): void
-{
-    $this->mostrarModalDetalleTaller = false;
-    $this->detalleTaller = null;
-}
-
-
-
-public function render()
-{
-    $estudiante = Auth::user()->estudiante;
-
-    if (!$estudiante) {
-        abort(403, 'El usuario no tiene un registro de estudiante.');
-    }
-
-    $grupos = $estudiante->grupos()
-        ->with([
-            'materia',
-            'docente.user',
-            'actividades' => function ($query) use ($estudiante) {
-                $query->where('tipo', 'taller')
-                    ->with([
-                        'respuestas' => function ($respuestaQuery) use ($estudiante) {
-                            $respuestaQuery->where(
-                                'estudiante_id',
-                                $estudiante->id
-                            );
-                        },
-                    ]);
-            },
-        ])
-        ->orderByDesc('anio')
-        ->orderBy('semestre')
-        ->get();
-
-    $actividades = $grupos
-        ->flatMap(function ($grupo) {
-            return $grupo->actividades->map(function ($actividad) use ($grupo) {
-                $actividad->materia_nombre = $grupo->materia->nombre;
-                $actividad->respuestaEstudiante = $actividad->respuestas->first();
-
-                return $actividad;
-            });
-        })
-        ->sortBy(function ($actividad) {
-            return ($actividad->fecha_limite?->format('Y-m-d') ?? '9999-12-31')
-                . ' '
-                . ($actividad->hora_limite ?? '23:59');
-        })
-        ->values();
-
-    if ($this->filtro === 'pendientes') {
-        $actividades = $actividades
-            ->filter(fn ($actividad) => !$actividad->respuestaEstudiante)
+                    return $actividad;
+                });
+            })
+            ->sortBy(function ($actividad) {
+                return ($actividad->fecha_limite?->format('Y-m-d') ?? '9999-12-31')
+                    . ' '
+                    . ($actividad->hora_limite ?? '23:59');
+            })
             ->values();
-    } elseif ($this->filtro === 'entregados') {
-        $actividades = $actividades
-            ->filter(fn ($actividad) => (bool) $actividad->respuestaEstudiante)
-            ->values();
+
+        if ($this->filtro === 'pendientes') {
+            $actividades = $actividades
+                ->filter(fn ($actividad) => !$actividad->respuestaEstudiante)
+                ->values();
+        } elseif ($this->filtro === 'entregados') {
+            $actividades = $actividades
+                ->filter(fn ($actividad) => (bool) $actividad->respuestaEstudiante)
+                ->values();
+        }
+
+        return view('components.estudiante.⚡talleres', [
+            'actividades' => $actividades,
+        ])->layout('layouts.estudiante');
     }
-
-    return view('components.estudiante.⚡talleres', [
-        'actividades' => $actividades,
-    ])->layout('layouts.estudiante');
-}
-
 }

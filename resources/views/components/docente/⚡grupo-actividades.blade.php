@@ -490,7 +490,7 @@
                                 @if ($respuesta->archivo)
                                     <p class="mt-2 text-sm">
                                         <a
-                                            href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($respuesta->archivo) }}"
+                                            href="{{ asset('storage/' . $respuesta->archivo) }}"
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             class="font-medium text-indigo-600 hover:underline"
@@ -927,7 +927,7 @@
 
             @if ($detalleRespuesta['archivo'])
                 <a
-                    href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($detalleRespuesta['archivo']) }}"
+                    href="{{ asset('storage/' . $detalleRespuesta['archivo']) }}"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 text-indigo-700 hover:bg-indigo-100"
