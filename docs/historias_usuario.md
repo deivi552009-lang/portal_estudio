@@ -1,7 +1,7 @@
 # Historias de Usuario
 
 > Inferidas a partir de las rutas de `routes/web.php` y `routes/auth.php`, los controladores de `app/Http/Controllers/` (Breeze + `ProfileController`) y los componentes Livewire a los que apuntan las rutas de negocio.
-> Última actualización: 2026-10-05.
+> Última actualización: 2026-10-17.
 
 ## Roles
 
@@ -18,7 +18,7 @@
 2. [Grupos y estudiantes (docente)](#epica-2-grupos-y-estudiantes-docente) — HU-013 a HU-018
 3. [Evaluaciones y calificaciones (docente)](#epica-3-evaluaciones-y-calificaciones-docente) — HU-019 a HU-022
 4. [Asistencia (docente)](#epica-4-asistencia-docente) — HU-023 a HU-024
-5. [Actividades (docente)](#epica-5-actividades-docente) — HU-025 a HU-028
+5. [Actividades (docente)](#epica-5-actividades-docente) — HU-025 a HU-028, HU-034 y HU-035
 6. [Panel del estudiante](#epica-6-panel-del-estudiante) — HU-029 a HU-033
 
 ---
@@ -306,6 +306,7 @@
 
 - Valida: grupo seleccionado (existente), tipo (máx. 30), título (máx. 255), fecha y hora límite; el archivo es opcional.
 - El tipo de la actividad se guarda normalizado a minúsculas (p. ej., "Taller" se almacena como "taller") para que los conteos no dependan de la mayúscula con la que se escribió.
+- Si el tipo es `taller`, se crea automáticamente (en la misma transacción) una evaluación del grupo vinculada a la actividad (`evaluaciones.actividad_id`, `porcentaje = 0`, `tipo = 'taller'`, nombre = título del taller); si el título cambia, la evaluación se renombra; si la actividad deja de ser taller, la evaluación se conserva.
 - Solo se aceptan archivos PDF, Word, Excel, PowerPoint y ZIP, de hasta 10 MB.
 - El archivo se guarda en el disco público bajo `actividades/`.
 - El mensaje "La actividad fue creada correctamente." se muestra al docente.
@@ -342,6 +343,29 @@
 - También existe la vista filtrada por grupo (`/docente/grupo/{grupoId}/actividades`).
 - El enlace "Ver archivo" abre el archivo adjunto en línea (`docente.actividad.archivo`); solo se puede ver si la actividad pertenece a un grupo del docente autenticado (de lo contrario el sistema responde 403, o 404 si el archivo no existe en el disco).
 
+### HU-034 — Revisar y calificar las entregas de un taller
+
+**Como** docente, **quiero** ver las entregas de los estudiantes de un taller y asignarles una calificación, **para** hacer seguimiento y evaluar lo que entregaron.
+
+#### Criterios de aceptación
+
+- El botón "Respuestas" de cada taller abre la lista de entregas (estudiante, asunto, resumen, fecha de envío y archivo adjunto).
+- El listado muestra un contador de entregas **sin leer**; al abrir el detalle de una entrega se marca como leída (`leida_at`).
+- El docente puede calificar cada entrega con una nota de 0 a 5, que se guarda en la evaluación vinculada al taller (`calificaciones`); la entrega muestra su nota actual.
+- Solo se pueden calificar actividades de tipo `taller` con evaluación vinculada, y solo de grupos del docente autenticado.
+- Tras calificar, el estudiante ya no puede modificar su entrega.
+
+### HU-035 — Enviar mensajes en los talleres
+
+**Como** docente, **quiero** dejar un mensaje general en un taller y mensajes individuales por entrega, **para** dar indicaciones o retroalimentación.
+
+#### Criterios de aceptación
+
+- El mensaje **general** del taller se guarda en `actividades.mensaje_docente` y el estudiante lo ve al consultar el detalle del taller y en el modal "Mi respuesta".
+- El mensaje **individual** por entrega se guarda en `actividad_respuestas.mensaje_docente` y el estudiante lo ve junto a su calificación en el modal "Mi respuesta".
+- Ambas acciones solo están disponibles para actividades de tipo `taller` de los grupos del docente autenticado (de lo contrario el sistema responde 403).
+- Los mensajes admiten hasta 5000 caracteres y pueden quedar vacíos (se guardan como `null`).
+
 ---
 
 ## Épica 6: Panel del estudiante
@@ -355,6 +379,8 @@
 - Solo se muestran los grupos donde el estudiante está inscrito.
 - Cada grupo indica su estado de clase según el horario: `proxima`, `en_curso` (con % de progreso) o `finalizada`; si no hay horario, `sin_horario`.
 - El progreso de la clase en curso va de 0 a 100 según el tiempo transcurrido entre hora de inicio y fin.
+- El dashboard muestra tarjetas de resumen: **Promedio General** (promedio de las notas finales ponderadas de las materias que tienen nota, con representación en estrellas), **Talleres Pendientes**, **Guías Disponibles** (`—`, aún no implementado) y **Próxima Entrega** (título y fecha de la actividad más próxima).
+- La sección "Mis Notas" del dashboard lista hasta 5 materias con su nota final (`—` si aún no tiene notas).
 
 ### HU-030 — Ver las actividades de mis materias
 
@@ -378,16 +404,20 @@
 - El promedio por materia se calcula con la suma ponderada (`nota × porcentaje / 100`) redondeada a 1 decimal; si ninguna evaluación tiene nota, el promedio queda vacío.
 - Si el estudiante no tiene ninguna inscripción, la vista muestra el estado vacío "No hay materias registradas".
 
-### HU-032 — Consultar mis talleres y actividades
+### HU-032 — Consultar mis talleres, entregarlos y ver mi calificación
 
-**Como** estudiante, **quiero** ver todos los talleres y actividades de mis materias con su fecha límite y estado, **para** organizarme con las entregas.
+**Como** estudiante, **quiero** ver los talleres de mis materias con su fecha límite y estado, **entregar mi respuesta** y consultar mi calificación, **para** organizarme con las entregas.
 
 #### Criterios de aceptación
 
 - La ruta `/estudiante/talleres` solo responde a usuarios con rol `estudiante` y con perfil de estudiante (si no tiene perfil, responde 403).
-- Cada fila muestra el taller (título y descripción), la asignatura, la fecha y hora de entrega y el estado: `Vencida` si la fecha ya pasó, `Pendiente` en caso contrario.
-- La lista incluye todas las actividades de los grupos del estudiante, ordenadas por fecha y hora límite (sin fecha → al final).
-- Se puede filtrar con los botones `Pendientes`, `Entregados` y `Todos`. **Nota de estado**: `Entregados` aún no está conectado al sistema de entregas y siempre muestra el estado vacío.
+- Se listan las actividades de **tipo `taller`** de sus grupos, ordenadas por fecha y hora límite (sin fecha → al final), con taller (título y descripción), asignatura, fecha/hora de entrega, estado y calificación.
+- El estado es `Revisado` si la entrega ya tiene nota, `Entregado` si existe entrega sin calificar, `Vencido` si el plazo pasó sin entrega y `Pendiente` en caso contrario.
+- Se puede filtrar con los botones `Pendientes` (por defecto), `Entregados` y `Todos`, ya conectados al sistema de entregas.
+- El estudiante puede **responder o editar** su entrega con `asunto`, texto y/o un archivo adjunto (PDF, Word, Excel, PowerPoint o ZIP; máx. 10 MB); debe aportar texto o archivo.
+- No se puede entregar/editar si el plazo (`fecha_limite` + `hora_limite`) ya venció, ni si la entrega ya fue **calificada** (en ambos casos se abre en modo solo lectura).
+- El estudiante puede ver el detalle del taller (descripción, mensaje general del docente, fecha límite) y consultar su propia respuesta con la nota, el mensaje general del docente y el mensaje individual de esa entrega.
+- Si hay un archivo adjunto del taller, se puede abrir; si la entrega ya fue revisada, el acceso al material queda bloqueado.
 
 ### HU-033 — Navegar entre las secciones del panel
 

@@ -37,6 +37,13 @@ class GrupoActividades extends Component
     public bool $mostrarConfirmacionEliminar = false;
     public bool $mostrarRespuestas = false;
     public array $notas = [];
+    public bool $mostrarModalMensaje = false;
+    public ?int $actividadMensajeId = null;
+    public string $mensajeDocente = '';
+    public bool $mostrarModalMensajeIndividual = false;
+    public ?int $respuestaMensajeId = null;
+    public string $mensajeDocenteIndividual = '';
+
 
     public function mount(?int $grupoId = null): void
     {
@@ -251,6 +258,60 @@ public function actualizarActividad(): void
     );
 }
 
+
+public function abrirModalMensaje(int $actividadId): void
+{
+    $actividad = Actividad::query()
+        ->whereKey($actividadId)
+        ->whereHas('grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+
+    if (mb_strtolower($actividad->tipo, 'UTF-8') !== 'taller') {
+        abort(403, 'Esta opción solo está disponible para talleres.');
+    }
+
+    $this->actividadMensajeId = $actividad->id;
+    $this->mensajeDocente = $actividad->mensaje_docente ?? '';
+    $this->mostrarModalMensaje = true;
+}
+
+    public function guardarMensajeDocente(): void
+{
+    $datos = $this->validate([
+        'mensajeDocente' => ['nullable', 'string', 'max:5000'],
+    ]);
+
+    $actividad = Actividad::query()
+        ->whereKey($this->actividadMensajeId)
+        ->whereHas('grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+
+    if (mb_strtolower($actividad->tipo, 'UTF-8') !== 'taller') {
+        abort(403, 'Esta opción solo está disponible para talleres.');
+    }
+
+    $actividad->update([
+        'mensaje_docente' => trim($datos['mensajeDocente'] ?? '') ?: null,
+    ]);
+
+    $this->cancelarModalMensaje();
+
+    session()->flash('mensaje', 'El mensaje del taller se guardó correctamente.');
+}
+
+    public function cancelarModalMensaje(): void
+{
+    $this->mostrarModalMensaje = false;
+    $this->actividadMensajeId = null;
+    $this->mensajeDocente = '';
+    $this->resetValidation('mensajeDocente');
+}
+
+
     public function verRespuestas(int $actividadId): void
 {
     Actividad::query()
@@ -423,6 +484,11 @@ public function abrirDetalleRespuesta(int $respuestaId): void
         })
         ->firstOrFail();
 
+        if ($respuesta->leida_at === null) {
+    $respuesta->leida_at = now();
+    $respuesta->save();
+}
+
     $this->respuestaSeleccionadaId = $respuesta->id;
     $this->detalleRespuesta = [
         'asunto' => $respuesta->asunto,
@@ -496,14 +562,83 @@ public function guardarNota(int $respuestaId): void
     session()->flash('mensaje', 'La nota se guardó correctamente.');
 }
 
+
+public function abrirMensajeIndividual(int $respuestaId): void
+{
+    $respuesta = ActividadRespuesta::query()
+        ->with('actividad')
+        ->whereKey($respuestaId)
+        ->whereHas('actividad.grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+
+    if (mb_strtolower($respuesta->actividad->tipo, 'UTF-8') !== 'taller') {
+        abort(403, 'Los mensajes individuales solo están disponibles para talleres.');
+    }
+
+    $this->respuestaMensajeId = $respuesta->id;
+    $this->mensajeDocenteIndividual = $respuesta->mensaje_docente ?? '';
+    $this->mostrarModalMensajeIndividual = true;
+}
+
+public function guardarMensajeIndividual(): void
+{
+    $datos = $this->validate([
+        'mensajeDocenteIndividual' => ['nullable', 'string', 'max:5000'],
+    ]);
+
+    if (!$this->respuestaMensajeId) {
+        return;
+    }
+
+    $respuesta = ActividadRespuesta::query()
+        ->with('actividad')
+        ->whereKey($this->respuestaMensajeId)
+        ->whereHas('actividad.grupo.docente', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->firstOrFail();
+
+    if (mb_strtolower($respuesta->actividad->tipo, 'UTF-8') !== 'taller') {
+        abort(403, 'Los mensajes individuales solo están disponibles para talleres.');
+    }
+
+    $respuesta->mensaje_docente = trim($datos['mensajeDocenteIndividual'] ?? '') ?: null;
+    $respuesta->save();
+
+    $this->cancelarMensajeIndividual();
+
+    session()->flash('mensaje', 'El mensaje individual se guardó correctamente.');
+}
+
+public function cancelarMensajeIndividual(): void
+{
+    $this->mostrarModalMensajeIndividual = false;
+    $this->respuestaMensajeId = null;
+    $this->mensajeDocenteIndividual = '';
+    $this->resetValidation('mensajeDocenteIndividual');
+}
+
+
 public function render()
 {
-    $grupos = Grupo::query()
-        ->with([
-            'materia',
-            'docente.user',
-            'actividades',
-        ])
+
+$grupos = Grupo::query()
+    ->with([
+        'materia',
+        'docente.user',
+        'actividades' => function ($query) {
+            $query
+                ->withCount('respuestas')
+                ->withCount([
+                    'respuestas as respuestas_sin_leer_count' => function ($respuestaQuery) {
+                        $respuestaQuery->whereNull('leida_at');
+                    },
+                ]);
+        },
+    ])
+
         ->whereHas('docente', function ($query) {
             $query->where('user_id', Auth::id());
         })

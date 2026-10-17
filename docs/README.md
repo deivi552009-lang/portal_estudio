@@ -16,7 +16,8 @@ La aplicación es un sistema web (sin API REST por el momento) construida sobre 
   - Matriz de calificaciones con evaluaciones dinámicas y notas 0–5.
   - Registro de asistencia por fecha (presente/ausente/excusa/tarde) e historial semestral con nota final ponderada.
   - Actividades (talleres, tareas, guías) con carga de archivos y seguimiento de vencimientos.
-- **Panel estudiante**: sus grupos, estado de cada clase (próxima/en curso/finalizada con progreso), listado de actividades de sus materias, **consulta de notas** (evaluaciones y promedio ponderado por asignatura) y **listado de talleres** con filtros; el layout incorpora un sidebar de navegación con las secciones del panel.
+  - **Talleres con entregas**: al publicar un taller se crea su evaluación automáticamente; el docente revisa las entregas de los estudiantes, las califica (0–5) con un comentario, marca la lectura y añade un mensaje general del taller o individual por entrega.
+- **Panel estudiante**: sus grupos, estado de cada clase (próxima/en curso/finalizada con progreso), listado de actividades de sus materias, **consulta de notas** (evaluaciones y promedio ponderado por asignatura) y **listado de talleres** con filtros y **entrega** (texto y/o archivo); el layout incorpora un sidebar de navegación con las secciones del panel.
 
 ## Requisitos previos
 

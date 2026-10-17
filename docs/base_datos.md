@@ -1,7 +1,7 @@
 # Modelo de Base de Datos
 
 > Documentación generada a partir de las migraciones de `database/migrations/` y los modelos de `app/Models/`.
-> Última actualización: 2026-10-03.
+> Última actualización: 2026-10-17.
 
 ## Contenido
 
@@ -23,6 +23,7 @@ El portal de estudio es una aplicación Laravel con base de datos relacional. El
 - **Perfiles**: cada usuario puede ser docente (`docentes`) o estudiante (`estudiantes`), con perfil opcional.
 - **Estructura académica**: `materias` que se imparten en `grupos` (identificados por semestre y año).
 - **Vida del grupo**: inscripciones de estudiantes (tabla pivote `grupo_estudiante`), `evaluaciones` con `calificaciones`, `asistencias` y `actividades`.
+- **Entregas**: cada estudiante responde una actividad (taller) en `actividad_respuestas`; los talleres generan una `evaluacion` vinculada por `actividades.id` para calificarlos.
 - **Periodos académicos**: tabla `periodos_academicos` independiente (sin relación con `grupos`).
 
 ### Diagrama entidad-relación
@@ -41,6 +42,9 @@ erDiagram
     GRUPOS ||--o{ ASISTENCIAS : "registra"
     ESTUDIANTES ||--o{ ASISTENCIAS : "regstra"
     GRUPOS ||--o{ ACTIVIDADES : "publica"
+    ACTIVIDADES ||--o| EVALUACIONES : "genera (si es taller)"
+    ACTIVIDADES ||--o{ ACTIVIDAD_RESPUESTAS : "recibe"
+    ESTUDIANTES ||--o{ ACTIVIDAD_RESPUESTAS : "entrega"
 
     PERIODOS_ACADEMICOS ||--|| PERIODOS_ACADEMICOS : "tabla independiente"
 ```
@@ -145,14 +149,16 @@ Leyenda de tipos (definidos en Laravel → tipo físico en MySQL):
 |---|---|---|
 | `id` | `id()` | Clave primaria |
 | `grupo_id` | `foreignId` | FK → `grupos.id`, `ON DELETE CASCADE` |
+| `actividad_id` | `foreignId` | FK → `actividades.id`, NULLABLE, `ON DELETE CASCADE`, UNIQUE (agregada en 2026-10-08). Vincula la evaluación con el taller que la generó |
 | `nombre` | `string` | NO NULL |
-| `tipo` | `enum` | `('parcial', 'asistencia_final', 'personalizada')` |
+| `tipo` | `enum` | `('parcial', 'asistencia_final', 'personalizada')` en la migración inicial; la aplicación también escribe `'taller'` (en PostgreSQL el `CHECK` derivado se eliminó en 2026-08-21; ver observación en `docs/arquitectura.md`) |
 | `porcentaje` | `decimal(5,2)` | NULLABLE |
 | `fecha` | `date` | NULLABLE |
 | `orden` | `integer` | DEFAULT 0 (agregada en 2026-08-21) |
 | `created_at`, `updated_at` | `timestamps` | |
 
 > Ver [nota 7.1](#7-historial-de-migraciones-y-notas): esta tabla tuvo tres intentos de migración; el esquema efectivo es el de 2026-08-13 más la columna `orden`.
+> La evaluación de un taller se crea con `porcentaje = 0` y `tipo = 'taller'` (ver Decisión 008 en `docs/arquitectura.md`).
 
 ### 2.9 `calificaciones`
 
@@ -162,6 +168,7 @@ Leyenda de tipos (definidos en Laravel → tipo físico en MySQL):
 | `evaluacion_id` | `foreignId` | FK → `evaluaciones.id`, `ON DELETE CASCADE` |
 | `estudiante_id` | `foreignId` | FK → `estudiantes.id`, `ON DELETE CASCADE` |
 | `nota` | `decimal(4,2)` | NULLABLE |
+| `comentario` | `text` | NULLABLE (agregada en 2026-10-13). Retroalimentación del docente sobre la entrega |
 | `created_at`, `updated_at` | `timestamps` | |
 | — | — | UNIQUE (`evaluacion_id`, `estudiante_id`): una sola nota por estudiante y evaluación |
 
@@ -201,7 +208,27 @@ Leyenda de tipos (definidos en Laravel → tipo físico en MySQL):
 | `fecha_limite` | `date` | NO NULL |
 | `hora_limite` | `time` | NO NULL |
 | `archivo` | `string` | NULLABLE (agregada en 2026-09-15) |
+| `mensaje_docente` | `text` | NULLABLE (agregada en 2026-10-14). Mensaje general del docente para el taller |
 | `created_at`, `updated_at` | `timestamps` | |
+
+### 2.13 `actividad_respuestas`
+
+Entregas de los estudiantes para las actividades tipo `taller` (una por estudiante y actividad).
+
+| Columna | Tipo | Restricciones / notas |
+|---|---|---|
+| `id` | `id()` | Clave primaria |
+| `actividad_id` | `foreignId` | FK → `actividades.id`, `ON DELETE CASCADE` |
+| `estudiante_id` | `foreignId` | FK → `estudiantes.id`, `ON DELETE CASCADE` |
+| `asunto` | `string` | NULLABLE |
+| `respuesta` | `text` | NULLABLE |
+| `archivo` | `string` | NULLABLE; archivo subido a `entregas/` (disco `public`) |
+| `mensaje_docente` | `text` | NULLABLE (agregada en 2026-10-15). Retroalimentación individual del docente para esa entrega |
+| `leida_at` | `timestamp` | NULLABLE (agregada en 2026-10-14). Se marca al abrir el docente el detalle de la entrega |
+| `created_at`, `updated_at` | `timestamps` | |
+| — | — | UNIQUE (`actividad_id`, `estudiante_id`): una entrega por estudiante y actividad |
+
+> Puede entregarse texto, archivo o ambos. La fila se crea o actualiza con `updateOrCreate`; al reemplazar el archivo se elimina el anterior del disco.
 
 ---
 
@@ -249,9 +276,12 @@ Todas las tablas del dominio usan `id` BIGINT autoincremental como PK, salvo:
 | `asistencias` | `grupo_id` | `grupos.id` | **CASCADE** |
 | `asistencias` | `estudiante_id` | `estudiantes.id` | **CASCADE** |
 | `actividades` | `grupo_id` | `grupos.id` | **CASCADE** |
+| `evaluaciones` | `actividad_id` | `actividades.id` | **CASCADE** (NULLABLE, UNIQUE) |
+| `actividad_respuestas` | `actividad_id` | `actividades.id` | **CASCADE** |
+| `actividad_respuestas` | `estudiante_id` | `estudiantes.id` | **CASCADE** |
 
 > Nota: `sessions.user_id` tiene índice pero **no** declara restricción foránea.
-> Efecto práctico del CASCADE: borrar un `grupo` elimina automáticamente sus inscripciones, evaluaciones, asistencias y actividades; borrar un `estudiante` borra sus inscripciones, calificaciones y asistencias; borrar una `evaluacion` borra sus `calificaciones`.
+> Efecto práctico del CASCADE: borrar un `grupo` elimina automáticamente sus inscripciones, evaluaciones, asistencias y actividades (y, en cadena, las `actividad_respuestas` y evaluaciones de taller de esas actividades); borrar un `estudiante` borra sus inscripciones, calificaciones, asistencias y entregas; borrar una `evaluacion` borra sus `calificaciones`; borrar una `actividad` borra su `evaluacion` vinculada y sus `actividad_respuestas`.
 
 ### 4.3 Índices únicos (multi-columna y de columna)
 
@@ -265,6 +295,8 @@ Todas las tablas del dominio usan `id` BIGINT autoincremental como PK, salvo:
 | `calificaciones` | (`evaluacion_id`, `estudiante_id`) |
 | `asistencias` | (`grupo_id`, `estudiante_id`, `fecha`) |
 | `periodos_academicos` | (`semestre`, `anio`) |
+| `evaluaciones` | `actividad_id` |
+| `actividad_respuestas` | (`actividad_id`, `estudiante_id`) |
 | `failed_jobs` | `uuid` |
 
 PostgreSQL no crea automáticamente índices sobre las columnas de claves foráneas. Los índices necesarios deben declararse explícitamente cuando las consultas y relaciones del dominio lo requieran.
@@ -286,6 +318,7 @@ Relaciones definidas en `app/Models/`:
 | `Estudiante` | `user()` | `belongsTo` | `User` | |
 | `Estudiante` | `grupos()` | `belongsToMany` | `Grupo` | Pivote: `grupo_estudiante` |
 | `Estudiante` | `calificaciones()` | `hasMany` | `Calificacion` | |
+| `Estudiante` | `actividadRespuestas()` | `hasMany` | `ActividadRespuesta` | |
 | `Materia` | `grupos()` | `hasMany` | `Grupo` | |
 | `Grupo` | `materia()` | `belongsTo` | `Materia` | |
 | `Grupo` | `docente()` | `belongsTo` | `Docente` | |
@@ -295,11 +328,16 @@ Relaciones definidas en `app/Models/`:
 | `Grupo` | `actividades()` | `hasMany` | `Actividad` | |
 | `Evaluacion` | `grupo()` | `belongsTo` | `Grupo` | |
 | `Evaluacion` | `calificaciones()` | `hasMany` | `Calificacion` | |
+| `Evaluacion` | `actividad()` | `belongsTo` | `Actividad` | Vía `evaluaciones.actividad_id` (NULLABLE) |
 | `Calificacion` | `evaluacion()` | `belongsTo` | `Evaluacion` | |
 | `Calificacion` | `estudiante()` | `belongsTo` | `Estudiante` | |
 | `Asistencia` | `grupo()` | `belongsTo` | `Grupo` | |
 | `Asistencia` | `estudiante()` | `belongsTo` | `Estudiante` | |
 | `Actividad` | `grupo()` | `belongsTo` | `Grupo` | |
+| `Actividad` | `respuestas()` | `hasMany` | `ActividadRespuesta` | |
+| `Actividad` | `evaluacion()` | `hasOne` | `Evaluacion` | Vía `evaluaciones.actividad_id` |
+| `ActividadRespuesta` | `actividad()` | `belongsTo` | `Actividad` | |
+| `ActividadRespuesta` | `estudiante()` | `belongsTo` | `Estudiante` | |
 | `PeriodoAcademico` | — | — | — | Sin relaciones definidas |
 
 ### Observaciones de diseño
@@ -322,11 +360,14 @@ Relaciones definidas en `app/Models/`:
 | `Docente` | `docentes` (por convención) | `user_id`, `telefono` | — |
 | `Estudiante` | `estudiantes` (por convención) | `user_id`, `telefono`, `carrera` | — |
 | `Grupo` | `grupos` (por convención) | `materia_id`, `docente_id`, `semestre`, `anio`, `fecha_creacion`, `hora_inicio`, `hora_fin` | `fecha_creacion` → date, `semestre` → integer, `anio` → integer |
-| `Evaluacion` | `evaluaciones` **(explicito)** | `grupo_id`, `nombre`, `porcentaje`, `tipo`, `fecha` | — |
-| `Calificacion` | `calificaciones` **(explicito)** | `evaluacion_id`, `estudiante_id`, `nota` | — |
+| `Evaluacion` | `evaluaciones` **(explicito)** | `grupo_id`, `actividad_id`, `nombre`, `porcentaje`, `tipo`, `fecha` | — |
+| `Calificacion` | `calificaciones` **(explicito)** | `evaluacion_id`, `estudiante_id`, `nota`, `comentario` | — |
 | `Asistencia` | `asistencias` (por convención) | `grupo_id`, `estudiante_id`, `fecha`, `presente`, `observacion` | `fecha` → date |
 | `PeriodoAcademico` | `periodos_academicos` **(explicito)** | `semestre`, `anio`, `activo` | `semestre` → integer, `anio` → integer, `activo` → boolean |
-| `Actividad` | `actividades` **(explicito)** | `grupo_id`, `tipo`, `titulo`, `descripcion`, `fecha_limite`, `hora_limite`, `archivo` | `fecha_limite` → date |
+| `Actividad` | `actividades` **(explicito)** | `grupo_id`, `tipo`, `titulo`, `descripcion`, `fecha_limite`, `hora_limite`, `archivo`, `mensaje_docente` | `fecha_limite` → date |
+| `ActividadRespuesta` | `actividad_respuestas` (por convención) | `actividad_id`, `estudiante_id`, `asunto`, `respuesta`, `archivo`, `mensaje_docente` | — |
+
+> `ActividadRespuesta` no declara `leida_at` en `fillable`; el componente docente lo asigna directamente al abrir la entrega. La pluralización por convención de `ActividadRespuesta` produce `actividad_respuestas`, que coincide con el nombre de la tabla.
 
 > Los modelos `Evaluacion`, `Calificacion` y `Actividad` definen `$table` explícitamente porque la pluralización por convención de Laravel produciría `evaluations` / `califications` (plural inglés) en lugar de `evaluaciones` / `calificaciones`.
 > `User` oculta `password` y `remember_token` en la serialización y usa `HasFactory` y `Notifiable`.
@@ -371,3 +412,8 @@ La carpeta contiene varias migraciones que intentan crear/modificar las mismas t
 | `2026_09_10_174931_create_periodos_academicos_table` | Crea `periodos_academicos` |
 | `2026_09_13_162848_create_actividads_table` | Crea `actividades` |
 | `2026_09_15_142022_add_archivo_to_actividades_table` | Agrega `actividades.archivo` VARCHAR(255) NULLABLE |
+| `2026_10_08_043138_create_actividad_respuestas_table` | Crea `actividad_respuestas` (unique `actividad_id` + `estudiante_id`) |
+| `2026_10_08_043257_add_actividad_id_to_evaluaciones_table` | Agrega `evaluaciones.actividad_id` FK → `actividades` (NULLABLE, UNIQUE, CASCADE) |
+| `2026_10_13_014729_add_comentario_to_calificaciones_table` | Agrega `calificaciones.comentario` TEXT NULLABLE |
+| `2026_10_14_152329_add_mensaje_docente_and_leida_at_columns` | Agrega `actividades.mensaje_docente` y `actividad_respuestas.leida_at` |
+| `2026_10_15_161041_add_mensaje_docente_to_actividad_respuestas_table` | Agrega `actividad_respuestas.mensaje_docente` TEXT NULLABLE |

@@ -1,7 +1,116 @@
 # Changelog de documentación y cambios
 
 > Registro de los cambios de código recientes y de los documentos de `docs/` que los describen.
-> Última actualización: 2026-10-05.
+> Última actualización: 2026-10-17.
+
+### Documentación actualizada en `docs/` (2026-10-16, incluida en el commit `7f4e3db`)
+
+| Documento | Qué se actualizó |
+|---|---|
+| `docs/base_datos.md` | Nueva tabla `actividad_respuestas`; columnas `evaluaciones.actividad_id`, `calificaciones.comentario` y `actividades.mensaje_docente`; relaciones de `Actividad`, `Evaluacion` y `ActividadRespuesta`; claves foráneas/únicas y las 5 migraciones nuevas. |
+| `docs/arquitectura.md` | Páginas del panel estudiante (entregas y promedio real) y del docente (gestión de entregas, calificación y mensajes); `Models` a 12; nuevas **Decisiones 008, 009 y 010**; observaciones (placeholders restantes, contador de talleres y `evaluaciones.tipo`). |
+| `docs/historias_usuario.md` | HU-025 (evaluación automática del taller), HU-029 (tarjetas del dashboard) y HU-032 (entrega y calificación de talleres); nuevas **HU-034** (revisar/calificar entregas) y **HU-035** (mensajes de talleres). |
+| `docs/roadmap.md` | Panel docente y estudiante al día; Fase 2.3 (entrega de talleres, archivos, sincronización del dashboard) y nuevos pendientes/riesgos. |
+| `docs/README.md` | Características de talleres con entregas (docente y estudiante). |
+| `docs/changelog.md` | Este documento. |
+
+---
+
+## 2026-10-17 — Calificación de talleres y mensajes docente–estudiante (commit `7f4e3db`)
+
+> `Calificacion de talleres y mensajes docente estudiante funcional`
+>
+> Este commit confirma (y amplía) el trabajo de mensajes y lectura de entregas que estaba en el árbol de trabajo. Incluye además todos los documentos de `docs/` actualizados el 2026-10-16.
+
+### Archivos nuevos
+
+| Archivo | Tipo | Descripción |
+|---|---|---|
+| `database/migrations/2026_10_14_152329_add_mensaje_docente_and_leida_at_columns.php` | Migración | Agrega `actividades.mensaje_docente` (TEXT NULLABLE) y `actividad_respuestas.leida_at` (timestamp NULLABLE). |
+| `database/migrations/2026_10_15_161041_add_mensaje_docente_to_actividad_respuestas_table.php` | Migración | Agrega `actividad_respuestas.mensaje_docente` (TEXT NULLABLE). |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `app/Models/Actividad.php` | Añade `mensaje_docente` a `fillable`. |
+| `app/Models/ActividadRespuesta.php` | Añade `mensaje_docente` a `fillable`. |
+| `app/Livewire/Docente/GrupoActividades.php` | Mensaje general del taller (`abrirModalMensaje` / `guardarMensajeDocente` / `cancelarModalMensaje`), mensaje individual por entrega (`abrirMensajeIndividual` / `guardarMensajeIndividual` / `cancelarMensajeIndividual`) y marcado de `leida_at` al abrir el detalle de una entrega. El listado calcula `respuestas` y `respuestas_sin_leer_count` (`whereNull('leida_at')`). Ambos mensajes validan `max:5000` y que la actividad sea `taller` del docente autenticado. |
+| `app/Livewire/Estudiante/Talleres.php` | `verTaller()` expone el mensaje general del taller; `verRespuesta()` expone `mensaje_general` (de la actividad) y `mensaje_docente` (de la entrega). Ajustes de robustez: `estaCalificada()` comprueba primero la existencia de `evaluacion`; `obtenerFechaLimite()` acepta `fecha_limite` como `Carbon` o string; materiales/fechas con respaldo (`Sin asignatura`, `9999-12-31`). |
+| `resources/views/components/docente/⚡grupo-actividades.blade.php` | Botón "Añadir/editar mensaje del taller", botón de mensaje individual por entrega, modales de mensaje (general e individual), modal de "Detalle de la entrega" y badge de respuestas sin leer (icono ámbar con contador o check verde). |
+| `resources/views/components/estudiante/⚡talleres.blade.php` | El detalle del taller y el modal "Mi respuesta" muestran el **mensaje general** del docente (bloque azul) y el **mensaje individual** (bloque esmeralda junto a la calificación); la nota en la tabla muestra el mensaje general en el `title`. |
+
+### Documentación actualizada en `docs/`
+
+Los seis documentos de `docs/` se actualizaron el 2026-10-16 (ver la tabla al inicio) y quedan confirmados dentro de este commit.
+
+> **Nota**: el commit fusiona en uno solo el trabajo de código (14–15/10) y la actualización de documentación (16/10).
+
+---
+
+## 2026-10-13 — Comentario del docente en la calificación del taller (commit `a0ea168`)
+
+> `Agregar comentario a talleres estudiantes`
+
+### Archivos nuevos
+
+| Archivo | Tipo | Descripción |
+|---|---|---|
+| `database/migrations/2026_10_13_014729_add_comentario_to_calificaciones_table.php` | Migración | Agrega `calificaciones.comentario` (TEXT NULLABLE). |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `app/Models/Calificacion.php` | Añade `comentario` a `fillable`. |
+| `app/Livewire/Estudiante/Talleres.php` | `verRespuesta()` expone `comentario` de la calificación. |
+| `resources/views/components/estudiante/⚡talleres.blade.php` | Muestra la nota sobre 5 (con el comentario en el `title`) y el comentario en el modal de la respuesta. |
+| `resources/views/components/docente/⚡grupo-actividades.blade.php` | Ajustes de la vista de entregas. |
+
+---
+
+## 2026-10-09 / 2026-10-12 — Talleres: evaluación automática y entregas (commits `66cbee5`, `08e9fc5`, `91d46e9`)
+
+> `Avance estable con la IA anterior` · `Actualiza talleres y actividades de grupo...` · `Últimos cambios antes de fusionar`
+
+### Archivos nuevos
+
+| Archivo | Tipo | Descripción |
+|---|---|---|
+| `app/Models/ActividadRespuesta.php` | Modelo | Entrega de un estudiante para una actividad (`actividad_id`, `estudiante_id`, `asunto`, `respuesta`, `archivo`); relaciones `actividad()` y `estudiante()`. |
+| `database/migrations/2026_10_08_043138_create_actividad_respuestas_table.php` | Migración | Crea `actividad_respuestas` (FK a `actividades` y `estudiantes` con CASCADE; UNIQUE `actividad_id` + `estudiante_id`). |
+| `database/migrations/2026_10_08_043257_add_actividad_id_to_evaluaciones_table.php` | Migración | Agrega `evaluaciones.actividad_id` (FK NULLABLE, UNIQUE, CASCADE). |
+| `cambios.txt` | Nota | Resumen del flujo taller → evaluación → calificaciones/entregas (archivo temporal de apoyo, no documentación oficial). |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `app/Models/Actividad.php` | Relaciones `respuestas()` (hasMany) y `evaluacion()` (hasOne). |
+| `app/Models/Evaluacion.php` | Añade `actividad_id` a `fillable` y la relación `actividad()` (belongsTo). |
+| `app/Models/Estudiante.php` | Relación `actividadRespuestas()` (hasMany). |
+| `app/Livewire/Docente/GrupoActividades.php` | `crearActividad()`/`actualizarActividad()` en transacción y **creación automática de la evaluación del taller** (vinculada por `actividad_id`); nuevos métodos `verRespuestas()`, `cerrarRespuestas()`, `abrirDetalleRespuesta()`, `verRespuesta()`, `guardarNota()`. |
+| `app/Livewire/Estudiante/Talleres.php` | Deja de ser solo lectura: `abrirRespuesta()`, `guardarRespuesta()`, `cerrarModalRespuesta()`, `verTaller()`, `verRespuesta()`; filtros `pendientes`/`entregados`/`todos` conectados a `actividad_respuestas`; archivo de entrega en `entregas/`. |
+| `resources/views/components/docente/⚡grupo-actividades.blade.php` | Vista de entregas del taller (estudiante, asunto, archivo, formulario de nota) y botón "Respuestas". |
+| `resources/views/components/estudiante/⚡talleres.blade.php` | Tabla con estado (Revisado/Entregado/Vencido/Pendiente), columna de calificación y modales de respuesta/detalle. |
+| `resources/views/layouts/estudiante.blade.php` | Ajustes menores del layout. |
+
+---
+
+## 2026-10-07 — Promedio general, notas finales y rediseño del panel estudiante (commits `4be769b`, `6e44668`, `633949e`)
+
+> `Muestra promedio general y notas finales...` · `Mejora visual del dashboard y notas...` · `Mejora visual... estrellas del promedio, tarjetas de notas y acciones de talleres`
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `app/Livewire/Estudiante/Dashboard.php` | Calcula la **nota final** por grupo (suma ponderada) y el **promedio general** (promedio de las notas finales con nota). |
+| `app/Livewire/Estudiante/Notas.php` | Añade `aprobada` (`promedio >= 3.0`) al resultado por materia. |
+| `resources/views/components/estudiante/⚡dashboard.blade.php` | Tarjeta "Promedio General" real con estrellas, "Mis Notas" con nota final y "Próxima Entrega". |
+| `resources/views/components/estudiante/⚡notas.blade.php` | Chips de evaluación con color según la nota y promedio con color. |
+| `resources/views/components/estudiante/⚡talleres.blade.php` | Acciones de talleres (ver, responder) y ajustes visuales. |
+| `.gitignore` | Ignora archivos de respaldo. |
 
 ---
 
@@ -40,9 +149,9 @@
 
 ### Pendientes detectados (ver `docs/roadmap.md`)
 
-- Las tarjetas "Promedio General" y "Guías Disponibles" del dashboard y su sección "Mis Notas" siguen mostrando `—`, aunque `/estudiante/notas` ya calcula los promedios.
-- El filtro "Entregados" de `/estudiante/talleres` siempre devuelve vacío (no hay sistema de entregas) y el botón "Ver taller" no tiene destino.
-- `Guías de Estudio`, `Calendario` y `Mensajes` del sidebar siguen siendo enlaces marcadores.
+- Las tarjetas "Promedio General" y "Guías Disponibles" del dashboard y su sección "Mis Notas" siguen mostrando `—`, aunque `/estudiante/notas` ya calcula los promedios. *(Resuelto para "Promedio General" y "Mis Notas" el 2026-10-07.)*
+- El filtro "Entregados" de `/estudiante/talleres` siempre devuelve vacío (no hay sistema de entregas) y el botón "Ver taller" no tiene destino. *(Resuelto el 2026-10-12 con `actividad_respuestas`.)*
+- `Guías de Estudio`, `Calendario` y `Mensajes` del sidebar siguen siendo enlaces marcadores. *(Sigue pendiente al 2026-10-16.)*
 
 ---
 

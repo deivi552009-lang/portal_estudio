@@ -1,7 +1,7 @@
 # Arquitectura
 
 > Documentación generada a partir de la estructura de `app/`, `routes/`, `config/` y `resources/`.
-> Última actualización: 2026-10-05.
+> Última actualización: 2026-10-17.
 
 ## Contenido
 
@@ -146,23 +146,32 @@ Los componentes de negocio renderizan su vista y aplican el layout con `view('co
 - Mensajes al usuario con `session()->flash('mensaje', ...)`.
 - Carga de archivos (`GrupoActividades`): trait `WithFileUploads`, guardado en disco `public` bajo `actividades/` (tipos permitidos: pdf, doc, docx, xls, xlsx, ppt, pptx, zip; máximo 10 MB); el archivo se elimina del disco al borrar o reemplazar la actividad.
 - Visualización en línea de archivos (`ActividadArchivoController`): la ruta `docente.actividad.archivo` (`/docente/actividad/{actividad}/archivo`) responde el archivo con `Content-Disposition: inline` y `X-Content-Type-Options: nosniff`; antes valida que la actividad pertenezca a un grupo del docente autenticado (403) y que el archivo exista en el disco `public` (404). El enlace "Ver archivo" de `⚡grupo-actividades` apunta a esta ruta.
+- **Taller → evaluación automática** (`GrupoActividades::crearActividad()` / `actualizarActividad()`): al crear (o al pasar a) una actividad de tipo `taller` se crea en la misma transacción una `Evaluacion` vinculada por `actividad_id`, con `nombre` = título del taller, `porcentaje = 0` y `tipo = 'taller'`. Al editar se sincroniza `nombre` y `grupo_id`; si la actividad deja de ser taller la evaluación **no** se elimina (se conservan las notas).
+- **Gestión de entregas** (`verRespuestas()`, `cerrarRespuestas()`, `abrirDetalleRespuesta()`): el botón "Respuestas" de cada taller abre la lista de `actividad_respuestas` del taller con el estudiante, asunto, resumen, archivo adjunto y el formulario de nota. Al abrir el detalle se marca `leida_at` si aún era nula; en el listado se muestra un contador de **respuestas sin leer** (`respuestas_sin_leer_count`).
+- **Calificación de talleres** (`guardarNota()`): guarda (0–5) la nota del estudiante en la evaluación vinculada al taller mediante `Calificacion::updateOrCreate`, dentro de una transacción. Solo actúa si la actividad es un `taller` y tiene evaluación vinculada.
+- **Mensajes del docente** (solo talleres): mensaje **general** del taller (`abrirModalMensaje()` / `guardarMensajeDocente()`, columna `actividades.mensaje_docente`) y mensaje **individual** por entrega (`abrirMensajeIndividual()` / `guardarMensajeIndividual()`, columna `actividad_respuestas.mensaje_docente`).
+
+> Todas estas acciones validan que la actividad/entrega pertenezca a un grupo del docente autenticado (`whereHas('grupo.docente', ...)` + `firstOrFail`) y usan `session()->flash('mensaje', ...)` para el aviso de éxito.
 
 ### 3.5 Páginas del panel estudiante
 
-Componentes de solo lectura (sin escrituras ni formularios), todos con la misma salvaguarda inicial: si `Auth::user()->estudiante` es `null` responden `abort(403, 'El usuario no tiene un registro de estudiante.')`, y todos usan `->layout('layouts.estudiante')`.
+`Dashboard` y `Notas` son componentes de solo lectura; `Talleres` permite además registrar entregas. Todos comparten la misma salvaguarda inicial: si `Auth::user()->estudiante` es `null` responden `abort(403, 'El usuario no tiene un registro de estudiante.')`, y todos usan `->layout('layouts.estudiante')`.
 
-| Componente | Vista | Qué muestra |
+| Componente | Vista | Qué muestra / hace |
 |---|---|---|
-| `Estudiante\Dashboard` | `⚡dashboard` | Saludo personalizado (primer nombre), 4 tarjetas resumen, sus grupos con estado/progreso de clase y actividades próximas. Se actualiza con `wire:poll.30s` |
-| `Estudiante\Notas` | `⚡notas` | Tabla "Mis Notas": por cada grupo inscrito, sus evaluaciones (fecha/id) con la calificación propia y el **promedio ponderado** (`nota × porcentaje / 100`, redondeado a 1 decimal; `null` si no hay ninguna nota) |
-| `Estudiante\Talleres` | `⚡talleres` | Tabla "Mis talleres": todas las actividades de sus grupos con materia, fecha/hora límite y estado (`Vencida`/`Pendiente`), más un conmutador de filtro (`pendientes` / `entregados` / `todos`) |
+| `Estudiante\Dashboard` | `⚡dashboard` | Saludo personalizado (primer nombre), 4 tarjetas resumen (Promedio General **real**, promedio de las notas finales de sus materias con nota; Talleres Pendientes; Guías Disponibles `—`; y Próxima Entrega), "Mis Notas" con la nota final por materia, y "Talleres Pendientes". Se actualiza con `wire:poll.30s` |
+| `Estudiante\Notas` | `⚡notas` | Tabla "Mis Notas": por cada grupo inscrito, sus evaluaciones (fecha/id) con la calificación propia (chip con color según la nota) y el **promedio ponderado** (`nota × porcentaje / 100`, redondeado a 1 decimal; `null` si no hay ninguna nota) |
+| `Estudiante\Talleres` | `⚡talleres` | Tabla "Mis talleres": todas las actividades **tipo `taller`** de sus grupos con materia, fecha/hora límite, estado (`Revisado`/`Entregado`/`Vencido`/`Pendiente`) y calificación; permite **entregar/editar la entrega**, ver el taller, ver la propia respuesta y filtrar (`pendientes` / `entregados` / `todos`, ya conectados) |
 
 Patrones propios de estas páginas:
 
 - Consultas con `whereHas('estudiantes', ...)` sobre `Grupo` (o `$estudiante->grupos()`) para limitar los datos al estudiante autenticado, ordenadas por `anio` desc y `semestre`.
-- Carga *eager* de `materia`, `evaluaciones` y `evaluaciones.calificaciones` filtradas por `estudiante_id` (en `Notas`) y de `docente.user`/`actividades` (en `Dashboard` y `Talleres`).
-- El filtrado de `Talleres` se resuelve en la vista con `@php` según la propiedad pública `$filtro`; la opción `entregados` aún **no está conectada** a un sistema de entregas y siempre devuelve vacío.
-- Las tarjetas "Promedio General" y "Guías Disponibles" del dashboard muestran `—` (marcadores de posición: "Disponible cuando se integren las notas" / "Próximamente"), al igual que las notas de la sección "Mis Notas" del dashboard.
+- Carga *eager* de `materia`, `evaluaciones` y `evaluaciones.calificaciones` filtradas por `estudiante_id` (en `Notas` y `Dashboard`) y de `docente.user`, `actividades` y `respuestas` (en `Dashboard` y `Talleres`).
+- El promedio por materia (y el promedio general del dashboard) se calcula con la suma ponderada; en el dashboard el "Promedio General" es el promedio de las notas finales de las materias que **sí** tienen nota.
+- **Entregas de talleres** (`Talleres::abrirRespuesta()`, `guardarRespuesta()`, `verRespuesta()`, `verTaller()`): el estudiante responde con `asunto`, texto y/o archivo (PDF, Word, Excel, PowerPoint o ZIP; máx. 10 MB, guardado en `entregas/` del disco `public`). Se usa `updateOrCreate` sobre (`actividad_id`, `estudiante_id`) y se elimina el archivo anterior al reemplazarlo. Reglas: no se puede entregar si el plazo (`fecha_limite` + `hora_limite`) ya venció, ni editar una entrega ya **calificada**; puede entregarse texto, archivo o ambos.
+- **Visualización de mensajes** (estudiante): el detalle del taller y el modal "Mi respuesta" muestran el **mensaje general** del docente (bloque azul) y el **mensaje individual** de la entrega (bloque esmeralda junto a la calificación); la nota de la tabla muestra el mensaje general en el `title`.
+- El filtro `entregados` **ya está conectado** al sistema de entregas (`actividad_respuestas`); `pendientes` es el valor por defecto.
+- La tarjeta "Guías Disponibles" del dashboard sigue mostrando `—` ("Próximamente"); el sidebar mantiene los enlaces marcadores `Guías de Estudio`, `Calendario` y `Mensajes`.
 
 ---
 
@@ -184,7 +193,7 @@ app/
 │   ├── Docente/                      # Dashboard, GrupoEstudiantes, GrupoNotas,
 │   │                                 # GrupoAsistencia, HistorialAsistencia, GrupoActividades
 │   └── Estudiante/                   # Dashboard, Notas, Talleres
-├── Models/                           # 11 modelos Eloquent (ver docs/base_datos.md)
+├── Models/                           # 12 modelos Eloquent (ver docs/base_datos.md)
 ├── Providers/
 │   ├── AppServiceProvider.php        # Vacío (placeholder)
 │   └── VoltServiceProvider.php       # Volt::mount(...) — Volt instalado pero sin páginas
@@ -242,6 +251,9 @@ Decisiones registradas previamente en este documento:
 - **Decisión 005** — El `tipo` de las actividades es texto libre: se normaliza a minúsculas al guardar y se compara siempre de forma insensible a mayúsculas (el dashboard docente lo convierte a minúsculas antes de buscar `taller`).
 - **Decisión 006** — El layout `layouts/estudiante` soporta los dos estilos de renderizado: `{{ $slot ?? '' }}` para los componentes Livewire-página (que inyectan el HTML en el slot) y `@yield('contenido')` para vistas que se rendericen con `@section('contenido', ...)`. Así el layout no se rompe si alguna página futura deja de ser un componente Livewire.
 - **Decisión 007** — La ruta `/dashboard` de Breeze redirige al panel del rol correspondiente (`estudiante`/`docente`) resolviendo el nombre del rol en minúsculas; los usuarios sin rol compatible siguen cayendo en la vista genérica, sin perder el comportamiento original.
+- **Decisión 008** — Un taller genera automáticamente su propia `Evaluacion` (vinculada por `evaluaciones.actividad_id`, UNIQUE) con `porcentaje = 0` y `tipo = 'taller'`, de modo que la nota del taller se guarda en `calificaciones` sin depender de crear la evaluación a mano. Si la actividad deja de ser taller, la evaluación se conserva para no perder las notas.
+- **Decisión 009** — Las entregas de los estudiantes se almacenan en `actividad_respuestas` (una por `actividad_id` + `estudiante_id`, UNIQUE) y **no** pueden modificarse una vez el docente asignó una nota ni cuando el plazo ya venció (se abren en modo solo lectura).
+- **Decisión 010** — Los mensajes del docente para los talleres se guardan en dos niveles: uno **general** por taller (`actividades.mensaje_docente`) y uno **individual** por entrega (`actividad_respuestas.mensaje_docente`); ambas acciones están restringidas a actividades de tipo `taller`.
 
 Nota: la Decisión 002 se implementa en `GrupoEstudiantes::crearNuevoGrupo()`, que inserta automáticamente las evaluaciones `P1`–`P4` y `A` (20%, 20%, 20%, 30%, 10%) al crear un grupo; `GrupoNotas::agregarEvaluacion()` impide renombrar evaluaciones con esos nombres y crea evaluaciones `personalizada` para el resto.
 
@@ -256,5 +268,8 @@ Nota: la Decisión 005 surgió porque la base de datos es PostgreSQL, que distin
 - **Volt instalado pero inactivo**: `VoltServiceProvider` y `views/livewire`/`views/pages` están listos para páginas Volt, pero el proyecto usa componentes Livewire clásicos; se puede documentar/eliminar para evitar confusión.
 - **Alpine.js desactivado**: está en `package.json` pero `resources/js/app.js` lo tiene comentado; el intermezzo UI lo cubre Livewire (e.g., el modal se controla con propiedades booleanas del componente).
 - **Panel docente sin `@livewireScripts` explícito**: `layouts/docente` no declara `@livewireStyles`/`@livewireScripts`; funciona porque Livewire 4.3.5 autoinyecta sus recursos cuando renderiza un componente-página por ruta. Si en el futuro se añaden componentes anidados (`<livewire: ...>`), conviene declararlos en el layout.
-- **Placeholders sin conectar en el panel estudiante**: el dashboard muestra "Promedio General" y "Guías Disponibles" como `—` y su tarjeta "Mis Notas" no carga calificaciones (aunque ya existe la página `/estudiante/notas` que sí las calcula); el filtro "Entregados" de `/estudiante/talleres` siempre devuelve vacío porque aún no hay sistema de entregas. Conviene enlazar esos accesos directos a las páginas ya implementadas.
+- **Placeholders sin conectar en el panel estudiante**: en el dashboard solo queda "Guías Disponibles" como `—` ("Próximamente") y los enlaces marcadores del sidebar (`Guías de Estudio`, `Calendario`, `Mensajes`). El "Promedio General", la tarjeta "Mis Notas" y el filtro "Entregados" de `/estudiante/talleres` **ya** usan datos reales.
+- **Contador "Talleres Pendientes" del dashboard**: `Estudiante\Dashboard` calcula `talleresPendientes = $actividades->count()`, es decir, cuenta **todas** las actividades de sus grupos (de cualquier `tipo` y sin descontar las entregadas), no solo los talleres pendientes; conviene filtrar por `tipo === 'taller'` y por ausencia de entrega.
+- **`evaluaciones.tipo` y el valor `taller`**: la migración inicial define `tipo` como `ENUM('parcial','asistencia_final','personalizada')`, pero la aplicación escribe `'taller'`. En PostgreSQL funciona porque la migración `remover_check_constraint_evaluaciones_tipo` elimina el `CHECK`; en MySQL (u otra base sin ese paso) el `ENUM` rechazaría `'taller'`. Conviene alinear el esquema (columna de texto) o ampliar el enum.
+- **`calificaciones.comentario` vs. `actividad_respuestas.mensaje_docente`**: el docente escribe hoy la retroalimentación individual en `mensaje_docente` (desde el botón de mensaje por entrega); `Talleres::verRespuesta()` sigue cargando `comentario`, pero la vista del estudiante muestra el bloque de calificación con `mensaje_docente`. Queda un campo (`comentario`) sin uso en la interfaz; conviene unificar cuál de los dos es la retroalimentación oficial.
 - **Notas de los archivos de la vista `⚡notas`**: la vista vive en `resources/views/components/estudiante/⚡notas.blade.php` (el prefijo `⚡` es U+26A1), por lo que en shells/terminales puede mostrarse codificado como `\342\232\241` al listar los cambios de Git.

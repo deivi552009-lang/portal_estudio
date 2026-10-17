@@ -13,6 +13,7 @@ class ActividadRespuesta extends Model
         'asunto',
         'respuesta',
         'archivo',
+        'mensaje_docente'
     ];
 
     public function actividad(): BelongsTo

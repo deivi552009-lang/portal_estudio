@@ -49,12 +49,12 @@ class Talleres extends Component
             ->with('evaluacion')
             ->firstOrFail();
 
-        // No permitir cambios si la entrega ya fue calificada.
         $entrega = ActividadRespuesta::query()
             ->where('actividad_id', $actividad->id)
             ->where('estudiante_id', $estudiante->id)
             ->first();
 
+        // Impedir la edición si la entrega ya fue calificada.
         if ($this->estaCalificada($actividad, $estudiante->id)) {
             $this->addError(
                 'textoRespuesta',
@@ -64,7 +64,7 @@ class Talleres extends Component
             return;
         }
 
-        // Comprobar la fecha y hora límite en el servidor.
+        // Validar la fecha y hora límite en el servidor.
         $fechaLimite = $this->obtenerFechaLimite($actividad);
 
         if ($fechaLimite && now()->greaterThan($fechaLimite)) {
@@ -87,8 +87,8 @@ class Talleres extends Component
             ],
         ]);
 
-        // Puede entregarse texto, archivo o ambos; al editar se puede conservar
-        // el archivo anterior si no se adjunta uno nuevo.
+        // Se permite entregar texto, archivo o ambos.
+        // Si se edita sin adjuntar otro archivo, se conserva el anterior.
         if (
             trim($datos['textoRespuesta'] ?? '') === ''
             && !$this->archivoRespuesta
@@ -106,7 +106,10 @@ class Talleres extends Component
         $rutaArchivo = $archivoAnterior;
 
         if ($this->archivoRespuesta) {
-            $rutaArchivo = $this->archivoRespuesta->store('entregas', 'public');
+            $rutaArchivo = $this->archivoRespuesta->store(
+                'entregas',
+                'public'
+            );
         }
 
         ActividadRespuesta::updateOrCreate(
@@ -121,7 +124,7 @@ class Talleres extends Component
             ]
         );
 
-        // Elimina el archivo anterior solo si se guardó uno nuevo.
+        // Eliminar el archivo anterior solo cuando se adjuntó uno nuevo.
         if (
             $this->archivoRespuesta
             && $archivoAnterior
@@ -135,6 +138,7 @@ class Talleres extends Component
             'textoRespuesta',
             'archivoRespuesta',
         ]);
+
         $this->archivoRespuestaExistente = null;
         $this->mostrarModalRespuesta = false;
         $this->respuestaSoloLectura = false;
@@ -169,7 +173,7 @@ class Talleres extends Component
         $fechaLimite = $this->obtenerFechaLimite($actividad);
         $vencida = $fechaLimite && now()->greaterThan($fechaLimite);
 
-        $this->respuestaSoloLectura = $calificada || $vencida;
+        $this->respuestaSoloLectura = (bool) ($calificada || $vencida);
         $this->actividadRespondiendoId = $actividad->id;
         $this->asuntoRespuesta = $entrega?->asunto ?? '';
         $this->textoRespuesta = $entrega?->respuesta ?? '';
@@ -220,9 +224,12 @@ class Talleres extends Component
         $this->detalleTaller = [
             'titulo' => $actividad->titulo,
             'descripcion' => $actividad->descripcion,
+            'mensaje_docente' => $actividad->mensaje_docente,
             'materia' => $actividad->grupo?->materia?->nombre ?? 'Sin asignatura',
             'fecha_limite' => $fechaLimite?->format('d/m/Y H:i'),
-            'vencida' => $fechaLimite ? now()->greaterThan($fechaLimite) : false,
+            'vencida' => $fechaLimite
+                ? now()->greaterThan($fechaLimite)
+                : false,
             'entregada' => $entregada,
         ];
 
@@ -267,6 +274,12 @@ class Talleres extends Component
             'archivo' => $entrega->archivo,
             'nota' => $calificacion?->nota,
             'comentario' => $calificacion?->comentario,
+
+            // Mensaje general configurado para todo el taller.
+            'mensaje_general' => $actividad->mensaje_docente,
+
+            // Mensaje individual enviado a esta entrega.
+            'mensaje_docente' => $entrega->mensaje_docente,
         ];
 
         $this->mostrarModalVerRespuesta = true;
@@ -278,12 +291,18 @@ class Talleres extends Component
         $this->respuestaDetalle = null;
     }
 
-    private function estaCalificada(Actividad $actividad, int $estudianteId): bool
-    {
+    private function estaCalificada(
+        Actividad $actividad,
+        int $estudianteId
+    ): bool {
+        if (!$actividad->evaluacion) {
+            return false;
+        }
+
         return $actividad->evaluacion
-            ?->calificaciones()
+            ->calificaciones()
             ->where('estudiante_id', $estudianteId)
-            ->exists() ?? false;
+            ->exists();
     }
 
     private function obtenerFechaLimite(Actividad $actividad): ?Carbon
@@ -292,10 +311,12 @@ class Talleres extends Component
             return null;
         }
 
+        $fecha = $actividad->fecha_limite instanceof Carbon
+            ? $actividad->fecha_limite->format('Y-m-d')
+            : Carbon::parse($actividad->fecha_limite)->format('Y-m-d');
+
         return Carbon::parse(
-            $actividad->fecha_limite->format('Y-m-d')
-            . ' '
-            . ($actividad->hora_limite ?? '23:59')
+            $fecha . ' ' . ($actividad->hora_limite ?? '23:59')
         );
     }
 
@@ -329,22 +350,31 @@ class Talleres extends Component
             ->get();
 
         $actividades = $grupos
-            ->flatMap(function ($grupo) {
-                return $grupo->actividades->map(function ($actividad) use ($grupo) {
-                    $actividad->materia_nombre = $grupo->materia->nombre;
-                    $actividad->respuestaEstudiante = $actividad->respuestas->first();
-                    $actividad->calificacionEstudiante = $actividad->evaluacion
-                        ?->calificaciones
-                        ?->firstWhere(
-                            'estudiante_id',
-                            Auth::user()->estudiante->id
-                        );
+            ->flatMap(function ($grupo) use ($estudiante) {
+                return $grupo->actividades->map(function ($actividad) use (
+                    $grupo,
+                    $estudiante
+                ) {
+                    $actividad->materia_nombre =
+                        $grupo->materia?->nombre ?? 'Sin asignatura';
+
+                    $actividad->respuestaEstudiante =
+                        $actividad->respuestas->first();
+
+                    $actividad->calificacionEstudiante =
+                        $actividad->evaluacion?->calificaciones
+                            ?->firstWhere(
+                                'estudiante_id',
+                                $estudiante->id
+                            );
 
                     return $actividad;
                 });
             })
             ->sortBy(function ($actividad) {
-                return ($actividad->fecha_limite?->format('Y-m-d') ?? '9999-12-31')
+                return ($actividad->fecha_limite
+                    ? Carbon::parse($actividad->fecha_limite)->format('Y-m-d')
+                    : '9999-12-31')
                     . ' '
                     . ($actividad->hora_limite ?? '23:59');
             })

@@ -70,6 +70,7 @@
                             <th class="px-6 py-4 text-right">Acción</th>
                         </tr>
                     </thead>
+
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($lista as $actividad)
                             @php
@@ -86,6 +87,10 @@
                                     ?->firstWhere('estudiante_id', $estudianteActual?->id);
 
                                 $revisada = $entregada && $calificacion !== null;
+
+                                $notaFormateada = $calificacion
+                                    ? rtrim(rtrim(number_format((float) $calificacion->nota, 2, '.', ''), '0'), '.')
+                                    : null;
                             @endphp
 
                             <tr wire:key="actividad-{{ $actividad->id }}" class="hover:bg-slate-50">
@@ -129,14 +134,14 @@
                                     </span>
                                 </td>
 
+                                {{-- Calificación: el mensaje general aparece al pasar el cursor sobre la nota --}}
                                 <td class="px-6 py-4 text-sm">
                                     @if ($revisada)
                                         <span
                                             class="cursor-help font-semibold text-slate-800"
-                                            title="{{ $calificacion->comentario ?: 'El docente no agregó comentarios.' }}">
-                                            {{ rtrim(rtrim(number_format((float) $calificacion->nota, 2, '.', ''), '0'), '.') }} / 5
+                                            title="{{ $actividad->mensaje_docente ?: 'El docente no agregó un mensaje para este taller.' }}">
+                                            {{ $notaFormateada }} / 5
                                         </span>
-                                        <p class="mt-1 text-xs text-slate-400">Pasa el cursor para ver la nota</p>
                                     @else
                                         <span class="text-slate-400">Pendiente</span>
                                     @endif
@@ -144,7 +149,8 @@
 
                                 <td class="px-6 py-4">
                                     <div class="flex items-center justify-end gap-2">
-                                        {{-- Ver el archivo adjunto por el docente. Si no hay archivo, muestra el detalle informativo. --}}
+
+                                        {{-- Ver taller o archivo adjunto --}}
                                         @if ($actividad->archivo)
                                             <a href="{{ asset('storage/' . ltrim($actividad->archivo, '/')) }}"
                                                target="_blank"
@@ -179,7 +185,7 @@
                                             </button>
                                         @endif
 
-                                        {{-- Ver la respuesta que envió el estudiante --}}
+                                        {{-- Ver respuesta entregada --}}
                                         @if ($entregada)
                                             <button type="button"
                                                     wire:click="verRespuesta({{ $actividad->id }})"
@@ -196,7 +202,7 @@
                                             </button>
                                         @endif
 
-                                        {{-- Responder o editar la entrega --}}
+                                        {{-- Responder o editar entrega --}}
                                         <button type="button"
                                                 wire:click="abrirRespuesta({{ $actividad->id }})"
                                                 wire:loading.attr="disabled"
@@ -220,7 +226,7 @@
             </div>
         @endif
 
-        {{-- Modal: detalle informativo cuando el taller no tiene archivo adjunto --}}
+        {{-- Modal: información del taller sin archivo adjunto --}}
         @if ($mostrarModalDetalleTaller && $detalleTaller)
             <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4"
                  role="dialog" aria-modal="true">
@@ -239,10 +245,19 @@
                         <p class="text-sm text-slate-600">
                             {{ $detalleTaller['descripcion'] ?: 'El docente no agregó una descripción.' }}
                         </p>
+
+                        @if (!empty($detalleTaller['mensaje_docente']))
+                            <div class="rounded-xl bg-blue-50 p-4">
+                                <p class="text-sm font-semibold text-blue-800">Mensaje del docente</p>
+                                <p class="mt-2 whitespace-pre-wrap text-sm text-blue-900">{{ $detalleTaller['mensaje_docente'] }}</p>
+                            </div>
+                        @endif
+
                         <div>
                             <h4 class="text-sm font-semibold text-slate-700">Fecha y hora límite</h4>
                             <p class="mt-1 text-sm text-slate-600">{{ $detalleTaller['fecha_limite'] ?? 'Sin fecha límite' }}</p>
                         </div>
+
                         <div class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
                             El docente no adjuntó un documento para este taller.
                         </div>
@@ -258,13 +273,15 @@
             </div>
         @endif
 
-        {{-- Modal: ver la respuesta del estudiante --}}
+        {{-- Modal: ver respuesta del estudiante --}}
         @if ($mostrarModalVerRespuesta && $respuestaDetalle)
             <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4"
                  role="dialog" aria-modal="true">
                 <section class="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
                     <div class="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-                        <h3 class="text-lg font-bold text-slate-900">Mi respuesta: {{ $respuestaDetalle['titulo'] }}</h3>
+                        <h3 class="text-lg font-bold text-slate-900">
+                            Mi respuesta: {{ $respuestaDetalle['titulo'] }}
+                        </h3>
                         <button type="button" wire:click="cerrarModalVerRespuesta"
                                 class="rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100"
                                 aria-label="Cerrar">✕</button>
@@ -273,12 +290,22 @@
                     <div class="space-y-4 px-6 py-6">
                         <div>
                             <p class="text-sm font-semibold text-slate-700">Asunto</p>
-                            <p class="mt-1 text-sm text-slate-600">{{ $respuestaDetalle['asunto'] ?: 'Sin asunto' }}</p>
+                            <p class="mt-1 text-sm text-slate-600">
+                                {{ $respuestaDetalle['asunto'] ?: 'Sin asunto' }}
+                            </p>
                         </div>
-                        <div>
-                            <p class="text-sm font-semibold text-slate-700">Respuesta</p>
-                            <p class="mt-1 whitespace-pre-wrap text-sm text-slate-600">{{ $respuestaDetalle['respuesta'] ?: 'No se escribió texto.' }}</p>
-                        </div>
+
+                        {{-- Mensaje general: aplica al taller --}}
+                        @if (!empty($respuestaDetalle['mensaje_general']))
+                            <div class="rounded-xl bg-blue-50 p-4">
+                                <p class="text-sm font-semibold text-blue-800">
+                                    Mensaje general del docente
+                                </p>
+                                <p class="mt-2 whitespace-pre-wrap text-sm text-blue-900">{{ $respuestaDetalle['mensaje_general'] }}</p>
+                            </div>
+                        @endif
+
+                        {{-- Mensaje individual: dirigido a este estudiante --}}
 
                         @if ($respuestaDetalle['archivo'])
                             <a href="{{ asset('storage/' . ltrim($respuestaDetalle['archivo'], '/')) }}"
@@ -294,7 +321,7 @@
                                     Calificación: {{ $respuestaDetalle['nota'] }} / 5
                                 </p>
                                 <p class="mt-2 whitespace-pre-wrap text-sm text-emerald-900">
-                                    {{ $respuestaDetalle['comentario'] ?: 'El docente no agregó comentarios.' }}
+                                    {{ $respuestaDetalle['mensaje_docente'] ?: 'El docente no agregó comentarios.' }}
                                 </p>
                             </div>
                         @endif
@@ -341,7 +368,9 @@
                             <input id="asuntoRespuesta" type="text" wire:model="asuntoRespuesta"
                                    @disabled($respuestaSoloLectura) maxlength="255"
                                    class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100">
-                            @error('asuntoRespuesta') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            @error('asuntoRespuesta')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         <div>
@@ -350,7 +379,9 @@
                                       @disabled($respuestaSoloLectura) rows="6" maxlength="20000"
                                       class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
                                       placeholder="Escribe aquí tu respuesta..."></textarea>
-                            @error('textoRespuesta') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                            @error('textoRespuesta')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         @if ($archivoRespuestaExistente)
@@ -370,9 +401,15 @@
                                 <input id="archivoRespuesta" type="file" wire:model="archivoRespuesta"
                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
                                        class="block w-full text-sm text-slate-600">
-                                <p class="mt-1 text-xs text-slate-400">Formatos permitidos: PDF, Word, Excel, PowerPoint o ZIP. Máximo 10 MB.</p>
-                                @error('archivoRespuesta') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                                <div wire:loading wire:target="archivoRespuesta" class="mt-2 text-sm text-blue-600">Cargando archivo...</div>
+                                <p class="mt-1 text-xs text-slate-400">
+                                    Formatos permitidos: PDF, Word, Excel, PowerPoint o ZIP. Máximo 10 MB.
+                                </p>
+                                @error('archivoRespuesta')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <div wire:loading wire:target="archivoRespuesta" class="mt-2 text-sm text-blue-600">
+                                    Cargando archivo...
+                                </div>
                             </div>
                         @endunless
 

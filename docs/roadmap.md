@@ -1,7 +1,7 @@
 # Roadmap
 
 > Elaborado a partir del estado real del código (`app/`, `routes/`, `database/`, `resources/`, `.env`).
-> Última actualización: 2026-10-05.
+> Última actualización: 2026-10-17.
 >
 > Leyenda: ✅ completado · 🚧 en progreso · ⬜ pendiente
 
@@ -44,12 +44,13 @@
 - ✅ Calificaciones: matriz de notas, creación de evaluaciones dinámicas (con nombres fijos reservados), eliminación de evaluaciones, guardado transaccional de notas 0–5 (`#[Renderless]`).
 - ✅ Asistencia: registro por fecha (presente/ausente/excusa/tarde con observación) y historial semestral con nota final ponderada.
 - ✅ Actividades: CRUD completo con carga de archivo (disco `public`/`actividades`, mimes y 10 MB validados), vista global, vista por grupo y panel de actividades próximas a vencer (3 días). El enlace simbólico `public/storage` está creado y los archivos son accesibles.
+- ✅ Talleres con entregas: al publicar/editar un taller se genera su evaluación vinculada (`actividad_id`); el docente revisa las entregas, las califica (0–5) con comentario, marca la lectura (contador de no leídas) y añade mensajes generales del taller o individuales por entrega.
 
 ### Panel estudiante (`/estudiante/*`)
 
-- ✅ Dashboard: grupos en los que está inscrito, estado de cada clase (próxima / en curso con progreso / finalizada / sin horario) y listado de actividades de sus materias (con materia y docente). Rediseñado con tarjetas de resumen (promedio, talleres pendientes, guías y próxima entrega), saludo personalizado y `wire:poll.30s`.
-- ✅ Mis Notas (`/estudiante/notas`): evaluaciones de cada grupo con la calificación del estudiante y promedio ponderado por asignatura (`nota × porcentaje / 100`).
-- ✅ Talleres (`/estudiante/talleres`): listado de actividades de sus grupos con materia, fecha/hora límite, estado (vencida/pendiente) y filtro `pendientes` / `entregados` / `todos`.
+- ✅ Dashboard: grupos en los que está inscrito, estado de cada clase (próxima / en curso con progreso / finalizada / sin horario) y listado de actividades de sus materias (con materia y docente). Rediseñado con tarjetas de resumen: **Promedio General real** (promedio de las notas finales, con estrellas), Talleres Pendientes, Guías Disponibles (`—`) y Próxima Entrega; incluye `wire:poll.30s`.
+- ✅ Mis Notas (`/estudiante/notas`): evaluaciones de cada grupo con la calificación del estudiante (chip con color según la nota) y promedio ponderado por asignatura (`nota × porcentaje / 100`).
+- ✅ Talleres (`/estudiante/talleres`): listado de las actividades tipo `taller` de sus grupos con materia, fecha/hora límite, estado (revisado/entregado/vencido/pendiente) y calificación; **entrega** de la respuesta (asunto, texto y/o archivo) y filtro `pendientes` / `entregados` / `todos` ya conectado.
 - 🚧 Sidebar del panel estudiante: `Mis Notas` y `Talleres` tienen ruta propia; `Guías de Estudio`, `Calendario` y `Mensajes` siguen siendo enlaces marcadores (`href="#"`).
 
 ---
@@ -82,11 +83,12 @@ El layout `layouts/docente` y el dashboard docente exponen enlaces marcadores (`
 ### 2.3 Ampliación del panel estudiante
 
 - ✅ Consulta de sus calificaciones (`/estudiante/notas`: evaluaciones y promedio ponderado por asignatura).
-- ✅ Listado de sus talleres/actividades (`/estudiante/talleres`, con filtro pendientes/entregados/todos).
+- ✅ Listado y entrega de sus talleres (`/estudiante/talleres`): el estudiante responde con texto y/o archivo; filtro `pendientes` / `entregados` / `todos` conectado a las entregas.
+- ✅ Descarga/visualización de los archivos de las actividades y de sus propias entregas desde el panel estudiante (disco `public`).
+- ✅ Sincronizar el dashboard del estudiante: "Promedio General" (con estrellas) y la sección "Mis Notas" usan las notas finales reales, y "Próxima Entrega" la actividad más cercana.
 - ⬜ Consulta de su historial personal de asistencias.
-- ⬜ Entrega de talleres: el filtro "Entregados" existe en la interfaz pero no hay sistema de entregas (marcar/adjuntar entrega); el botón "Ver taller" aún no tiene destino.
-- ⬜ Descarga/visualización de los archivos de las actividades desde el panel estudiante (el enlace ya está disponible vía disco público).
-- 🚧 Sincronizar el dashboard del estudiante con las páginas nuevas: la tarjeta "Promedio General" y la sección "Mis Notas" muestran `—` en lugar de usar los datos que ya calcula `/estudiante/notas`.
+- 🚧 Mensajería: el docente ya puede dejar mensajes en los talleres (general e individual), pero no existe la sección `Mensajes` del sidebar (canal dedicado estudiante ↔ docente).
+- ⬜ Corregir el contador "Talleres Pendientes" del dashboard: hoy cuenta todas las actividades del estudiante (de cualquier tipo y ya entregadas), no solo los talleres sin entregar.
 
 ### 2.4 Integración y pulido
 
@@ -103,6 +105,7 @@ El layout `layouts/docente` y el dashboard docente exponen enlaces marcadores (`
 - ⬜ **Autorización incompleta en mounts de componentes**: `GrupoNotas`, `GrupoAsistencia` e `HistorialAsistencia` cargan el grupo con `findOrFail($grupoId)` **sin validar que el grupo pertenezca al docente autenticado** (a diferencia de `GrupoEstudiantes` y `GrupoActividades`, que sí lo validan). Un docente podría ver o modificar notas/asistencias/historial de otro grupo conociendo su ID. Agregar el mismo `whereHas('docente', user_id)` en los mounts.
 - ⬜ Depurar el `role_id = 4` hardcodeado en `GrupoEstudiantesService` (buscar por nombre de rol o usar una constante/consulta al seeder).
 - ⬜ Centralizar la creación de evaluaciones fijas `P1`–`P4`/`A` y sus porcentajes (hoy hardcodeados en `GrupoEstudiantes`) en un servicio/config, coherente con la Decisión 002.
+- ⬜ Alinear el tipo de `evaluaciones.tipo`: el esquema inicial lo define como `ENUM('parcial','asistencia_final','personalizada')` pero la aplicación escribe `'taller'`; funciona en PostgreSQL por la migración que elimina el `CHECK`, pero conviene migrar la columna a texto o ampliar el enum.
 - ⬜ Aplicar throttling a las rutas de negocio y mantener `APP_DEBUG=false` en producción.
 - ⬜ Revisar la política del disco `public` (quién puede listarchivados) y validar extensiones reales de los archivos subidos.
 

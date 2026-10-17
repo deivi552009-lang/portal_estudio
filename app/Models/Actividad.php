@@ -18,6 +18,7 @@ class Actividad extends Model
         'fecha_limite',
         'hora_limite',
         'archivo',
+        'mensaje_docente',
     ];
 
     protected $casts = [

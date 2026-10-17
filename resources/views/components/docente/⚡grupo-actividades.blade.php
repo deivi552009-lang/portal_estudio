@@ -509,6 +509,29 @@
                                 Ver entrega completa
                             </button>
 
+    <button
+    type="button"
+    wire:click="abrirMensajeIndividual({{ $respuesta->id }})"
+    title="{{ $respuesta->mensaje_docente ? 'Editar mensaje para este estudiante' : 'Escribir mensaje para este estudiante' }}"
+    aria-label="Escribir o editar mensaje individual"
+    class="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-700 transition hover:bg-amber-100"
+    >
+    <svg
+        class="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+    >
+        <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.8"
+            d="M21 11.5a8.4 8.4 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.4 8.4 0 013.8-.9h.5a8.5 8.5 0 018 8v.5z"
+        />
+    </svg>
+    </button>
+
+
                         </div>
 
                         <div class="mt-4 border-t border-slate-100 pt-4">
@@ -738,6 +761,64 @@
 
                         </div>
 
+
+@if (mb_strtolower($actividad->tipo, 'UTF-8') === 'taller')
+    @php
+        $sinLeer = (int) ($actividad->respuestas_sin_leer_count ?? 0);
+    @endphp
+
+    <div class="mt-3">
+        <button
+            type="button"
+            wire:click="verRespuestas({{ $actividad->id }})"
+            title="{{ $sinLeer > 0 ? $sinLeer . ' respuestas sin leer' : 'Todas las respuestas están leídas' }}"
+            aria-label="{{ $sinLeer > 0 ? $sinLeer . ' respuestas sin leer' : 'Todas las respuestas están leídas' }}"
+            class="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border transition
+                {{ $sinLeer > 0
+                    ? 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100' }}"
+        >
+            <svg
+                class="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                stroke-width="1.8"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M3 7.5l9 7 9-7M4.5 5h15A1.5 1.5 0 0121 6.5v11a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 17.5v-11A1.5 1.5 0 014.5 5z"
+                />
+            </svg>
+
+            @if ($sinLeer > 0)
+                <span class="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {{ $sinLeer }}
+                </span>
+            @else
+                <span class="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+                    <svg
+                        class="h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        stroke-width="2.5"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M5 12l4 4L19 6"
+                        />
+                    </svg>
+                </span>
+            @endif
+        </button>
+    </div>
+@endif
+
+
+
                     </div>
 
 
@@ -764,6 +845,33 @@
                                 />
                             </svg>
                         </button>
+
+
+@if (mb_strtolower($actividad->tipo, 'UTF-8') === 'taller')
+    <button
+        type="button"
+        wire:click="abrirModalMensaje({{ $actividad->id }})"
+        title="{{ $actividad->mensaje_docente ? 'Editar mensaje del taller' : 'Añadir mensaje al taller' }}"
+        aria-label="Añadir o editar mensaje del taller"
+        class="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
+    >
+        <svg
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+                d="M21 11.5a8.4 8.4 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.4 8.4 0 013.8-.9h.5a8.5 8.5 0 018 8v.5z"
+            />
+        </svg>
+    </button>
+@endif
+
+
 <button
     type="button"
     wire:click="verRespuestas({{ $actividad->id }})"
@@ -938,5 +1046,107 @@
         </div>
     </div>
 @endif
+
+@if ($mostrarModalMensaje)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div
+            class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-modal-mensaje"
+        >
+            <h2 id="titulo-modal-mensaje" class="text-lg font-bold text-slate-800">
+                Mensaje para los estudiantes
+            </h2>
+
+            <p class="mt-1 text-sm text-slate-500">
+                Escribe las indicaciones o aclaraciones generales de este taller.
+            </p>
+
+            <textarea
+                wire:model="mensajeDocente"
+                rows="5"
+                maxlength="5000"
+                placeholder="Escribe el mensaje para los estudiantes..."
+                class="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            ></textarea>
+
+            @error('mensajeDocente')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+
+            <div class="mt-5 flex justify-end gap-3">
+                <button
+                    type="button"
+                    wire:click="cancelarModalMensaje"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                    Cancelar
+                </button>
+
+                <button
+                    type="button"
+                    wire:click="guardarMensajeDocente"
+                    wire:loading.attr="disabled"
+                    class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if ($mostrarModalMensajeIndividual)
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
+        <div
+            class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-mensaje-individual"
+        >
+            <h2 id="titulo-mensaje-individual" class="text-lg font-bold text-slate-800">
+                Mensaje para el estudiante
+            </h2>
+
+            <p class="mt-1 text-sm text-slate-500">
+                Escribe las observaciones o correcciones para esta entrega.
+            </p>
+
+            <textarea
+                wire:model="mensajeDocenteIndividual"
+                rows="5"
+                maxlength="5000"
+                placeholder="Escribe aquí tus observaciones..."
+                class="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            ></textarea>
+
+            @error('mensajeDocenteIndividual')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+
+            <div class="mt-5 flex justify-end gap-3">
+                <button
+                    type="button"
+                    wire:click="cancelarMensajeIndividual"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                    Cancelar
+                </button>
+
+                <button
+                    type="button"
+                    wire:click="guardarMensajeIndividual"
+                    wire:loading.attr="disabled"
+                    wire:target="guardarMensajeIndividual"
+                    class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+@endif
+
 
 </div>
