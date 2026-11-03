@@ -5,7 +5,6 @@
     margin: 0 auto;
 ">
 
-```
 <!-- ENCABEZADO -->
 
 <div style="
@@ -563,6 +562,5 @@
     </div>
 
 </div>
-```
 
 </div>

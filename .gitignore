@@ -28,3 +28,5 @@ Thumbs.db
 repomix-output.txt
 repomix-output.txt
 *.ps1
+
+docs/.obsidian/
