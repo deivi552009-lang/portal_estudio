@@ -184,15 +184,37 @@
 
             let total = 0;
 
+            let pendientes = 0;
+
             this.evaluaciones.forEach(ev => {
 
                 if (ev.porcentaje === null) {
                     return;
                 }
 
-                let nota = parseFloat(
-                    this.notas[estudianteId]?.[ev.id] || 0
-                );
+                let valor = this.notas[estudianteId]?.[ev.id];
+
+                /*
+                 * Una nota pendiente no cuenta como cero:
+                 * se excluye del cálculo y se marca la definitiva.
+                 */
+                if (
+                    valor === null ||
+                    valor === undefined ||
+                    valor === ''
+                ) {
+                    pendientes++;
+
+                    return;
+                }
+
+                let nota = parseFloat(valor);
+
+                if (Number.isNaN(nota)) {
+                    pendientes++;
+
+                    return;
+                }
 
                 let porcentaje = parseFloat(
                     ev.porcentaje
@@ -202,6 +224,10 @@
                     (nota * porcentaje) / 100;
 
             });
+
+            if (pendientes > 0) {
+                return '—';
+            }
 
             return total.toFixed(2);
         },

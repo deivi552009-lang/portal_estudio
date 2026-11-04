@@ -4,6 +4,7 @@ namespace App\Livewire\Docente;
 
 use App\Models\Grupo;
 use App\Services\CalificacionesService;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
@@ -17,12 +18,17 @@ class GrupoNotas extends Component
 
     public function mount(int $grupoId): void
     {
-        $this->grupo = Grupo::with([
-            'materia',
-            'docente.user',
-            'estudiantes.user',
-            'evaluaciones',
-        ])->findOrFail($grupoId);
+        $this->grupo = Grupo::query()
+            ->with([
+                'materia',
+                'docente.user',
+                'estudiantes.user',
+                'evaluaciones',
+            ])
+            ->whereHas('docente', function ($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->findOrFail($grupoId);
 
         $this->cargarNotas();
     }

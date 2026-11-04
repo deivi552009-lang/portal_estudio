@@ -4,6 +4,7 @@ namespace App\Livewire\Docente;
 
 use App\Models\Grupo;
 use App\Services\AsistenciasService;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
@@ -17,11 +18,16 @@ class GrupoAsistencia extends Component
 
     public function mount(int $grupoId): void
     {
-        $this->grupo = Grupo::with([
-            'materia',
-            'docente.user',
-            'estudiantes.user',
-        ])->findOrFail($grupoId);
+        $this->grupo = Grupo::query()
+            ->with([
+                'materia',
+                'docente.user',
+                'estudiantes.user',
+            ])
+            ->whereHas('docente', function ($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->findOrFail($grupoId);
 
         $this->fecha = today()->toDateString();
 
@@ -59,7 +65,7 @@ class GrupoAsistencia extends Component
     public function render()
     {
         return view('components.docente.⚡grupo-asistencia')
-        ->layout('layouts.docente');
+            ->layout('layouts.docente');
     }
 
     private function asistenciasService(): AsistenciasService

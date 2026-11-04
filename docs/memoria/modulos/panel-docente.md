@@ -1,5 +1,5 @@
 # Panel docente
-Última actualización: 2026-11-02
+Última actualización: 2026-11-03
 
 ## Qué hace
 Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y cantidad de talleres. Desde ahí se accede a notas, asistencia, historial y actividades.
@@ -28,15 +28,15 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 - El dashboard solo debe mostrar grupos del docente autenticado.
 - Los enlaces `href="#"` son marcadores, no funcionalidades terminadas.
 - El total de estudiantes se calcula sobre la colección en PHP, no con una consulta agregada.
-- Las secciones de notas/asistencia enlazadas desde el dashboard dependen de componentes que aún no validan la propiedad del grupo en su `mount()`.
+- Las secciones de notas/asistencia enlazadas desde el dashboard cargan ahora solo grupos del docente autenticado.
 
 ## Hallazgos clasificados
 - **[Verificado en código]** Accesos rápidos y varios enlaces del sidebar son `href="#"`.
 - **[Verificado en código]** El dashboard filtra grupos por `docente.user_id`.
-- **[Riesgo detectado]** Los accesos a notas/asistencia heredan la falta de autorización en los componentes destino.
+- **[Comprobado localmente]** Notas, asistencia e historial validan la propiedad del grupo en su `mount()` (2026-11-03); cubierto por `tests/Feature/Docente/GrupoPropiedadTest.php`.
 - **[Decisión pendiente]** Alcance de las secciones pendientes y del panel administrativo.
 
 ## Por confirmar
 - Si se implementarán las secciones Estudiantes, Asignaturas, Talleres, Guías, Calendario, Mensajes, Notas, Reportes y Configuración.
 - Si el dashboard debe mostrar métricas adicionales.
-- Si se unificará la validación de pertenencia en un middleware o servicio.
+- Si la validación de pertenencia, hoy repetida con `whereHas` en cada componente, se unificará en un middleware o servicio.

@@ -1,8 +1,9 @@
 # Decisiones técnicas
-Última actualización: 2026-11-02
+Última actualización: 2026-11-03
 
 ## Decisiones implementadas y verificadas
-- **Autorización por nombre de rol.** `RoleMiddleware` compara el nombre en minúsculas (`app/Http/Middleware/RoleMiddleware.php`). Evita depender de IDs en las rutas, aunque `GrupoEstudiantesService` sí usa `role_id = 4`.
+- **Autorización por nombre de rol.** `RoleMiddleware` compara el nombre en minúsculas (`app/Http/Middleware/RoleMiddleware.php`). Evita depender de IDs en las rutas; desde 2026-11-03 `GrupoEstudiantesService` también filtra por nombre de rol.
+- **Rol Estudiante sin IDs fijos.** `GrupoEstudiantesService::buscarEstudiantes()` y `agregarEstudiante()` usan `whereHas('user.role', ...)` con `nombre = 'Estudiante'`; no dependen del ID que asigne `RoleSeeder`. Cubierto por `tests/Feature/Services/GrupoEstudiantesServiceTest.php`.
 - **Rutas separadas por panel.** Docente y estudiante tienen grupos independientes con `auth` y `role:*` (`routes/web.php`).
 - **Livewire de página completa.** Los módulos usan clases en `app/Livewire/` y vistas Blade con layout.
 - **Servicios para lógica reutilizable.** Notas, asistencia y estudiantes de grupo se concentran en `app/Services/`.
@@ -14,6 +15,8 @@
 - **La entrega se bloquea al calificar o vencer.** `Estudiante\Talleres` la abre en solo lectura en esos casos.
 - **Mensajes en dos niveles.** General en `actividades.mensaje_docente` e individual en `actividad_respuestas.mensaje_docente`; ambos solo para talleres.
 - **Archivos en disco público.** Actividades y entregas usan `Storage::disk('public')`; el archivo de actividad se sirve con control de propiedad.
+- **Creación de grupo transaccional.** `GrupoEstudiantes::crearNuevoGrupo()` guarda el grupo y sus evaluaciones P1–P4/A dentro de `DB::transaction`; si falla una inserción, no queda un grupo sin evaluaciones. Cubierto por `tests/Feature/Docente/GrupoCreacionTest.php`.
+- **Nota pendiente ≠ cero.** `CalificacionesService::guardarNotas()` ignora `null` (no guarda ni borra), borra solo con `''` y guarda `0` como cero real. `calcularDefinitiva` excluye las evaluaciones pendientes del cálculo y muestra `—`. Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php`.
 
 ## Estados de preferencias, propuestas y decisiones pendientes
 | Tema | Estado | Decisión o nota |
@@ -21,7 +24,7 @@
 | Comentario de calificación | Preferencia expresada | Implementar su captura y almacenamiento; no retirar el campo. Sigue pendiente de desarrollo y pruebas. |
 | Ponderación P1–P4/A | Propuesta pendiente de aprobación | P1 20%, P2 20%, P3 20%, P4 30% y A 10%. No implementar hasta confirmarla. |
 | Evaluaciones personalizadas | Decisión pendiente | Definir si tendrán porcentaje editable y cómo participarán en la nota final. |
-| Evaluaciones P1 IDs 3 y 4 | Revisión de datos pendiente | No se sabe cuál es correcta ni cuál podría ser duplicada. Revisar datos, fechas, actividades relacionadas y calificaciones antes de cualquier modificación. No eliminar ni modificar registros por ahora. |
+| Evaluaciones P1 IDs 3 y 4 | Verificación completada | El ID 3 no existe en la base remota (mínimo 4); no hay P1 duplicados por grupo y el duplicado no se pudo reproducir. El usuario indicó no modificar registros P1. |
 | Verificación de correo | Sin decisión | No modificar el sistema de autenticación por ahora. |
 | Períodos académicos | Diseño y reglas pendientes | No asumir criterios académicos ni implementarlos sin definirlos. |
 | Supabase | Verificación controlada pendiente | Comprobar esquema y migraciones remotas sin exponer credenciales ni modificar datos. |
@@ -32,13 +35,10 @@
 - Una decisión pendiente **no debe convertirse** en una decisión por iniciativa del agente.
 
 ## Otros pendientes técnicos
-- **Rol Estudiante dinámico.** Sustituir `role_id = 4` por una consulta o constante basada en el nombre del rol.
-- **`null` frente a `0.0`.** `matrizNotas()` devuelve `null` para celdas sin calificación; la vista usa `0` como fallback en el cálculo. No se encontró guardado automático de ceros, pero debe probarse y preservarse la distinción.
-- **Transacción de grupos.** `crearNuevoGrupo()` debe garantizar grupo y evaluaciones de forma atómica.
 - **Archivos al eliminar grupos.** Revisar si deben borrarse los archivos de actividades/entregas.
 
 ## Por confirmar
 - Ponderación definitiva y porcentaje de evaluaciones personalizadas.
 - Cómo implementar la captura del comentario de calificación; la preferencia de conservarlo ya está expresada.
 - Verificación de correo, períodos académicos y esquema remoto de Supabase.
-- Corrección del duplicado P1. Ningún punto se considera completado.
+- Los P1 con IDs 3 y 4 ya se verificaron; ningún punto pendiente relacionado con ellos.

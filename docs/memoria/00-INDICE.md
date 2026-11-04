@@ -1,5 +1,5 @@
 # Portal Estudio — Índice de memoria
-Última actualización: 2026-11-02
+Última actualización: 2026-11-03
 
 Proyecto académico Laravel 12 + Livewire para docentes y estudiantes.
 El panel docente gestiona grupos, notas, asistencia, actividades y talleres.

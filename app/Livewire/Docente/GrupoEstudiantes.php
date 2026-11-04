@@ -239,58 +239,66 @@ class GrupoEstudiantes extends Component
             ]);
         }
 
-        $grupo = Grupo::create([
-            'materia_id' => $materia->id,
-            'docente_id' => $docente->id,
-            'semestre' => $periodo->semestre,
-            'anio' => $periodo->anio,
-            'fecha_creacion' => $this->fechaCreacion,
-            'hora_inicio' => $this->horaInicio,
-            'hora_fin' => $this->horaFin,
-        ]);
+        $grupo = DB::transaction(function () use ($docente, $periodo, $materia): Grupo {
+            $grupo = Grupo::create([
+                'materia_id' => $materia->id,
+                'docente_id' => $docente->id,
+                'semestre' => $periodo->semestre,
+                'anio' => $periodo->anio,
+                'fecha_creacion' => $this->fechaCreacion,
+                'hora_inicio' => $this->horaInicio,
+                'hora_fin' => $this->horaFin,
+            ]);
 
-        Evaluacion::insert([
-    [
-        'grupo_id' => $grupo->id,
-        'nombre' => 'P1',
-        'tipo' => 'parcial',
-        'porcentaje' => 20,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ],
-    [
-        'grupo_id' => $grupo->id,
-        'nombre' => 'P2',
-        'tipo' => 'parcial',
-        'porcentaje' => 20,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ],
-    [
-        'grupo_id' => $grupo->id,
-        'nombre' => 'P3',
-        'tipo' => 'parcial',
-        'porcentaje' => 20,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ],
-    [
-        'grupo_id' => $grupo->id,
-        'nombre' => 'P4',
-        'tipo' => 'parcial',
-        'porcentaje' => 30,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ],
-    [
-        'grupo_id' => $grupo->id,
-        'nombre' => 'A',
-        'tipo' => 'parcial',
-        'porcentaje' => 10,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ],
-]);
+            /*
+             * El grupo y sus evaluaciones se guardan juntos:
+             * si falla la inserción, no queda un grupo sin P1–P4/A.
+             */
+            Evaluacion::insert([
+                [
+                    'grupo_id' => $grupo->id,
+                    'nombre' => 'P1',
+                    'tipo' => 'parcial',
+                    'porcentaje' => 20,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'grupo_id' => $grupo->id,
+                    'nombre' => 'P2',
+                    'tipo' => 'parcial',
+                    'porcentaje' => 20,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'grupo_id' => $grupo->id,
+                    'nombre' => 'P3',
+                    'tipo' => 'parcial',
+                    'porcentaje' => 20,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'grupo_id' => $grupo->id,
+                    'nombre' => 'P4',
+                    'tipo' => 'parcial',
+                    'porcentaje' => 30,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'grupo_id' => $grupo->id,
+                    'nombre' => 'A',
+                    'tipo' => 'parcial',
+                    'porcentaje' => 10,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            ]);
+
+            return $grupo;
+        });
 
         $this->resetFormulario();
 

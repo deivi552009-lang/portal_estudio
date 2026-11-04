@@ -16,8 +16,8 @@ class GrupoEstudiantesService
 
         return Estudiante::query()
             ->with('user')
-            ->whereHas('user', function ($query) {
-                $query->where('role_id', 4);
+            ->whereHas('user.role', function ($query) {
+                $query->where('nombre', 'Estudiante');
             })
             ->when($busqueda !== '', function ($query) use ($busqueda) {
                 $query->whereHas('user', function ($q) use ($busqueda) {
@@ -42,8 +42,8 @@ class GrupoEstudiantesService
     ): void {
         $estudiante = Estudiante::query()
             ->whereKey($estudianteId)
-            ->whereHas('user', function ($query) {
-                $query->where('role_id', 4);
+            ->whereHas('user.role', function ($query) {
+                $query->where('nombre', 'Estudiante');
             })
             ->firstOrFail();
 

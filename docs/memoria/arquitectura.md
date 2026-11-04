@@ -1,5 +1,5 @@
 # Arquitectura
-Última actualización: 2026-11-02
+Última actualización: 2026-11-03
 
 ## Vista general
 - Aplicación Laravel 12 + Livewire de página completa, Blade/Tailwind, PHP 8.2+ y Vite; no existe `routes/api.php` ni API REST visible.
@@ -26,7 +26,7 @@
 ## Roles y autorización
 - `RoleSeeder` crea `Superadministrador`, `Administrativo`, `Docente` y `Estudiante` con `updateOrInsert`; el orden no garantiza IDs concretos.
 - `RegisteredUserController` obtiene el ID de `Estudiante` dinámicamente con `Role::firstOrCreate` y crea el perfil en `estudiantes`.
-- `GrupoEstudiantesService` usa `where('role_id', 4)` en dos consultas; es un riesgo si cambian los IDs.
+- `GrupoEstudiantesService` identifica a los estudiantes por el nombre del rol (`Estudiante`), no por un ID fijo (2026-11-03).
 - Solo existen rutas y vistas para docente y estudiante; no hay panel administrativo ni flujo de alta de docentes.
 - `User` no implementa `MustVerifyEmail`; la verificación de correo está por decidir.
 
@@ -47,7 +47,7 @@
 
 - Un taller se vincula a su evaluación mediante `evaluaciones.actividad_id` (nullable y único); la nota vive en `calificaciones`, no en `actividad_respuestas`.
 - `CalificacionesService::matrizNotas()` devuelve `null` para celdas sin calificación; la vista de notas usa `0` solo como fallback de cálculo. No se encontró guardado automático de ceros, pero debe probarse.
-- Se reportaron dos evaluaciones P1 con IDs 3 y 4 y calificaciones distintas; no es verificable desde el código y requiere revisión de datos antes de cualquier cambio.
+- Verificado en solo lectura (2026-11-03): el ID 3 no existe en la base remota y no hay P1 duplicados por grupo; no se modificaron registros.
 
 ## Transacciones y archivos
 - `GrupoActividades::crearActividad()` y `actualizarActividad()` usan `DB::transaction` para la actividad y su evaluación.

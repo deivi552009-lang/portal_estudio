@@ -1,5 +1,5 @@
 # Autenticación, perfil y roles
-Última actualización: 2026-11-02
+Última actualización: 2026-11-03
 
 ## Qué hace
 Gestiona registro, login, logout, recuperación de contraseña y perfil. Asigna roles y protege las rutas de cada panel.
@@ -32,15 +32,15 @@ Gestiona registro, login, logout, recuperación de contraseña y perfil. Asigna 
 - Los nombres de rol deben coincidir con el seeder: `Docente` y `Estudiante`; la comparación no distingue mayúsculas.
 - `RoleSeeder` usa `updateOrInsert`; el orden de inserción no garantiza IDs concretos.
 - `RegisteredUserController` obtiene el ID de Estudiante dinámicamente; no hardcodear ese ID en el registro.
-- `GrupoEstudiantesService` usa `role_id = 4` fijo en dos consultas; si los IDs cambian, la búsqueda y el alta de estudiantes fallan.
+- `GrupoEstudiantesService` identifica al estudiante por el nombre de rol (`Estudiante`), no por un ID fijo (2026-11-03).
 - El registro público solo crea estudiantes; no asumir que crea docentes.
 - `User` no implementa `MustVerifyEmail`, así que la verificación de correo no está exigida por el modelo. Sin decisión sobre si será obligatoria; no modificar autenticación por ahora.
 - Eliminar una cuenta puede chocar con las FKs de `estudiantes`/`docentes`, que no tienen cascade.
 
 ## Hallazgos clasificados
 - **[Verificado en código]** Registro con rol dinámico y perfil de estudiante en `RegisteredUserController.php`.
-- **[Comprobado localmente]** Dos usos de `role_id = 4` en `GrupoEstudiantesService.php` (líneas 20 y 46).
-- **[Riesgo detectado]** IDs de roles no garantizados por el seeder.
+- **[Comprobado localmente]** El filtro por rol de `GrupoEstudiantesService` usa el nombre (`Estudiante`); cubierto por `tests/Feature/Services/GrupoEstudiantesServiceTest.php` (2026-11-03).
+- **[Verificado en código]** Los IDs de roles no están garantizados por el seeder; el registro y el alta de estudiantes ya no dependen de ellos.
 - **[Decisión pendiente]** Alta de docentes, panel administrativo y verificación de correo.
 - **[Sin decisión]** La verificación de correo no está decidida; no se deben cambiar flujos de autenticación todavía.
 

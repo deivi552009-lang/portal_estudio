@@ -4,6 +4,7 @@
 ## Criterios de clasificación
 - `[Verificado en código]`: leído directamente en el archivo indicado.
 - `[Comprobado localmente]`: confirmado con búsquedas en el checkout local.
+- `[Comprobado en base remota]`: consulta de solo lectura ejecutada contra Supabase, sin modificar datos.
 - `[Riesgo detectado]`: posible fallo o acceso indebido; requiere prueba.
 - `[Decisión pendiente]`: requiere aprobación funcional o académica.
 - `[Sin decisión]`: todavía no existe una determinación tomada.
@@ -24,7 +25,7 @@ Ninguna tarea pendiente se considera completada; este documento solo registra tr
 | Comentario de calificación | Preferencia expresada: implementar captura y almacenamiento; no retirar. Pendiente de desarrollo y pruebas. |
 | Ponderación P1–P4/A | Propuesta pendiente de aprobación: 20/20/20/30/10. No implementar hasta confirmarla. |
 | Evaluaciones personalizadas | Decisión pendiente: porcentaje editable y participación en la nota final. |
-| Evaluaciones P1 IDs 3 y 4 | Revisión de datos pendiente: no se sabe cuál es correcta ni cuál podría ser duplicada. No eliminar ni modificar registros. |
+| Evaluaciones P1 IDs 3 y 4 | Verificación completada: el ID 3 no existe en la base remota, no se reproduce el duplicado y no se modifican registros. |
 | Verificación de correo | Sin decisión: no modificar autenticación por ahora. |
 | Períodos académicos | Diseño y reglas pendientes: no asumir criterios académicos. |
 | Supabase | Verificación controlada pendiente: sin exponer credenciales ni modificar datos. |
@@ -32,10 +33,7 @@ Ninguna tarea pendiente se considera completada; este documento solo registra tr
 **Regla de documentación:** una preferencia expresada no equivale a una funcionalidad implementada; una propuesta no equivale a una regla aprobada; una decisión pendiente no debe convertirse en una decisión por iniciativa del agente.
 
 ## Prioridad alta
-1. **Validar propiedad del grupo en los tres componentes docentes.** `GrupoNotas`, `GrupoAsistencia` e `HistorialAsistencia` cargan el grupo con `findOrFail($grupoId)` sin `whereHas('docente', ...)` en `mount()` (`app/Livewire/Docente/`). **[Verificado en código] [Riesgo detectado]**
-2. **Corregir el `role_id = 4` fijo.** `GrupoEstudiantesService.php` lo usa en dos consultas (líneas 20 y 46); `RoleSeeder` usa `updateOrInsert`, por lo que el ID no está garantizado. `RegisteredUserController` sí obtiene el rol dinámicamente. **[Verificado en código] [Comprobado localmente] [Riesgo detectado]**
-3. **Incorporar transacción conjunta al crear grupos.** `GrupoEstudiantes::crearNuevoGrupo()` crea el grupo y luego inserta P1–P4/A con `Evaluacion::insert` sin `DB::transaction`. La creación de talleres en `GrupoActividades::crearActividad()` sí está transaccionada. **[Verificado en código] [Riesgo detectado]**
-4. **Revisar duplicados de P1 y distinguir notas nulas de ceros reales.** Se reportaron dos P1 con IDs 3 y 4 y calificaciones diferentes; todavía no se ha confirmado cuál es la correcta ni cuál podría ser duplicada. Consultar datos, fechas de creación, relaciones con actividades y calificaciones asociadas antes de cualquier cambio; no modificar ni eliminar registros. **[Reportado por el usuario] [No verificable desde código] [Revisión de datos pendiente]** En el código, `CalificacionesService::matrizNotas()` devuelve `null` para celdas sin calificación; la vista de notas usa `0` como fallback en el cálculo. No se encontró guardado automático de ceros, pero debe probarse. **[Verificado en código] [Riesgo detectado]**
+Sin pendientes de prioridad alta registrados.
 
 ## Prioridad media
 5. **Guardar comentarios de calificación.** `calificaciones.comentario` está en `$fillable` y se lee en `Talleres.php`, pero `GrupoActividades::guardarNota()` solo guarda `nota`. La preferencia es implementar su captura y almacenamiento, no retirar el campo; sigue pendiente de desarrollo y pruebas. No confundir con `actividades.mensaje_docente` (mensaje general) ni con `actividad_respuestas.mensaje_docente` (mensaje individual). **[Verificado en código] [Preferencia expresada] [Decisión pendiente]**
@@ -50,7 +48,7 @@ Ninguna tarea pendiente se considera completada; este documento solo registra tr
 13. **Definir alta y administración de docentes y otros roles.** El registro público crea solo estudiantes y no se encontró flujo de alta de docentes. **[Verificado en código] [Decisión pendiente]**
 14. **Diseñar o completar el panel administrativo.** Los roles `Administrativo` y `Superadministrador` existen en el seeder, pero no hay rutas ni vistas para ellos. **[Verificado en código] [Decisión pendiente]**
 15. **Completar enlaces y navegación de los paneles.** Hay `href="#"` en `layouts/docente.blade.php`, `layouts/estudiante.blade.php` y `components/docente/dashboard.blade.php`; falta definir qué se implementa y qué se retira. **[Verificado en código] [Decisión pendiente]**
-16. **Verificar esquema y migraciones de Supabase.** El código no confirma el esquema activo, las migraciones ejecutadas en remoto ni la coincidencia con el repositorio. Realizar una comprobación controlada del entorno real, sin exponer credenciales ni modificar datos. **[No verificable desde código] [Verificación pendiente]**
+16. **Verificar esquema y migraciones de Supabase.** El código no confirma el esquema activo, las migraciones ejecutadas en remoto ni la coincidencia con el repositorio. Realizar una comprobación controlada del entorno real, sin exponer credenciales ni modificar datos. **[No verificable desde código] [Verificación pendiente]** Comprobación de solo lectura (2026-11-03): la base remota **no tiene** `evaluaciones.orden`, columna que el repositorio local espera; confirma la deriva de esquema.
 17. **Decidir si se implementará verificación de correo.** `app/Models/User.php` tiene comentado `MustVerifyEmail`; las rutas de verificación existen, pero el modelo no exige la verificación. Sin decisión tomada; no modificar autenticación por ahora. **[Verificado en código] [Sin decisión]**
 
 ## Otros riesgos y mantenimiento
@@ -62,10 +60,14 @@ Ninguna tarea pendiente se considera completada; este documento solo registra tr
 - Actualizar `docs/roadmap.md` y `docs/changelog.md`; algunas afirmaciones ya no coinciden con el código. **[Verificado en código] [Propuesta de mejora]**
 
 ## Por confirmar
-- Origen y relaciones de los P1 duplicados.
 - Ponderación académica definitiva y uso de evaluaciones personalizadas.
 - Cómo se implementará la captura y el almacenamiento del comentario de calificación.
 - Si se limpiarán archivos al eliminar grupos y si el acceso público es aceptable.
 
 ## Resueltos
 - 2026-11-03 · antigua tarea 9: **Retirar los delimitadores Markdown de la vista de notas.** Se eliminaron las dos vallas con triple backtick de `resources/views/components/docente/⚡grupo-notas.blade.php`; grep confirma que no queda ninguna. Vista probada y confirmada por el usuario. **[Comprobado localmente]**
+- 2026-11-03 · antigua tarea 1: **Validar propiedad del grupo en los tres componentes docentes.** `GrupoNotas`, `GrupoAsistencia` e `HistorialAsistencia` cargan el grupo con `whereHas('docente', ...)` sobre `user_id = Auth::id()`; un docente ajeno recibe 404. Se agregó `tests/Feature/Docente/GrupoPropiedadTest.php` (9 pruebas: dueño 200, docente ajeno 404, estudiante 403) y se comprobó que fallan sin el cambio. Suite completa en verde (34 pruebas). También se corrigió la indentación de encadenado que marcaba Pint en `GrupoAsistencia` e `HistorialAsistencia`. Vista confirmada por el usuario en el navegador; **integrado en `main`** el 2026-11-03 (rama `pruebas`). **[Verificado en código] [Comprobado localmente]**
+- 2026-11-03 · antigua tarea 2: **Corregir el `role_id = 4` fijo.** `GrupoEstudiantesService::buscarEstudiantes()` y `agregarEstudiante()` filtran ahora por `whereHas('user.role', ...)` con `nombre = 'Estudiante'`, sin depender de IDs. Pruebas nuevas en `tests/Feature/Services/GrupoEstudiantesServiceTest.php` (4; los roles se crean con IDs distintos de 4 y se comprobó que 3 fallan sin el cambio). Suite completa en verde (38 pruebas). **Integrado en `main`** el 2026-11-03 (rama `pruebas`). **[Verificado en código] [Comprobado localmente]**
+- 2026-11-03 · antigua tarea 3: **Incorporar transacción conjunta al crear grupos.** `GrupoEstudiantes::crearNuevoGrupo()` envuelve la creación del grupo y la inserción de P1–P4/A en `DB::transaction`. Pruebas nuevas en `tests/Feature/Docente/GrupoCreacionTest.php` (2): alta correcta y reversión completa cuando falla la inserción de evaluaciones (se comprobó que sin el cambio queda el grupo huérfano). Suite completa en verde (40 pruebas). **Integrado en `main`** el 2026-11-03 (rama `pruebas`). **[Verificado en código] [Comprobado localmente]**
+- 2026-11-03 · antigua tarea 4 (parte P1): **Revisar los P1 con IDs 3 y 4.** Consulta de solo lectura en la base remota: el ID 3 **no existe** (el mínimo es 4), no hay P1 duplicados por grupo y el P1 id 4 (grupo 1) tiene 2 calificaciones (3.00 y 4.00). El duplicado no se pudo reproducir y el usuario indicó no modificar registros P1. **[Comprobado en base remota]**
+- 2026-11-03 · antigua tarea 4 (resto): **Distinguir notas nulas de ceros reales en la planilla.** `CalificacionesService::guardarNotas()` ahora ignora `null` (no guarda ni borra), conserva `''` como borrado explícito y guarda `0` como cero real. `calcularDefinitiva` en `⚡grupo-notas.blade.php` ya no usa `|| 0`: excluye las pendientes del cálculo y muestra `—`. Pruebas en `tests/Feature/Services/CalificacionesServiceTest.php` (7, incluida la que antes fallaba). Suite completa en verde (47 pruebas). Vista confirmada por el usuario en el navegador. **Integrado en `main`** el 2026-11-03 (rama `pruebas`). **[Verificado en código] [Comprobado localmente]**

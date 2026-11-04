@@ -24,7 +24,7 @@ Permite al docente ver la matriz de notas por grupo, crear o eliminar evaluacion
 7. El estudiante lee sus calificaciones por evaluación en `/estudiante/notas`.
 
 ## Estado
-**En progreso.** La matriz y el guardado están implementados; el comentario de calificación aún no se captura, las evaluaciones dinámicas no tienen porcentaje editable y falta validar la propiedad del grupo en el `mount()`.
+**En progreso.** La matriz y el guardado están implementados y el `mount()` valida la propiedad del grupo; el comentario de calificación aún no se captura y las evaluaciones dinámicas no tienen porcentaje editable.
 
 ## Puntos delicados o reglas que no se deben romper
 - La nota se guarda en `calificaciones`, nunca en `actividad_respuestas`.
@@ -32,17 +32,18 @@ Permite al docente ver la matriz de notas por grupo, crear o eliminar evaluacion
 - Los nombres `P1`, `P2`, `P3`, `P4` y `A` están reservados en el formulario de evaluaciones.
 - Las evaluaciones dinámicas se crean como `personalizada` y con `porcentaje = null`; no afectan la definitiva.
 - La ponderación actual P1 20%, P2 20%, P3 20%, P4 30% y A 10% está implementada, pero es una propuesta pendiente de aprobación; no implementar cambios hasta confirmarla. Sigue pendiente decidir si las evaluaciones personalizadas tendrán porcentaje editable y cómo participarán en la nota final.
-- `GrupoNotas::mount()` no verifica que el grupo pertenezca al docente autenticado.
+- `GrupoNotas::mount()` solo carga grupos del docente autenticado (`whereHas('docente', ...)` sobre `user_id = Auth::id()`); un docente ajeno recibe 404.
 - La vista `⚡grupo-notas.blade.php` ya no contiene vallas Markdown (triple backtick); se retiraron las dos sueltas y la vista fue probada por el usuario.
 - `calificaciones.comentario` existe, está en `$fillable` y se lee en el panel estudiante, pero no hay flujo que lo guarde. La preferencia es implementar su captura y almacenamiento, no retirar el campo; sigue pendiente de desarrollo y pruebas. Mantenerlo separado de los mensajes del taller.
-- **Distinción `null` vs `0.0`:** el servicio devuelve `null` para celdas sin calificar; el JavaScript de la vista usa `|| 0` como fallback para calcular la definitiva. No se encontró guardado automático de ceros, pero debe probarse que una celda vacía no se persista como cero.
-- Se reportaron dos P1 con IDs 3 y 4 y calificaciones diferentes; revisar datos, fechas, actividades y calificaciones antes de cualquier cambio. No eliminar ni modificar registros.
+- **Distinción `null` vs `0.0`:** `matrizNotas()` y `cargarNotas()` conservan `null` para celdas sin calificar. `guardarNotas()` ignora `null` (no guarda ni borra), borra solo con `''` y guarda `0` como cero real. `calcularDefinitiva` en la vista excluye las pendientes y muestra `—`; ya no usa `|| 0`. Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php` y confirmado por el usuario en el navegador (2026-11-03).
+- Verificado en solo lectura (2026-11-03): el ID 3 no existe en la base remota y no hay P1 duplicados por grupo; no se modificaron registros.
 
 ## Hallazgos clasificados
-- **[Verificado en código]** `matrizNotas()` usa `null`; la vista usa `0` como fallback; `guardarNotas()` solo envía notas modificadas.
+- **[Comprobado localmente]** `matrizNotas()` conserva `null`; `guardarNotas()` distingue `null`, `''` y `0`; la vista ya no usa `0` como fallback (2026-11-03). Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php`.
 - **[Comprobado localmente]** `comentario` solo se lee en `Talleres.php`.
-- **[Riesgo detectado]** Posible confusión entre nota vacía y cero real; falta autorización en `mount()`.
-- **[Reportado por el usuario]** Duplicado de P1 con IDs 3 y 4; no se ha confirmado cuál es correcto ni cuál podría ser duplicado. Requiere revisión de datos, fechas, actividades y calificaciones; no modificar registros.
+- **[Comprobado localmente]** `GrupoNotas::mount()` valida la propiedad del grupo (2026-11-03); cubierto por `tests/Feature/Docente/GrupoPropiedadTest.php`.
+- **[Comprobado localmente]** Nota pendiente y cero real diferenciados desde 2026-11-03; la prueba cubre `null`, `''` y `0`.
+- **[Comprobado en base remota]** El supuesto duplicado de P1 con IDs 3 y 4 no se reproduce: el ID 3 no existe y no hay P1 duplicados por grupo. No se modificaron registros.
 - **[Preferencia expresada]** Implementar la captura y almacenamiento de `calificaciones.comentario`; no retirar el campo. Pendiente de desarrollo y pruebas.
 - **[Propuesta pendiente]** Ponderación P1–P4/A; pendiente de aprobación.
 - **[Decisión pendiente]** Porcentaje de evaluaciones personalizadas y ponderación definitiva.
@@ -50,5 +51,3 @@ Permite al docente ver la matriz de notas por grupo, crear o eliminar evaluacion
 ## Por confirmar
 - Si las evaluaciones personalizadas deben tener porcentaje y afectar la definitiva.
 - Cómo se implementará la captura del comentario de calificación.
-- Si la autorización del `mount()` se corregirá en este módulo o en un middleware común.
-- Cuál P1 es correcto y cuál podría ser duplicado; revisar antes de cualquier cambio y no modificar registros.

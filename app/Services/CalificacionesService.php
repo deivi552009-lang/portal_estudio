@@ -74,7 +74,14 @@ class CalificacionesService
                     continue;
                 }
 
-                if ($nota === null || $nota === '') {
+                /*
+                 * Una nota pendiente no se guarda ni borra nada.
+                 */
+                if ($nota === null) {
+                    continue;
+                }
+
+                if ($nota === '') {
                     $paresParaEliminar[] = [
                         'estudiante_id' => $estudianteId,
                         'evaluacion_id' => $evaluacionId,
