@@ -7,6 +7,7 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 ## Archivos clave
 - `app/Livewire/Docente/GrupoNotas.php`: matriz, alta/baja de evaluaciones y guardado de notas.
 - `app/Services/CalificacionesService.php`: matriz, `upsert` de notas y cálculo de notas finales.
+- `app/Console/Commands/CompletarEvaluacionesOficiales.php`: comando de reparación `evaluaciones:completar-oficiales`.
 - `resources/views/components/docente/⚡grupo-notas.blade.php`: planilla de notas.
 - `app/Models/Evaluacion.php`, `Calificacion.php`, `Estudiante.php`.
 - Migraciones: `2026_08_13_155815_create_evaluacions_table.php`, `2026_08_13_160527_create_calificaciones_table.php`, `2026_08_21_162709_create_evaluaciones_table.php`, `2026_10_08_043257_add_actividad_id_to_evaluaciones_table.php`, `2026_10_13_014729_add_comentario_to_calificaciones_table.php`.
@@ -29,6 +30,8 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 
 ## Puntos delicados o reglas que no se deben romper
 - La nota se guarda en `calificaciones`, nunca en `actividad_respuestas`.
+- Todo grupo nuevo recibe P1–P4/A al crearse: `GrupoEstudiantes::crearNuevoGrupo()` los inserta dentro de la misma `DB::transaction` que el grupo (cubierto por `GrupoCreacionTest`). No retirar esa inserción ni sacarla de la transacción.
+- Para grupos creados antes del commit `d6027d2` (2026-10-01) que no tengan las oficiales existe el comando `evaluaciones:completar-oficiales`: por defecto solo muestra el plan; `--ejecutar` inserta; `--grupo=*` limita a IDs. Solo inserta faltantes (P1 20%, P2 20%, P3 20%, P4 30%, A 10%, `tipo = parcial`), es idempotente y no modifica evaluaciones existentes, calificaciones ni grupos. Las A reparadas quedan con `tipo = parcial`; el A del grupo 1 conserva `tipo = asistencia_final` y el comando no lo toca.
 - El unique `evaluacion_id` + `estudiante_id` impide duplicados; el servicio usa `upsert`.
 - Los nombres `P1`, `P2`, `P3`, `P4` y `A` están reservados en el formulario de evaluaciones.
 - Las evaluaciones dinámicas se crean como `personalizada` y con `porcentaje = null`; no afectan la definitiva.
@@ -46,6 +49,8 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 - **[Comprobado localmente]** `GrupoNotas::mount()` valida la propiedad del grupo (2026-11-03); cubierto por `tests/Feature/Docente/GrupoPropiedadTest.php`.
 - **[Comprobado localmente]** Selector de grupos en la planilla (2026-11-05): lista solo grupos del docente, separa grupos de la misma materia y redirige con `navigate: true`; cubierto por `tests/Feature/Docente/GrupoNotasSelectorTest.php` y confirmado por el usuario en el navegador.
 - **[Comprobado localmente]** Nota pendiente y cero real diferenciados desde 2026-11-03; la prueba cubre `null`, `''` y `0`.
+- **[Comprobado localmente]** Todo grupo nuevo recibe P1–P4/A en la transacción de `crearNuevoGrupo()`; grupos legados se reparan con `evaluaciones:completar-oficiales` (2026-11-05). Cubierto por `tests/Feature/Docente/GrupoCreacionTest.php` y `tests/Feature/Console/CompletarEvaluacionesOficialesTest.php`.
+- **[Comprobado en base remota]** El 2026-11-05 el comando insertó 15 evaluaciones en los grupos legados 2, 4 y 5 (5 en cada uno); un dry-run posterior mostró los 5 grupos del docente completos.
 - **[Comprobado en base remota]** El supuesto duplicado de P1 con IDs 3 y 4 no se reproduce: el ID 3 no existe y no hay P1 duplicados por grupo. No se modificaron registros.
 - **[Preferencia expresada]** Implementar la captura y almacenamiento de `calificaciones.comentario`; no retirar el campo. Pendiente de desarrollo y pruebas.
 - **[Propuesta pendiente]** Ponderación P1–P4/A; pendiente de aprobación.

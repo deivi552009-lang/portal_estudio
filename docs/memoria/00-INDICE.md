@@ -21,7 +21,7 @@ El panel estudiante consulta notas y talleres, y entrega respuestas; hay riesgos
 - [[modulos/panel-estudiante]] — Dashboard, notas y talleres del estudiante.
 - [[bitacora/2026-11-02]] — Registro de esta documentación y actualización.
 - [[bitacora/2026-11-03]] — Configuración de permisos de agentes.
-- [[bitacora/2026-11-05]] — Selector de grupos en la planilla de notas.
+- [[bitacora/2026-11-05]] — Selector de grupos en la planilla y reparación de evaluaciones oficiales.
 
 ## Por confirmar
 - Esquema remoto de Supabase, ponderación académica y períodos académicos.
