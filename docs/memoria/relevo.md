@@ -1,7 +1,11 @@
 # Relevo: tarea en curso
-Sin tarea en curso: antes de cerrar la rama, el usuario resolverá otros problemas.
+Sin tarea en curso.
 
-Última actualización: 2026-11-03 · Modelo: DeepSeek V4.1 Flash 1017
+Última actualización: 2026-11-05 · Modelo: DeepSeek V4.1 Flash 1017
+
+## Estado
+- La última tarea (selector de grupos en la planilla de notas) está cerrada y confirmada por el usuario el 2026-11-05; detalle en `bitacora/2026-11-05.md`.
+- El cambio está integrado en `main` el 2026-11-05 (rama `pruebas`); no hay tarea en curso.
 
 ## Cambios integrados en `main` (rama `pruebas`)
 - Rama `pruebas` creada desde `main` y fusionada en `main` el 2026-11-03; `main` avanza al commit de integración.
@@ -13,12 +17,8 @@ Sin tarea en curso: antes de cerrar la rama, el usuario resolverá otros problem
 - `crearNuevoGrupo()` usa `DB::transaction` para grupo + P1–P4/A. Pruebas nuevas en `tests/Feature/Docente/GrupoCreacionTest.php` (2).
 - Distinción `null`/`0.0` corregida: `guardarNotas()` ignora `null`, borra solo con `''` y guarda `0`; la definitiva excluye pendientes y muestra `—`. Pruebas en `tests/Feature/Services/CalificacionesServiceTest.php` (7).
 
-## Pendiente de revisión del usuario
-- `docs/diagnostico/consulta-p1-ids-3-4.sql`: ejecutado en solo lectura el 2026-11-03. El ID 3 no existe, no hay P1 duplicados por grupo y el P1 id 4 tiene 2 calificaciones. El usuario confirmó que no se modifiquen registros P1; tarea cerrada.
-- Corrección `null`/`0.0` implementada y **confirmada por el usuario en el navegador** el 2026-11-03: la definitiva muestra `—` con pendientes y el `0` real se conserva.
-- Cambios integrados en `main` el 2026-11-03; la rama `pruebas` se conserva.
-
 ## Última tarea cerrada
+- Selector de grupos en la planilla de notas; implementado, probado (51 pruebas) y **confirmado por el usuario en el navegador** el 2026-11-05. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Distinguir notas nulas de ceros reales; completada, probada y **confirmada por el usuario en el navegador** el 2026-11-03. Detalle en `bitacora/2026-11-03.md`.
 - Incorporar transacción conjunta al crear grupos; completada y probada el 2026-11-03.
 - Corregir el `role_id = 4` fijo en `GrupoEstudiantesService`; completada y probada el 2026-11-03.

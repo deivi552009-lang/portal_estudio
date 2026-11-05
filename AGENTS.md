@@ -5,4 +5,5 @@
 - No leas ni muestres .env ni credenciales.
 - En cambios de diseño o vistas Blade, no toques la lógica del backend.
 - Al cerrar una tarea con pruebas confirmadas por el usuario, el agente documentador actualiza la memoria (skill memoria-proyecto).
+- Si el agente documentador no está disponible o falla por crédito, límite de pasos u otro error, asigna la misma documentación a uno de los modelos de respaldo listados en `.opencode/agents/portal-estudio-orquestador.md` y revisa lo escrito antes de darlo por bueno.
 - Si hay una tarea en curso, está en docs/memoria/relevo.md: léelo al empezar y actualízalo tras cada bloque de cambios.

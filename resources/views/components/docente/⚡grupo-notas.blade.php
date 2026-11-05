@@ -150,6 +150,54 @@
             </span>
         </button>
 
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        ">
+
+            <label
+                for="selector-grupo-notas"
+                style="
+                    font-size: 13px;
+                    font-weight: bold;
+                    color: #444;
+                    white-space: nowrap;
+                "
+            >
+                Materia:
+            </label>
+
+            <select
+                id="selector-grupo-notas"
+                wire:change="seleccionarGrupo($event.target.value)"
+                wire:loading.attr="disabled"
+                wire:target="seleccionarGrupo"
+                style="
+                    padding: 8px 10px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    background-color: white;
+                    max-width: 320px;
+                "
+            >
+                @foreach ($grupos as $grupoOpcion)
+
+                    <option
+                        value="{{ $grupoOpcion->id }}"
+                        @selected($grupoOpcion->id === $grupo->id)
+                    >
+                        {{ $grupoOpcion->materia->nombre }}
+                        — Semestre {{ $grupoOpcion->semestre }}
+                        — {{ $grupoOpcion->anio }}
+                    </option>
+
+                @endforeach
+            </select>
+
+        </div>
+
     </form>
 
     @error('nuevaEvaluacionNombre')

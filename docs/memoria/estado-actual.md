@@ -1,5 +1,5 @@
 # Estado actual
-Última actualización: 2026-11-03
+Última actualización: 2026-11-05
 
 ## En qué punto está
 - Los paneles docente y estudiante existen y tienen rutas protegidas por rol (`routes/web.php`).
@@ -11,6 +11,7 @@
 - 2026-11-03: eliminado el `role_id = 4` fijo de `GrupoEstudiantesService`; ahora se filtra por nombre de rol (`user.role.nombre = 'Estudiante'`). Pruebas nuevas en `tests/Feature/Services/GrupoEstudiantesServiceTest.php` (4) y suite completa en verde (38). Integrado en `main` el 2026-11-03 (rama `pruebas`).
 - 2026-11-03: `crearNuevoGrupo()` crea el grupo y sus P1–P4/A dentro de `DB::transaction`; si falla la inserción, revierte todo. Pruebas en `tests/Feature/Docente/GrupoCreacionTest.php` (2) y suite completa en verde (40). Integrado en `main` el 2026-11-03 (rama `pruebas`).
 - 2026-11-03: corregida la distinción `null`/`0.0`: `guardarNotas()` ignora `null`, borra solo con `''` y guarda `0` como cero real; la definitiva excluye pendientes y muestra `—`. Pruebas en `tests/Feature/Services/CalificacionesServiceTest.php` (7) y suite completa en verde (47). Vista confirmada por el usuario en el navegador. Integrado en `main` el 2026-11-03 (rama `pruebas`).
+- 2026-11-05: la planilla de notas incorpora un selector «Materia» para cambiar de grupo sin volver al dashboard. `GrupoNotas::render()` lista solo los grupos del docente autenticado (materia, año y semestre) y `seleccionarGrupo()` valida la pertenencia (grupo ajeno → 404) y redirige a `docente.grupo.notas`. Cada grupo es una opción con el formato «Materia — Semestre N — Año». Pruebas en `tests/Feature/Docente/GrupoNotasSelectorTest.php` (4) y suite completa en verde (51 pruebas, 102 aserciones). El usuario confirmó en el navegador que «cambia y funciona». Integrado en `main` el 2026-11-05 (rama `pruebas`).
 
 ## Hallazgos priorizados
 - **Media:** `calificaciones.comentario` se lee pero no se escribe; la preferencia es implementar su captura y almacenamiento, no retirarlo, y sigue pendiente de desarrollo y pruebas. No confundirlo con los dos campos `mensaje_docente`.

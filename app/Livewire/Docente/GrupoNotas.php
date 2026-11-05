@@ -18,19 +18,20 @@ class GrupoNotas extends Component
 
     public function mount(int $grupoId): void
     {
-        $this->grupo = Grupo::query()
-            ->with([
-                'materia',
-                'docente.user',
-                'estudiantes.user',
-                'evaluaciones',
-            ])
-            ->whereHas('docente', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->findOrFail($grupoId);
+        $this->grupo = $this->cargarGrupo($grupoId);
 
         $this->cargarNotas();
+    }
+
+    public function seleccionarGrupo(int $grupoId): void
+    {
+        $this->cargarGrupo($grupoId);
+
+        $this->redirectRoute(
+            'docente.grupo.notas',
+            ['grupoId' => $grupoId],
+            navigate: true
+        );
     }
 
     public function cargarNotas(): void
@@ -76,9 +77,40 @@ class GrupoNotas extends Component
 
     public function render()
     {
-        return view('components.docente.⚡grupo-notas')
-            ->layout('layouts.docente');
+        $grupos = Grupo::query()
+            ->with('materia')
+            ->whereHas('docente', function ($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->orderBy('anio')
+            ->orderBy('semestre')
+            ->orderBy('id')
+            ->get()
+            ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
+                .'|'.$grupo->anio
+                .'|'.$grupo->semestre
+                .'|'.$grupo->id)
+            ->values();
 
+        return view('components.docente.⚡grupo-notas', [
+            'grupos' => $grupos,
+        ])->layout('layouts.docente');
+
+    }
+
+    private function cargarGrupo(int $grupoId): Grupo
+    {
+        return Grupo::query()
+            ->with([
+                'materia',
+                'docente.user',
+                'estudiantes.user',
+                'evaluaciones',
+            ])
+            ->whereHas('docente', function ($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->findOrFail($grupoId);
     }
 
     private function calificaciones(): CalificacionesService

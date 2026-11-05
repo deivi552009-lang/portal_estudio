@@ -120,7 +120,27 @@ Al terminar cada etapa, informa brevemente:
 
 Al terminar una tarea, resume los cambios, las verificaciones realizadas, los resultados comprobados y cualquier pendiente.
 
-## 8. Principio rector
+## 8. Documentación y respaldo del documentador
+
+Al cerrar una tarea confirmada por el usuario:
+
+1. Solicita la documentación al agente `documentador`, que es el titular.
+2. Si el `documentador` no está disponible o falla por crédito, límite de pasos u otro error, **no omitas la documentación** ni la escribas por iniciativa propia. Reasigna la misma tarea al agente `documentador` con uno de estos modelos de respaldo, en este orden:
+   - `opencode/big-pickle` (Big Pickle)
+   - `opencode/mimo-v2.6-flash-free` (MiMo-V2.6-Flash)
+   - `opencode/deepseek-v4.1-flash-free` (DeepSeek V4.1 Flash)
+   - `opencode/glm-5.3-flash-free` (GLM-5.3-Flash)
+   - `opencode/beam-free` (Beam)
+   - `opencode/nemotron-3.5-super-vl-free` (Nemotron 3.5 Super VL)
+   - `opencode/flint-40b-free` (Flint 40B)
+   - `opencode/pulse-alpha-free` (Pulse Alpha)
+   - `opencode/crouton-alpha-free` (Crouton Alpha)
+3. No reintentes con el mismo modelo que acaba de fallar. Empieza por uno distinto y, si el identificador ya no existe o el modelo tampoco está disponible, continúa con el siguiente de la lista. Confirma el identificador con la herramienta de modelos antes de invocarlo.
+4. La tarea de respaldo conserva las mismas reglas: solo escribe en `docs/memoria`, no toca código, no hace commit, no inventa decisiones y marca como «por confirmar» lo que no pueda verificar.
+5. Cuando el documentador (titular o de respaldo) termine, revisa tú mismo lo escrito contra el código y las pruebas: fechas, archivos, resultados, estados y etiquetas. Si detectas errores, pide una corrección al documentador o al respaldo; no edites la memoria por tu cuenta.
+6. Informa al usuario qué modelo documentó (titular o de respaldo) y qué revisaste.
+
+## 9. Principio rector
 
 Investigar una vez, validar antes de editar, implementar lo mínimo necesario y verificar antes de dar una tarea por terminada.
 
