@@ -19,10 +19,10 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 3. Cuenta actividades cuyo `tipo`, en minúsculas, sea `taller`.
 4. La vista muestra los totales y enlaces a notas, asistencia e historial de cada grupo.
 5. Dentro de la planilla de notas, el selector «Materia» permite cambiar de grupo sin volver al dashboard.
-6. El sidebar enlaza dashboard, grupos y actividades; el resto son marcadores.
+6. El sidebar enlaza Dashboard, Grupos, Actividades, Historial y Tomar asistencia; Estudiantes, Asignaturas, Guías de Estudio, Calendario, Notas, Reportes y Configuración siguen como marcadores.
 
 ## Estado
-**En progreso.** El dashboard funciona, pero varias secciones del sidebar y de “Acciones rápidas” siguen sin destino.
+**En progreso.** El dashboard y los enlaces de notas/asistencia funcionan; varias secciones del sidebar y de “Acciones rápidas” siguen sin destino.
 
 ## Puntos delicados o reglas que no se deben romper
 - El conteo de talleres compara `tipo` en minúsculas para tolerar `Taller` y `taller` en PostgreSQL.
@@ -30,15 +30,18 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 - Los enlaces `href="#"` son marcadores, no funcionalidades terminadas.
 - El total de estudiantes se calcula sobre la colección en PHP, no con una consulta agregada.
 - Las secciones de notas/asistencia enlazadas desde el dashboard cargan ahora solo grupos del docente autenticado.
+- En «Principal», «Historial» y «Tomar asistencia» van después de Actividades; Talleres y Mensajes ya no están en el sidebar.
+- `$grupoNavId = request()->route('grupoId')`: con grupo, Historial y Tomar asistencia enlazan a `docente.grupo.asistencia.historial` y `docente.grupo.asistencia`; sin grupo, ambas caen en `docente.grupos`. El estado activo se resuelve con `routeIs`.
 
 ## Hallazgos clasificados
-- **[Verificado en código]** Accesos rápidos y varios enlaces del sidebar son `href="#"`.
+- **[Verificado en código]** Accesos rápidos y varios enlaces del sidebar siguen siendo `href="#"`.
 - **[Verificado en código]** El dashboard filtra grupos por `docente.user_id`.
 - **[Comprobado localmente]** Notas, asistencia e historial validan la propiedad del grupo en su `mount()` (2026-11-03); cubierto por `tests/Feature/Docente/GrupoPropiedadTest.php`.
 - **[Comprobado localmente]** La planilla de notas permite cambiar de grupo con un selector, sin pasar por el dashboard (2026-11-05); cubierto por `tests/Feature/Docente/GrupoNotasSelectorTest.php`.
+- **[Comprobado localmente]** El sidebar enlaza Historial y Tomar asistencia al grupo actual y no muestra Talleres ni Mensajes (2026-11-05); cubierto por `tests/Feature/Docente/AsistenciaSelectorTest.php` y confirmado por el usuario en el navegador.
 - **[Decisión pendiente]** Alcance de las secciones pendientes y del panel administrativo.
 
 ## Por confirmar
-- Si se implementarán las secciones Estudiantes, Asignaturas, Talleres, Guías, Calendario, Mensajes, Notas, Reportes y Configuración.
+- Si se implementarán las secciones Estudiantes, Asignaturas, Guías de Estudio, Calendario, Notas, Reportes y Configuración.
 - Si el dashboard debe mostrar métricas adicionales.
 - Si la validación de pertenencia, hoy repetida con `whereHas` en cada componente, se unificará en un middleware o servicio.

@@ -42,6 +42,10 @@
             {{-- Navegación --}}
             <nav class="flex-1 px-4 py-6">
 
+                @php
+                    $grupoNavId = request()->route('grupoId');
+                @endphp
+
                 <p class="px-3 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Principal
                 </p>
@@ -125,15 +129,34 @@
 </a>
 
 
-                {{-- Talleres --}}
-                <a href="#"
+                {{-- Historial --}}
+                <a href="{{ $grupoNavId ? route('docente.grupo.asistencia.historial', $grupoNavId) : route('docente.grupos') }}"
                    class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl
-                          text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                          {{ request()->routeIs('docente.grupo.asistencia.historial')
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}
+                          transition">
 
                     <span class="w-5 text-center">▤</span>
 
                     <span class="text-sm font-medium">
-                        Talleres
+                        Historial
+                    </span>
+                </a>
+
+
+                {{-- Tomar asistencia --}}
+                <a href="{{ $grupoNavId ? route('docente.grupo.asistencia', $grupoNavId) : route('docente.grupos') }}"
+                   class="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl
+                          {{ request()->routeIs('docente.grupo.asistencia')
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}
+                          transition">
+
+                    <span class="w-5 text-center">✓</span>
+
+                    <span class="text-sm font-medium">
+                        Tomar asistencia
                     </span>
                 </a>
 
@@ -160,19 +183,6 @@
 
                     <span class="text-sm font-medium">
                         Calendario
-                    </span>
-                </a>
-
-
-                {{-- Mensajes --}}
-                <a href="#"
-                   class="flex items-center gap-3 px-3 py-2.5 mb-6 rounded-xl
-                          text-slate-300 hover:bg-slate-800 hover:text-white transition">
-
-                    <span class="w-5 text-center">▱</span>
-
-                    <span class="text-sm font-medium">
-                        Mensajes
                     </span>
                 </a>
 

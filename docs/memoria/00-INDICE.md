@@ -10,6 +10,7 @@ El panel estudiante consulta notas y talleres, y entrega respuestas; hay riesgos
 - [[arquitectura]] — Estructura, rutas, roles, datos y riesgos de transacción.
 - [[estado-actual]] — Punto actual, prioridades y siguientes pasos.
 - [[decisiones]] — Decisiones implementadas, propuestas y decisiones pendientes.
+- [[agentes-documentacion]] — Evaluación y prioridad de modelos para documentar.
 - [[pendientes]] — Tareas por prioridad y hallazgos clasificados.
 - [[modulos/autenticacion-roles]] — Login, registro, perfil y control por rol.
 - [[modulos/panel-docente]] — Dashboard y accesos del docente.

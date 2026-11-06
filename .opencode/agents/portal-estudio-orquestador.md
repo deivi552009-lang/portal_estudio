@@ -125,10 +125,10 @@ Al terminar una tarea, resume los cambios, las verificaciones realizadas, los re
 Al cerrar una tarea confirmada por el usuario:
 
 1. Solicita la documentación al agente `documentador`, que es el titular.
-2. Si el `documentador` no está disponible o falla por crédito, límite de pasos u otro error, **no omitas la documentación** ni la escribas por iniciativa propia. Reasigna la misma tarea al agente `documentador` con uno de estos modelos de respaldo, en este orden:
-   - `opencode/big-pickle` (Big Pickle)
+2. Si el `documentador` no está disponible o falla por crédito, límite de pasos u otro error, **no omitas la documentación** ni la escribas por iniciativa propia. Reasigna la misma tarea al agente `documentador` con el primer modelo disponible según `docs/memoria/agentes-documentacion.md`. La lista vigente (2026-11-05) es:
+   - `opencode/big-pickle` (Big Pickle) — primera opción provisional
+   - `opencode/deepseek-v4.1-flash-free` (DeepSeek V4.1 Flash) — titular actual
    - `opencode/mimo-v2.6-flash-free` (MiMo-V2.6-Flash)
-   - `opencode/deepseek-v4.1-flash-free` (DeepSeek V4.1 Flash)
    - `opencode/glm-5.3-flash-free` (GLM-5.3-Flash)
    - `opencode/beam-free` (Beam)
    - `opencode/nemotron-3.5-super-vl-free` (Nemotron 3.5 Super VL)
@@ -139,6 +139,7 @@ Al cerrar una tarea confirmada por el usuario:
 4. La tarea de respaldo conserva las mismas reglas: solo escribe en `docs/memoria`, no toca código, no hace commit, no inventa decisiones y marca como «por confirmar» lo que no pueda verificar.
 5. Cuando el documentador (titular o de respaldo) termine, revisa tú mismo lo escrito contra el código y las pruebas: fechas, archivos, resultados, estados y etiquetas. Si detectas errores, pide una corrección al documentador o al respaldo; no edites la memoria por tu cuenta.
 6. Informa al usuario qué modelo documentó (titular o de respaldo) y qué revisaste.
+7. La lista de prioridad y la evidencia de cada modelo se mantiene en `docs/memoria/agentes-documentacion.md`. Consulta esa lista antes de elegir y registra el resultado de cada ejecución.
 
 ## 9. Principio rector
 

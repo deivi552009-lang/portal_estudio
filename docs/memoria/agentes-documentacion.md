@@ -1,0 +1,65 @@
+# Agentes de documentación — evaluación y prioridad
+Última actualización: 2026-11-05
+
+## Objetivo
+Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
+
+## Criterios de evaluación
+1. Exactitud contra el código, las pruebas y los datos reales.
+2. No inventar decisiones, estados ni resultados; usar las etiquetas correctas.
+3. Completar todos los archivos pedidos en un turno.
+4. No tocar código, datos ni credenciales; no hacer commits.
+5. Necesitar cero correcciones del orquestador.
+
+## Evidencia disponible (2026-11-05)
+| Modelo | Tarea | Resultado | Correcciones del orquestador |
+|---|---|---|---|
+| `opencode/deepseek-v4.1-flash-free` (titular) | Selector de grupos en la planilla de notas | Completado | 3: modelo «Free» en relevo, sección obsoleta de revisión, índice con P1 ya cerrado |
+| `opencode/deepseek-v4.1-flash-free` (titular) | Backfill de evaluaciones oficiales | Completado | 4: modelo «Free», etiquetas `[Reportado por el usuario]` mal clasificadas, salvedad de shell, faltaba la tarea en «Última tarea cerrada» |
+| `opencode/deepseek-v4.1-flash-free` (titular) | Jornada, día de clase y cruces | Máximo de pasos (15); escribió 6 archivos | 3: modelo «Free», estados «sin commitear» al integrar, detalle de índice |
+| `opencode/big-pickle` | Evaluación controlada del comando de backfill (documento temporal) | Contenido exacto; 2 errores de etiquetas; límites declarados | 2: inventó `[Cubierto por prueba]`/`[Según bitácora]` y usó `[Comprobado en base remota]` sin consultar la base |
+| `opencode/deepseek-v4.1-flash-free` (titular) | Selector en asistencia/historial y sidebar | Parcial: 4 archivos; faltaron `modulos/asistencia`, `modulos/panel-docente` y `relevo`, y la bitácora los daba por hechos | 3 archivos faltantes; los completó Big Pickle |
+| `opencode/big-pickle` | Completar la documentación anterior (3 archivos) | Completado; contenido correcto y etiquetas estándar | 0 correcciones detectadas |
+
+**Conclusión:** ninguno tiene cero errores acumulados. El titular acumula cuatro ejecuciones con correcciones y una parcial; Big Pickle tiene una tarea real limpia y una prueba controlada con errores de etiquetas. Big Pickle pasa a primera opción provisional, pero necesita una segunda tarea limpia para marcarse «recomendado».
+
+## Lista de prioridad (provisional)
+1. `opencode/big-pickle` — **evaluado**: 1 tarea real sin correcciones; 1 prueba con errores de etiquetas. Primera opción provisional; revisar siempre.
+2. `opencode/deepseek-v4.1-flash-free` — **evaluado con reservas**: 3 tareas con correcciones y 1 parcial (faltaron archivos). Segunda opción.
+3. `opencode/mimo-v2.6-flash-free` — sin evaluar.
+4. `opencode/glm-5.3-flash-free` — sin evaluar.
+5. `opencode/beam-free` — sin evaluar.
+6. `opencode/nemotron-3.5-super-vl-free` — sin evaluar.
+7. `opencode/flint-40b-free` — sin evaluar.
+8. `opencode/pulse-alpha-free` — sin evaluar.
+9. `opencode/crouton-alpha-free` — sin evaluar.
+
+El orden de los modelos sin evaluar sigue la lista aportada por el usuario; **no es un ranking de calidad**.
+
+## Regla de uso
+- Intenta primero el modelo 1. Si falla por crédito, límite de pasos u otro error, pasa al siguiente sin repetir el que falló.
+- Si un modelo falla dos veces en tareas distintas, baja de prioridad.
+- Si completa una tarea con cero correcciones, súbelo; tras dos tareas limpias, márcalo «recomendado».
+- Registra cada ejecución en la tabla de evidencia con la fecha, la tarea y las correcciones.
+- La revisión del orquestador es obligatoria siempre.
+
+## Cómo evaluar una ejecución
+1. Leer el diff de `docs/memoria`.
+2. Comparar fechas, archivos, resultados, estados y etiquetas con el código, las pruebas y los datos.
+3. Contar las correcciones necesarias.
+4. Anotar modelo, tarea, resultado y correcciones en la tabla.
+
+## Prueba controlada — Big Pickle (2026-11-05)
+- Encargo: documentar el comando `evaluaciones:completar-oficiales` en un documento temporal.
+- Resultado: contenido correcto (firma, opciones, porcentajes, idempotencia, pruebas y uso real); declaró sus límites por no tener acceso a shell.
+- Errores: usó etiquetas no estándar (`[Cubierto por prueba]`, `[Según bitácora]`) y `[Comprobado en base remota]` sin consultar la base.
+- El documento temporal se eliminó; no quedó en la memoria.
+- No se promovió en esa prueba: faltaba una ejecución real.
+
+## Tarea real — selector en asistencia y sidebar (2026-11-05)
+- El titular actualizó solo `00-INDICE.md`, `bitacora/2026-11-05.md`, `estado-actual.md` y `pendientes.md`; faltaron `modulos/asistencia.md`, `modulos/panel-docente.md` y `relevo.md`, aunque la bitácora afirmaba que los había actualizado.
+- Big Pickle completó esos tres archivos con contenido correcto y etiquetas estándar, sin correcciones detectadas.
+- Con esta evidencia, Big Pickle pasa a primera opción provisional; el titular queda como segunda opción.
+
+## Observación operativa
+El titular tiene `steps: 15` en `.opencode/agents/documentador.md`. En tareas que tocan 5–6 archivos de memoria agotó el límite. Si vuelve a pasar, conviene dividir la documentación en dos encargos o subir el límite, sin perder la revisión posterior.

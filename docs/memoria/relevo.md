@@ -4,10 +4,10 @@ Sin tarea en curso.
 Última actualización: 2026-11-05 · Modelo: DeepSeek V4.1 Flash 1017
 
 ## Estado
-- Sin tarea en curso. La última tarea cerrada es **jornada, día de clase y validación de cruces** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
-- Cambios **integrados en `main`** el 2026-11-05: migración `2026_11_05_230849_add_jornada_and_dia_clase_to_grupos_table.php`, `app/Models/Grupo.php`, `app/Livewire/Docente/GrupoEstudiantes.php`, `resources/views/components/docente/⚡grupo-estudiantes.blade.php`, `tests/Feature/Docente/GrupoHorarioTest.php` y `tests/Feature/Docente/GrupoCreacionTest.php`.
-- La migración **ya está aplicada en Supabase** y verificada: `jornada`/`dia_clase` existen y los 6 grupos previos quedaron en NULL. **[Comprobado en base remota]**
-- `main` avanza al commit de integración del 2026-11-05.
+- Sin tarea en curso. La última tarea cerrada es el **selector de grupos en asistencia/historial y el ajuste del sidebar** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
+- Cambios **integrados en `main`** el 2026-11-05: `app/Livewire/Docente/GrupoAsistencia.php`, `app/Livewire/Docente/HistorialAsistencia.php`, `resources/views/components/docente/⚡grupo-asistencia.blade.php`, `resources/views/components/docente/⚡historial-asistencia.blade.php`, `resources/views/layouts/docente.blade.php` y `tests/Feature/Docente/AsistenciaSelectorTest.php`.
+- Sin migraciones ni cambios de esquema.
+- `main` avanzó desde `8f9b9ad` al commit de integración del 2026-11-05.
 
 ## Cambios integrados en `main` (rama `pruebas`)
 - Rama `pruebas` creada desde `main` y fusionada en `main` el 2026-11-03; `main` avanza al commit de integración.
@@ -19,8 +19,10 @@ Sin tarea en curso.
 - `crearNuevoGrupo()` usa `DB::transaction` para grupo + P1–P4/A. Pruebas nuevas en `tests/Feature/Docente/GrupoCreacionTest.php` (2).
 - Distinción `null`/`0.0` corregida: `guardarNotas()` ignora `null`, borra solo con `''` y guarda `0`; la definitiva excluye pendientes y muestra `—`. Pruebas en `tests/Feature/Services/CalificacionesServiceTest.php` (7).
 - Jornada, día de clase y validación de cruces: migración aplicada en Supabase, formulario con Jornada/Día y `validarCruceDeHorario()`. Pruebas en `tests/Feature/Docente/GrupoHorarioTest.php` (9).
+- Selector de grupos en asistencia e historial, distribución de ambas vistas y ajuste del sidebar docente (Historial/Tomar asistencia; sin Talleres/Mensajes). Pruebas en `tests/Feature/Docente/AsistenciaSelectorTest.php` (7); suite completa en verde (71 pruebas, 187 aserciones).
 
 ## Última tarea cerrada
+- Selector de grupos en asistencia/historial y ajuste del sidebar; implementado, probado (71 pruebas, 187 aserciones) y **confirmado por el usuario en el navegador** el 2026-11-05. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Jornada, día de clase y validación de cruces de horario; implementada, probada (64 pruebas, 164 aserciones) y **confirmada por el usuario en el navegador** el 2026-11-05. Migración aplicada en Supabase. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Reparación de evaluaciones oficiales faltantes en los grupos legados 2, 4 y 5; ejecutada y verificada el 2026-11-05 (15 inserciones). Comando y pruebas **integrados en `main`** el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Selector de grupos en la planilla de notas; implementado, probado (51 pruebas) y **confirmado por el usuario en el navegador** el 2026-11-05. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.

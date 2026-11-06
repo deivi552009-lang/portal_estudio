@@ -14,6 +14,7 @@
 - 2026-11-05: reparadas las evaluaciones oficiales faltantes de los grupos legados 2, 4 y 5 (anteriores al commit `d6027d2`). El comando nuevo `evaluaciones:completar-oficiales` (dry-run por defecto, `--ejecutar`, `--grupo=*`) insertó 15 evaluaciones (P1–P4/A en cada grupo) sin tocar las existentes; un dry-run posterior mostró los 5 grupos del docente como completos. Pruebas en `tests/Feature/Console/CompletarEvaluacionesOficialesTest.php` (4) y suite completa en verde (55 pruebas, 124 aserciones). **Integrado en `main`** el 2026-11-05.
 - 2026-11-05: cada grupo admite **jornada** (Diurna/Nocturna/Sabatina) y **día de clase** (Lunes–Domingo), exigidos al crear o editar (`GrupoEstudiantes`), y se valida el cruce de horario del mismo docente en el mismo día (solapamiento estricto; consecutivos permitidos; la jornada no excluye la comparación). Migración `2026_11_05_230849_add_jornada_and_dia_clase_to_grupos_table.php` **aplicada en Supabase**: columnas nullable y los 6 grupos existentes en NULL. Pruebas en `tests/Feature/Docente/GrupoHorarioTest.php` (9) y suite completa en verde (64 pruebas, 164 aserciones). Confirmado por el usuario en el navegador; **integrado en `main`** el 2026-11-05. **[Comprobado en base remota]** para la migración aplicada.
 - 2026-11-05: la planilla de notas incorpora un selector «Materia» para cambiar de grupo sin volver al dashboard. `GrupoNotas::render()` lista solo los grupos del docente autenticado (materia, año y semestre) y `seleccionarGrupo()` valida la pertenencia (grupo ajeno → 404) y redirige a `docente.grupo.notas`. Cada grupo es una opción con el formato «Materia — Semestre N — Año». Pruebas en `tests/Feature/Docente/GrupoNotasSelectorTest.php` (4) y suite completa en verde (51 pruebas, 102 aserciones). El usuario confirmó en el navegador que «cambia y funciona». Integrado en `main` el 2026-11-05 (rama `pruebas`).
+- 2026-11-05: asistencia e historial incorporan el selector «Materia» con el formato «Materia — Día Año» («Sin día» si `dia_clase` es NULL); `seleccionarGrupo()` valida la pertenencia (grupo ajeno → 404) y redirige con `navigate: true`. La vista de asistencia lleva el selector a la tarjeta de fecha, a la derecha, y el historial lo integra en el encabezado, sin botón «Volver a Asistencia». El sidebar docente retira Talleres y Mensajes y añade Historial y Tomar asistencia, enlazados al grupo de la ruta o a `docente.grupos`. Pruebas en `tests/Feature/Docente/AsistenciaSelectorTest.php` (7); suite completa reportada en verde (71 pruebas, 187 aserciones). Confirmado por el usuario en el navegador; integrado en `main` el 2026-11-05 (rama `pruebas`).
 
 ## Hallazgos priorizados
 - **Media:** `calificaciones.comentario` se lee pero no se escribe; la preferencia es implementar su captura y almacenamiento, no retirarlo, y sigue pendiente de desarrollo y pruebas. No confundirlo con los dos campos `mensaje_docente`.
@@ -23,9 +24,7 @@
 - **Media:** al eliminar un grupo no se limpian los archivos de actividades/entregas del disco.
 
 ## Qué sigue
-- Distinguir `null` de `0.0` en `cargarNotas()`/`guardarNotas()`: una nota pendiente no debe persistirse como cero y las calificaciones existentes deben conservarse.
-- Definir períodos académicos, alta de docentes, panel administrativo y navegación.
-- Verificar Supabase y decidir la verificación de correo.
+- Definir períodos académicos, alta de docentes, panel administrativo y navegación; verificar Supabase y decidir la verificación de correo.
 
 ## Por confirmar
 - Esquema y migraciones remotas; ponderación definitiva; verificación de correo; períodos académicos.

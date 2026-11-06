@@ -21,11 +21,36 @@
             </p>
         </div>
 
-        <div class="flex items-center gap-3">
-            <a href="{{ route('docente.grupo.asistencia', $grupo->id) }}"
-               class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-sm rounded-xl transition-all shadow-sm">
-                ← Volver a Asistencia
-            </a>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto">
+
+            <label
+                for="selector-grupo-historial"
+                class="text-sm font-medium text-slate-600 shrink-0"
+            >
+                Materia:
+            </label>
+
+            <select
+                id="selector-grupo-historial"
+                wire:change="seleccionarGrupo($event.target.value)"
+                wire:loading.attr="disabled"
+                wire:target="seleccionarGrupo"
+                class="w-full sm:w-auto max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            >
+                @foreach ($grupos as $grupoOpcion)
+
+                    <option
+                        value="{{ $grupoOpcion->id }}"
+                        @selected($grupoOpcion->id === $grupo->id)
+                    >
+                        {{ $grupoOpcion->materia->nombre }}
+                        — {{ $grupoOpcion->dia_clase ?? 'Sin día' }}
+                        {{ $grupoOpcion->anio }}
+                    </option>
+
+                @endforeach
+            </select>
+
         </div>
     </div>
 

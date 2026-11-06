@@ -503,6 +503,49 @@
 
         </button>
 
+        <div style="
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        ">
+
+            <label
+                for="selector-grupo-asistencia"
+                style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #495057;
+                "
+            >
+                Materia:
+            </label>
+
+            <select
+                id="selector-grupo-asistencia"
+                wire:change="seleccionarGrupo($event.target.value)"
+                wire:loading.attr="disabled"
+                wire:target="seleccionarGrupo"
+                class="fecha-input"
+                style="min-width: 260px;"
+            >
+                @foreach ($grupos as $grupoOpcion)
+
+                    <option
+                        value="{{ $grupoOpcion->id }}"
+                        @selected($grupoOpcion->id === $grupo->id)
+                    >
+                        {{ $grupoOpcion->materia->nombre }}
+                        — {{ $grupoOpcion->dia_clase ?? 'Sin día' }}
+                        {{ $grupoOpcion->anio }}
+                    </option>
+
+                @endforeach
+            </select>
+
+        </div>
+
     </div>
 
 
