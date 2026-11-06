@@ -1,5 +1,5 @@
 # Decisiones técnicas
-Última actualización: 2026-11-03
+Última actualización: 2026-11-05
 
 ## Decisiones implementadas y verificadas
 - **Autorización por nombre de rol.** `RoleMiddleware` compara el nombre en minúsculas (`app/Http/Middleware/RoleMiddleware.php`). Evita depender de IDs en las rutas; desde 2026-11-03 `GrupoEstudiantesService` también filtra por nombre de rol.
@@ -17,7 +17,7 @@
 - **Archivos en disco público.** Actividades y entregas usan `Storage::disk('public')`; el archivo de actividad se sirve con control de propiedad.
 - **Creación de grupo transaccional.** `GrupoEstudiantes::crearNuevoGrupo()` guarda el grupo y sus evaluaciones P1–P4/A dentro de `DB::transaction`; si falla una inserción, no queda un grupo sin evaluaciones. Cubierto por `tests/Feature/Docente/GrupoCreacionTest.php`.
 - **Nota pendiente ≠ cero.** `CalificacionesService::guardarNotas()` ignora `null` (no guarda ni borra), borra solo con `''` y guarda `0` como cero real. `calcularDefinitiva` excluye las evaluaciones pendientes del cálculo y muestra `—`. Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php`.
-
+- **Jornada y día por grupo, con cruces por docente y día.** Decisión del usuario: exigir siempre jornada (`Diurna`/`Nocturna`/`Sabatina`) y día de clase (`Lunes`–`Domingo`) al crear o editar un grupo. `GrupoEstudiantes::validarCruceDeHorario()` rechaza el solapamiento estricto con otro grupo del mismo docente y mismo día, sin importar la jornada y excluyendo el grupo editado; los horarios consecutivos están permitidos. Los grupos legados conservan NULL en la base y deben completar ambos campos para editarse. Cubierto por `tests/Feature/Docente/GrupoHorarioTest.php`.
 ## Estados de preferencias, propuestas y decisiones pendientes
 | Tema | Estado | Decisión o nota |
 |---|---|---|

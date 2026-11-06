@@ -7,12 +7,31 @@ use App\Models\Materia;
 use App\Models\PeriodoAcademico;
 use App\Models\Evaluacion;
 use App\Services\GrupoEstudiantesService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class GrupoEstudiantes extends Component
 {
+    private const JORNADAS = [
+        'Diurna',
+        'Nocturna',
+        'Sabatina',
+    ];
+
+    private const DIAS = [
+        'Lunes',
+        'Martes',
+        'Miércoles',
+        'Jueves',
+        'Viernes',
+        'Sábado',
+        'Domingo',
+    ];
+
     public ?Grupo $grupo = null;
 
     public ?int $grupoSeleccionadoId = null;
@@ -32,6 +51,10 @@ class GrupoEstudiantes extends Component
     public string $horaInicio = '';
 
     public string $horaFin = '';
+
+    public string $jornada = '';
+
+    public string $diaClase = '';
 
     /*
     |--------------------------------------------------------------------------
@@ -124,6 +147,10 @@ class GrupoEstudiantes extends Component
             ? substr($grupo->hora_fin, 0, 5)
             : '';
 
+        $this->jornada = $grupo->jornada ?? '';
+
+        $this->diaClase = $grupo->dia_clase ?? '';
+
         $this->resetValidation();
     }
 
@@ -175,7 +202,21 @@ class GrupoEstudiantes extends Component
                 'date_format:H:i',
                 'after:horaInicio',
             ],
+
+            'jornada' => [
+                'required',
+                'string',
+                Rule::in(self::JORNADAS),
+            ],
+
+            'diaClase' => [
+                'required',
+                'string',
+                Rule::in(self::DIAS),
+            ],
         ]);
+
+        $this->validarCruceDeHorario();
 
         /*
          * La confirmación se controla desde la interfaz.
@@ -248,6 +289,8 @@ class GrupoEstudiantes extends Component
                 'fecha_creacion' => $this->fechaCreacion,
                 'hora_inicio' => $this->horaInicio,
                 'hora_fin' => $this->horaFin,
+                'jornada' => $this->jornada,
+                'dia_clase' => $this->diaClase,
             ]);
 
             /*
@@ -345,6 +388,8 @@ private function actualizarGrupo(): void
         'fecha_creacion' => $this->fechaCreacion,
         'hora_inicio' => $this->horaInicio,
         'hora_fin' => $this->horaFin,
+        'jornada' => $this->jornada,
+        'dia_clase' => $this->diaClase,
     ]);
 
     // Cerrar inmediatamente la ventana de confirmación
@@ -540,6 +585,58 @@ private function actualizarGrupo(): void
         $this->horaInicio = '';
 
         $this->horaFin = '';
+
+        $this->jornada = '';
+
+        $this->diaClase = '';
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validación de cruces de horario
+    |--------------------------------------------------------------------------
+    */
+
+    private function validarCruceDeHorario(): void
+    {
+        $docente = Auth::user()->docente;
+
+        if (! $docente) {
+            abort(
+                403,
+                'El usuario autenticado no tiene un registro de docente.'
+            );
+        }
+
+        $nuevoInicio = Carbon::createFromFormat('H:i', $this->horaInicio);
+        $nuevoFin = Carbon::createFromFormat('H:i', $this->horaFin);
+
+        $gruposDelDia = Grupo::query()
+            ->with('materia')
+            ->where('docente_id', $docente->id)
+            ->where('dia_clase', $this->diaClase)
+            ->when($this->grupoEditandoId, function ($query) {
+                $query->where('id', '!=', $this->grupoEditandoId);
+            })
+            ->get();
+
+        foreach ($gruposDelDia as $grupo) {
+            if (! $grupo->hora_inicio || ! $grupo->hora_fin) {
+                continue;
+            }
+
+            $inicio = Carbon::parse($grupo->hora_inicio);
+            $fin = Carbon::parse($grupo->hora_fin);
+
+            if ($inicio->lt($nuevoFin) && $fin->gt($nuevoInicio)) {
+                $horario = $inicio->format('H:i').'–'.$fin->format('H:i');
+
+                throw ValidationException::withMessages([
+                    'horaInicio' => 'El horario se cruza con '."{$grupo->materia->nombre} ({$grupo->dia_clase}, {$horario}).",
+                ]);
+            }
+        }
     }
 
 
@@ -588,6 +685,8 @@ private function actualizarGrupo(): void
                 'estudiantes' => $estudiantes,
                 'estudiantesGrupoIds' => $estudiantesGrupoIds,
                 'periodoActivo' => $periodoActivo,
+                'jornadas' => self::JORNADAS,
+                'dias' => self::DIAS,
             ]
         )->layout('layouts.docente');
     }

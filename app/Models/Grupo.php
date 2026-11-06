@@ -17,6 +17,8 @@ class Grupo extends Model
         'fecha_creacion',
         'hora_inicio',
         'hora_fin',
+        'jornada',
+        'dia_clase',
     ];
 
     protected $casts = [

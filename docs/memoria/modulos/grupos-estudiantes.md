@@ -1,15 +1,22 @@
 # Grupos y estudiantes
-Última actualización: 2026-11-03
+Última actualización: 2026-11-05
 
 ## Qué hace
-Permite al docente crear, editar y eliminar sus grupos, definir materia y horario, y agregar o quitar estudiantes. Al crear un grupo se generan las evaluaciones iniciales P1–P4/A.
+Permite al docente crear, editar y eliminar sus grupos, definir materia, jornada, día de clase y horario, y agregar o quitar estudiantes. Al crear un grupo se generan las evaluaciones iniciales P1–P4/A.
 
 ## Archivos clave
 - `app/Livewire/Docente/GrupoEstudiantes.php`: CRUD de grupos y gestión de estudiantes.
 - `app/Services/GrupoEstudiantesService.php`: búsqueda, alta y baja de estudiantes del grupo.
 - `app/Models/Grupo.php`, `Materia.php`, `PeriodoAcademico.php`, `Estudiante.php`.
 - `resources/views/components/docente/⚡grupo-estudiantes.blade.php`: interfaz de gestión.
-- Migraciones: `2026_08_13_155103_create_grupos_table.php`, `2026_08_13_155456_create_grupo_estudiante_table.php`, `2026_09_10_165549_add_horario_to_grupos_table.php`, `2026_09_10_174931_create_periodos_academicos_table.php`.
+- Migraciones: `2026_08_13_155103_create_grupos_table.php`, `2026_08_13_155456_create_grupo_estudiante_table.php`, `2026_09_10_165549_add_horario_to_grupos_table.php`, `2026_09_10_174931_create_periodos_academicos_table.php`, `2026_11_05_230849_add_jornada_and_dia_clase_to_grupos_table.php`.
+- `tests/Feature/Docente/GrupoHorarioTest.php`: jornada, día y validación de cruces.
+
+## Campos de jornada y día
+- `grupos.jornada` string(20) nullable: `Diurna`, `Nocturna` o `Sabatina`.
+- `grupos.dia_clase` string(20) nullable: `Lunes` a `Domingo`.
+- Migración **aplicada en Supabase** el 2026-11-05: las columnas existen y los 6 grupos existentes quedaron con ambos valores en NULL, sin backfill. **[Comprobado en base remota]**
+- Ambos campos están en `$fillable` de `Grupo` y son **obligatorios** en el formulario (crear y editar).
 
 ## Tablas/modelos que usa
 `grupos`, `materias`, `periodos_academicos`, `docentes`, `estudiantes`, `grupo_estudiante`, `evaluaciones`, `calificaciones`, `asistencias`, `actividades`.
@@ -18,13 +25,22 @@ Permite al docente crear, editar y eliminar sus grupos, definir materia y horari
 1. El docente selecciona o crea un grupo.
 2. Para crear, se exige un período académico `activo`.
 3. El nombre de la materia se normaliza y se busca sin distinguir mayúsculas; si no existe, se crea.
-4. Se crea el grupo con semestre, año, fecha y horario del período activo.
+4. Se crea el grupo con semestre, año, fecha, horario, jornada y día de clase del formulario.
 5. Se insertan las evaluaciones `P1`, `P2`, `P3`, `P4` y `A` con la ponderación actual 20/20/20/30/10, dentro de la misma transacción que el grupo; si falla la inserción, no queda un grupo creado. La ponderación es una propuesta pendiente de aprobación y no se deben implementar cambios hasta confirmarla.
-6. Para agregar estudiantes, se buscan perfiles cuyo rol se llame `Estudiante` y se adjuntan a la pivote.
-7. Al eliminar, se desvinculan estudiantes, se borran asistencias, calificaciones, evaluaciones y el grupo.
+6. Antes de guardar, se valida que el docente no tenga otro grupo solapado ese día (ver reglas de cruce).
+7. Para agregar estudiantes, se buscan perfiles cuyo rol se llame `Estudiante` y se adjuntan a la pivote.
+8. Al eliminar, se desvinculan estudiantes, se borran asistencias, calificaciones, evaluaciones y el grupo.
 
 ## Estado
-**En progreso.** El CRUD y la inscripción están implementados; faltan la gestión global de estudiantes, la administración de períodos y la limpieza de archivos.
+**En progreso.** El CRUD, la jornada/día con validación de cruces y la inscripción están implementados; faltan la gestión global de estudiantes, la administración de períodos y la limpieza de archivos.
+
+## Reglas de cruce de horario
+- Se comparan solo grupos del **mismo docente** (`docente_id`) y **mismo `dia_clase`**.
+- Solapamiento estricto: `inicio_existente < fin_nuevo && fin_existente > inicio_nuevo`. Los horarios consecutivos (fin = inicio) se permiten.
+- La **jornada no excluye** la comparación: un cruce entre Diurna y Nocturna también se rechaza.
+- Al editar se excluye el grupo actual.
+- El error se asocia al campo `horaInicio` y el mensaje indica la materia, el día y el horario en conflicto.
+- Grupos legados sin horario (`hora_inicio`/`hora_fin` nulos) se omiten en la comparación.
 
 ## Puntos delicados o reglas que no se deben romper
 - Sin período activo no se puede crear un grupo.
@@ -32,10 +48,14 @@ Permite al docente crear, editar y eliminar sus grupos, definir materia y horari
 - La búsqueda de estudiantes filtra por el nombre del rol (`Estudiante`), no por ID; no volver a fijar `role_id`.
 - `crearNuevoGrupo()` guarda el grupo y sus P1–P4/A dentro de `DB::transaction`; si falla la inserción, no queda un grupo sin evaluaciones.
 - La eliminación no borra los archivos de actividades/entregas del disco.
+- Jornada y día son obligatorios al crear o editar, aunque las columnas sean nullable para conservar los grupos legados en NULL; no asignarles valores arbitrarios.
+- La validación de cruces compara solo grupos con el mismo `dia_clase`; los grupos legados con NULL no entran en la comparación hasta que se les asigne un día.
 - Verificado en solo lectura (2026-11-03): el ID 3 no existe en la base remota y no hay P1 duplicados por grupo; no se modificaron registros.
 - La relación grupo-estudiante es muchos a muchos con unique por pareja.
 
 ## Hallazgos clasificados
+- **[Verificado en código]** Jornada y día de clase por grupo, obligatorios en el formulario y con validación de cruces por docente y día (`GrupoHorarioTest`, 9 pruebas). La migración está aplicada en Supabase y los grupos existentes quedaron en NULL.
+- **[Comprobado en base remota]** Migración `2026_11_05_230849_...` aplicada: existen `grupos.jornada` y `grupos.dia_clase`; los 6 grupos previos tienen ambos campos en NULL y no se hizo backfill.
 - **[Verificado en código]** La creación de grupo es transaccional desde 2026-11-03; cubierta por `tests/Feature/Docente/GrupoCreacionTest.php`.
 - **[Verificado en código]** Ausencia de limpieza de archivos en `confirmarEliminacion()`.
 - **[Comprobado localmente]** El filtro por rol se hace por nombre (`Estudiante`) desde 2026-11-03; cubierto por `tests/Feature/Services/GrupoEstudiantesServiceTest.php`.

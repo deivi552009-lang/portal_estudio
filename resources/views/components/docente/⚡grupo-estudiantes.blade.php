@@ -216,6 +216,79 @@
                         </div>
 
 
+                        {{-- Jornada y día --}}
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                            <div>
+
+                                <label
+                                    for="jornada"
+                                    class="mb-1.5 block text-sm font-medium text-gray-700"
+                                >
+                                    Jornada
+                                </label>
+
+                                <select
+                                    id="jornada"
+                                    wire:model="jornada"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                >
+                                    <option value="">Selecciona una jornada</option>
+
+                                    @foreach ($jornadas as $opcionJornada)
+
+                                        <option value="{{ $opcionJornada }}">
+                                            {{ $opcionJornada }}
+                                        </option>
+
+                                    @endforeach
+                                </select>
+
+                                @error('jornada')
+                                    <p class="mt-1 text-xs text-red-600">
+                                        {{ $message }}
+                                    </p>
+                                @enderror
+
+                            </div>
+
+
+                            <div>
+
+                                <label
+                                    for="diaClase"
+                                    class="mb-1.5 block text-sm font-medium text-gray-700"
+                                >
+                                    Día de la clase
+                                </label>
+
+                                <select
+                                    id="diaClase"
+                                    wire:model="diaClase"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                >
+                                    <option value="">Selecciona un día</option>
+
+                                    @foreach ($dias as $opcionDia)
+
+                                        <option value="{{ $opcionDia }}">
+                                            {{ $opcionDia }}
+                                        </option>
+
+                                    @endforeach
+                                </select>
+
+                                @error('diaClase')
+                                    <p class="mt-1 text-xs text-red-600">
+                                        {{ $message }}
+                                    </p>
+                                @enderror
+
+                            </div>
+
+                        </div>
+
+
                         {{-- Horario --}}
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 

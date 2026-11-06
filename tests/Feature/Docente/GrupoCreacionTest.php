@@ -81,6 +81,8 @@ class GrupoCreacionTest extends TestCase
             ->set('fechaCreacion', '2026-11-03')
             ->set('horaInicio', '08:00')
             ->set('horaFin', '10:00')
+            ->set('jornada', 'Diurna')
+            ->set('diaClase', 'Lunes')
             ->call('guardarGrupo');
     }
 }
