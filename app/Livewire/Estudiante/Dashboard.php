@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Estudiante;
 
+use App\Models\Actividad;
 use App\Models\Grupo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -22,7 +24,13 @@ class Dashboard extends Component
             ->with([
                 'materia',
                 'docente.user',
-                'actividades',
+                'actividades' => fn ($query) => $query->where('tipo', 'taller')
+                    ->with([
+                        'respuestas' => fn ($respuestaQuery) => $respuestaQuery->where(
+                            'estudiante_id',
+                            $estudiante->id
+                        ),
+                    ]),
                 'evaluaciones' => fn ($query) => $query->orderBy('fecha')->orderBy('id'),
                 'evaluaciones.calificaciones' => fn ($query) => $query->where('estudiante_id', $estudiante->id),
             ])
@@ -67,12 +75,15 @@ class Dashboard extends Component
 
         $actividades = $grupos
             ->flatMap(function ($grupo) {
-                return $grupo->actividades->map(function ($actividad) use ($grupo) {
-                    $actividad->materia_nombre = $grupo->materia->nombre;
-                    $actividad->docente_nombre = $grupo->docente->user->name;
+                return $grupo->actividades
+                    ->reject(fn ($actividad) => $actividad->respuestas->isNotEmpty()
+                        || $this->tallerVencido($actividad))
+                    ->map(function ($actividad) use ($grupo) {
+                        $actividad->materia_nombre = $grupo->materia->nombre;
+                        $actividad->docente_nombre = $grupo->docente->user->name;
 
-                    return $actividad;
-                });
+                        return $actividad;
+                    });
             })
             ->sortBy(function ($actividad) {
                 return $actividad->fecha_limite->format('Y-m-d') . ' ' .
@@ -101,6 +112,13 @@ class Dashboard extends Component
                 'promedioGeneral' => $promedioGeneral,
             ]
         )->layout('layouts.estudiante');
+    }
+
+    private function tallerVencido(Actividad $actividad): bool
+    {
+        return Carbon::parse($actividad->fecha_limite)
+            ->setTimeFromTimeString($actividad->hora_limite)
+            ->isPast();
     }
 
     private function estadoClase(Grupo $grupo): string

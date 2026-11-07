@@ -1,10 +1,18 @@
-# Relevo: tarea en curso
-Sin tarea en curso.
+# Relevo: sin tarea en curso
 
-Última actualización: 2026-11-05 · Modelo: DeepSeek V4.1 Flash 1017
+Última actualización: 2026-11-06 · Modelo: big-pickle (documentación)
 
 ## Estado
-- Sin tarea en curso. La última tarea cerrada es el **selector de grupos en asistencia/historial y el ajuste del sidebar** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
+- **Sin tarea en curso.** La corrección del contador «Talleres Pendientes» del dashboard del estudiante (tarea 7 de `pendientes.md`) quedó **confirmada por el usuario en el navegador** el 2026-11-06.
+- Regla acordada: un taller **vencido sin entregar tampoco es pendiente**, solo en el dashboard (contador, lista «Talleres Pendientes» y «Próxima Entrega»). El filtro «Pendientes» de `/estudiante/talleres` no cambia y sigue mostrando vencidos con estado «Vencido».
+- Archivos tocados: `app/Livewire/Estudiante/Dashboard.php`, `resources/views/components/estudiante/⚡dashboard.blade.php` y `tests/Feature/Estudiante/DashboardTalleresPendientesTest.php` (nueva).
+- Pruebas: la nueva cubre 6 casos con fechas relativas; suite completa en verde (77 pruebas, 207 aserciones) el 2026-11-06.
+- Sin migraciones ni cambios de esquema.
+- Integración en `main`: se ejecuta con el add/commit/push de cierre del 2026-11-06; sin hash registrado todavía.
+- Pint: `Dashboard.php` mantiene dos avisos preexistentes (`concat_space`, `not_operator_with_successor_space`) ajenos a este cambio; el archivo de pruebas pasa.
+
+## Tarea anterior cerrada
+- El **selector de grupos en asistencia/historial y el ajuste del sidebar** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
 - Cambios **integrados en `main`** el 2026-11-05: `app/Livewire/Docente/GrupoAsistencia.php`, `app/Livewire/Docente/HistorialAsistencia.php`, `resources/views/components/docente/⚡grupo-asistencia.blade.php`, `resources/views/components/docente/⚡historial-asistencia.blade.php`, `resources/views/layouts/docente.blade.php` y `tests/Feature/Docente/AsistenciaSelectorTest.php`.
 - Sin migraciones ni cambios de esquema.
 - `main` avanzó desde `8f9b9ad` al commit de integración del 2026-11-05.
@@ -22,6 +30,7 @@ Sin tarea en curso.
 - Selector de grupos en asistencia e historial, distribución de ambas vistas y ajuste del sidebar docente (Historial/Tomar asistencia; sin Talleres/Mensajes). Pruebas en `tests/Feature/Docente/AsistenciaSelectorTest.php` (7); suite completa en verde (71 pruebas, 187 aserciones).
 
 ## Última tarea cerrada
+- Contador «Talleres Pendientes» del dashboard del estudiante; implementado, probado (77 pruebas, 207 aserciones) y **confirmado por el usuario en el navegador** el 2026-11-06. Integración en `main` prevista con el cierre del 2026-11-06. Sin migraciones.
 - Selector de grupos en asistencia/historial y ajuste del sidebar; implementado, probado (71 pruebas, 187 aserciones) y **confirmado por el usuario en el navegador** el 2026-11-05. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Jornada, día de clase y validación de cruces de horario; implementada, probada (64 pruebas, 164 aserciones) y **confirmada por el usuario en el navegador** el 2026-11-05. Migración aplicada en Supabase. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Reparación de evaluaciones oficiales faltantes en los grupos legados 2, 4 y 5; ejecutada y verificada el 2026-11-05 (15 inserciones). Comando y pruebas **integrados en `main`** el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.

@@ -212,8 +212,6 @@
                         $fechaLimite = \Carbon\Carbon::parse(
                             $actividad->fecha_limite->format('Y-m-d') . ' ' . $actividad->hora_limite
                         );
-
-                        $vencida = $fechaLimite->isPast();
                     @endphp
 
                     <div class="flex items-center gap-3 px-5 py-3.5">
@@ -235,11 +233,8 @@
                             </p>
                         </div>
 
-                        <span class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold
-                            {{ $vencida
-                                ? 'bg-slate-100 text-slate-500'
-                                : 'bg-amber-50 text-amber-600' }}">
-                            {{ $vencida ? 'Vencida' : 'Pendiente' }}
+                        <span class="shrink-0 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600">
+                            Pendiente
                         </span>
                     </div>
                 @empty

@@ -1,5 +1,5 @@
 # Agentes de documentación — evaluación y prioridad
-Última actualización: 2026-11-05
+Última actualización: 2026-11-06
 
 ## Objetivo
 Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
@@ -11,7 +11,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 4. No tocar código, datos ni credenciales; no hacer commits.
 5. Necesitar cero correcciones del orquestador.
 
-## Evidencia disponible (2026-11-05)
+## Evidencia disponible (al 2026-11-06)
 | Modelo | Tarea | Resultado | Correcciones del orquestador |
 |---|---|---|---|
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector de grupos en la planilla de notas | Completado | 3: modelo «Free» en relevo, sección obsoleta de revisión, índice con P1 ya cerrado |
@@ -20,6 +20,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `opencode/big-pickle` | Evaluación controlada del comando de backfill (documento temporal) | Contenido exacto; 2 errores de etiquetas; límites declarados | 2: inventó `[Cubierto por prueba]`/`[Según bitácora]` y usó `[Comprobado en base remota]` sin consultar la base |
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector en asistencia/historial y sidebar | Parcial: 4 archivos; faltaron `modulos/asistencia`, `modulos/panel-docente` y `relevo`, y la bitácora los daba por hechos | 3 archivos faltantes; los completó Big Pickle |
 | `opencode/big-pickle` | Completar la documentación anterior (3 archivos) | Completado; contenido correcto y etiquetas estándar | 0 correcciones detectadas |
+| `opencode/big-pickle` | Contador de talleres pendientes (2 encargos) | Completado; ambos encargos agotaron el límite de pasos | 1: faltó la fila de evidencia en este archivo (la añadió el orquestador) |
 
 **Conclusión:** ninguno tiene cero errores acumulados. El titular acumula cuatro ejecuciones con correcciones y una parcial; Big Pickle tiene una tarea real limpia y una prueba controlada con errores de etiquetas. Big Pickle pasa a primera opción provisional, pero necesita una segunda tarea limpia para marcarse «recomendado».
 

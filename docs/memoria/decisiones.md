@@ -1,5 +1,5 @@
 # Decisiones técnicas
-Última actualización: 2026-11-05
+Última actualización: 2026-11-06
 
 ## Decisiones implementadas y verificadas
 - **Autorización por nombre de rol.** `RoleMiddleware` compara el nombre en minúsculas (`app/Http/Middleware/RoleMiddleware.php`). Evita depender de IDs en las rutas; desde 2026-11-03 `GrupoEstudiantesService` también filtra por nombre de rol.
@@ -18,6 +18,7 @@
 - **Creación de grupo transaccional.** `GrupoEstudiantes::crearNuevoGrupo()` guarda el grupo y sus evaluaciones P1–P4/A dentro de `DB::transaction`; si falla una inserción, no queda un grupo sin evaluaciones. Cubierto por `tests/Feature/Docente/GrupoCreacionTest.php`.
 - **Nota pendiente ≠ cero.** `CalificacionesService::guardarNotas()` ignora `null` (no guarda ni borra), borra solo con `''` y guarda `0` como cero real. `calcularDefinitiva` excluye las evaluaciones pendientes del cálculo y muestra `—`. Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php`.
 - **Jornada y día por grupo, con cruces por docente y día.** Decisión del usuario: exigir siempre jornada (`Diurna`/`Nocturna`/`Sabatina`) y día de clase (`Lunes`–`Domingo`) al crear o editar un grupo. `GrupoEstudiantes::validarCruceDeHorario()` rechaza el solapamiento estricto con otro grupo del mismo docente y mismo día, sin importar la jornada y excluyendo el grupo editado; los horarios consecutivos están permitidos. Los grupos legados conservan NULL en la base y deben completar ambos campos para editarse. Cubierto por `tests/Feature/Docente/GrupoHorarioTest.php`.
+- **Un taller vencido sin entregar no cuenta como pendiente en el dashboard del estudiante.** Decisión del usuario (2026-11-06): alcance limitado al dashboard; `/estudiante/talleres` no cambia y sigue mostrando los vencidos en «Pendientes» con estado «Vencido». `Estudiante\Dashboard` carga solo `tipo = 'taller'` con las respuestas del estudiante y descarta entregados y vencidos (`tallerVencido()`); el mismo conjunto alimenta contador, lista y «Próxima Entrega». Cubierto por `tests/Feature/Estudiante/DashboardTalleresPendientesTest.php` (6 pruebas).
 ## Estados de preferencias, propuestas y decisiones pendientes
 | Tema | Estado | Decisión o nota |
 |---|---|---|
