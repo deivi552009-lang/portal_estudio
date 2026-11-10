@@ -53,6 +53,8 @@ class GrupoActividades extends Component
 
         if ($grupoId) {
             $this->grupoSeleccionadoId = $grupoId;
+
+            session(['docente_ultimo_grupo' => $grupoId]);
         }
     }
 

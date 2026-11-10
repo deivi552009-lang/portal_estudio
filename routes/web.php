@@ -6,6 +6,7 @@ use App\Livewire\Docente\Dashboard;
 use App\Livewire\Docente\GrupoAsistencia;
 use App\Livewire\Docente\GrupoEstudiantes;
 use App\Livewire\Docente\GrupoNotas;
+use App\Livewire\Estudiante\Asistencia;
 use App\Livewire\Estudiante\Dashboard as EstudianteDashboard;
 use App\Livewire\Estudiante\Notas;
 use App\Livewire\Estudiante\Talleres;
@@ -107,6 +108,9 @@ Route::middleware(['auth', 'role:estudiante'])->group(function () {
 
     Route::get('/estudiante/talleres', Talleres::class)
         ->name('estudiante.talleres');
+
+    Route::get('/estudiante/asistencia', Asistencia::class)
+        ->name('estudiante.asistencia');
 });
 
 

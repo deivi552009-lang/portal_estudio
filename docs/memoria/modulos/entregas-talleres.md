@@ -27,7 +27,7 @@ Permite al estudiante responder un taller con asunto, texto y/o archivo. El doce
 10. El estudiante ve la nota, el mensaje general y el mensaje individual en el detalle; el comentario de la calificación aparece en un bloque separado del mensaje individual.
 
 ## Estado
-**En progreso.** El flujo está implementado en código y el comentario de la calificación ya se captura en la entrega; faltan pruebas de negocio.
+**En progreso.** El flujo está implementado en código, el comentario de la calificación se captura en la entrega y las pruebas de negocio de la entrega están añadidas (2026-11-10); esos cambios están en el árbol de trabajo, **pendientes de commit**.
 
 ## Puntos delicados o reglas que no se deben romper
 - Solo existe una entrega por estudiante y actividad (unique en la tabla).
@@ -40,13 +40,12 @@ Permite al estudiante responder un taller con asunto, texto y/o archivo. El doce
 - `calificaciones.comentario` se guarda en `GrupoActividades::guardarNota()` desde «Ver respuestas», junto con la nota: nullable, string de máximo 2000 caracteres; vacío o solo espacios → `null`. La planilla de notas no lo escribe.
 - No confundir `calificaciones.comentario` (observación de la nota) con `actividades.mensaje_docente` (mensaje general) ni con `actividad_respuestas.mensaje_docente` (mensaje individual).
 - El dashboard del estudiante cuenta solo talleres vigentes sin entregar; los entregados y vencidos no cuentan como pendientes (2026-11-06).
-- Faltan pruebas de: texto, archivos o ambos; modificación/sustitución; conservación y borrado del archivo anterior; fecha límite; permisos y pertenencia al grupo.
+- Cobertura de pruebas en `tests/Feature/Estudiante/EntregaTallerTest.php` (12 pruebas, 45 aserciones, 2026-11-10): entrega solo con texto, solo con archivo y con ambos; rechazo sin texto ni archivo; formato no permitido (`.exe`) y archivo mayor a 10 MB; reemplazo de archivo que borra el anterior; edición sin archivo nuevo que conserva el anterior; actualización sin duplicar; bloqueo por fecha límite; bloqueo si ya está calificada; taller de un grupo ajeno → 404.
 
 ## Hallazgos clasificados
 - **[Verificado en código]** Entrega con texto y/o archivo, bloqueo por calificación/plazo y conservación del archivo anterior.
 - **[Comprobado localmente]** `calificaciones.comentario` se guarda desde «Ver respuestas» con la nota y se lee en `Talleres.php` en un bloque separado del mensaje individual (2026-11-10). Cubierto por `tests/Feature/Docente/CalificacionComentarioTest.php`.
-- **[Riesgo detectado]** Falta de pruebas de negocio para las entregas de talleres.
+- **[Comprobado localmente]** Cobertura de pruebas de negocio de la entrega en `tests/Feature/Estudiante/EntregaTallerTest.php` (12 pruebas, 45 aserciones, 2026-11-10); el comportamiento existente pasó todas las pruebas sin cambios en código de producción y la suite completa quedó en verde (96 pruebas, 269 aserciones). Sin migraciones. Cambios en el árbol de trabajo, pendientes de commit.
 
 ## Por confirmar
 - Si se permitirá reabrir una entrega calificada.
-- Si se agregarán pruebas de entrega, bloqueo por fecha y calificación.

@@ -55,6 +55,15 @@
                 Talleres
             </a>
 
+            <a href="{{ route('estudiante.asistencia') }}"
+               class="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
+               {{ request()->routeIs('estudiante.asistencia')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+                <span class="w-5 text-center">▦</span>
+                Asistencia
+            </a>
+
             <a href="#"
                class="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white">
                 <span class="w-5 text-center">▧</span>
@@ -131,6 +140,7 @@
             <a href="{{ route('estudiante.dashboard') }}" class="shrink-0 rounded-lg px-3 py-2 text-sm font-medium {{ request()->routeIs('estudiante.dashboard') ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100' }}">Inicio</a>
             <a href="{{ route('estudiante.notas') }}" class="shrink-0 rounded-lg px-3 py-2 text-sm font-medium {{ request()->routeIs('estudiante.notas') ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100' }}">Mis Notas</a>
             <a href="{{ route('estudiante.talleres') }}" class="shrink-0 rounded-lg px-3 py-2 text-sm font-medium {{ request()->routeIs('estudiante.talleres') ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100' }}">Talleres</a>
+            <a href="{{ route('estudiante.asistencia') }}" class="shrink-0 rounded-lg px-3 py-2 text-sm font-medium {{ request()->routeIs('estudiante.asistencia') ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100' }}">Asistencia</a>
         </nav>
 
         <main class="p-5 sm:p-8">

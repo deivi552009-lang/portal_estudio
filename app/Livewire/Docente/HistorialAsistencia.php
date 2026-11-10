@@ -18,6 +18,8 @@ class HistorialAsistencia extends Component
     {
         $this->grupo = $this->cargarGrupo($grupoId);
 
+        session(['docente_ultimo_grupo' => $this->grupo->id]);
+
         $this->historial = $this->asistenciasService()
             ->historialSemestral($this->grupo);
 

@@ -24,7 +24,7 @@ El panel estudiante consulta notas y talleres, y entrega respuestas; hay riesgos
 - [[bitacora/2026-11-03]] — Configuración de permisos de agentes.
 - [[bitacora/2026-11-05]] — Selector de grupos en la planilla y reparación de evaluaciones oficiales.
 - [[bitacora/2026-11-06]] — Contador de talleres pendientes en el dashboard del estudiante (sin entregados ni vencidos).
-- [[bitacora/2026-11-10]] — Comentario de la calificación del taller capturado en la entrega y visible para el estudiante.
+- [[bitacora/2026-11-10]] — Comentario de la calificación del taller, pruebas de negocio de entregas, confirmación de la ponderación con personalizadas sin porcentaje, consulta de asistencia del estudiante y navegación del sidebar docente al último grupo.
 
 ## Por confirmar
 - Esquema remoto de Supabase, ponderación académica y períodos académicos.

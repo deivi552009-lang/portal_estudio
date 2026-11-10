@@ -20,6 +20,8 @@ class GrupoAsistencia extends Component
     {
         $this->grupo = $this->cargarGrupo($grupoId);
 
+        session(['docente_ultimo_grupo' => $this->grupo->id]);
+
         $this->fecha = today()->toDateString();
 
         $this->cargarAsistencias();

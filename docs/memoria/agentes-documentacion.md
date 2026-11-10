@@ -22,6 +22,10 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `opencode/big-pickle` | Completar la documentación anterior (3 archivos) | Completado; contenido correcto y etiquetas estándar | 0 correcciones detectadas |
 | `opencode/big-pickle` | Contador de talleres pendientes (2 encargos) | Completado; ambos encargos agotaron el límite de pasos | 1: faltó la fila de evidencia en este archivo (la añadió el orquestador) |
 | `opencode/big-pickle` | Comentario de calificación del taller (3 encargos) | Completado; los 3 encargos agotaron el límite de pasos | 2: repuesta la decisión del 2026-11-06 que se había perdido en `decisiones.md` y corregidas dos líneas obsoletas del contador en `entregas-talleres.md` |
+| `opencode/big-pickle` | Pruebas de entregas de talleres (2 encargos) | Completado; un encargo agotó el límite de pasos | 2: línea en blanco dentro de la lista en `estado-actual.md` y referencia desactualizada a la integración de la tarea anterior; el encabezado de `relevo.md` quedó sin línea en blanco |
+| `opencode/big-pickle` | Confirmación de ponderación y personalizadas (2 encargos) | Parcial: un encargo no arrancó por cuota gratuita y el otro agotó pasos; lo completó el respaldo OpenRouter | — |
+| `openrouter/thinkingmachines/inkling-2-small:free` | Completar documentación de ponderación (3 encargos) | Completado; corrigió filas de `pendientes.md` y añadió la sección de bitácora | 2: sección duplicada en la bitácora y línea en blanco en `estado-actual.md` |
+| `openrouter/thinkingmachines/inkling-2-small:free` | Documentación de asistencia estudiantil y navegación (3 encargos) | Completado; un encargo agotó el límite de pasos | 1: en `panel-estudiante.md` seguía «tres páginas» y faltaba `asistencias` en las tablas |
 
 **Conclusión:** ninguno tiene cero errores acumulados. El titular acumula cuatro ejecuciones con correcciones y una parcial; Big Pickle tiene una tarea real limpia y una prueba controlada con errores de etiquetas. Big Pickle pasa a primera opción provisional, pero necesita una segunda tarea limpia para marcarse «recomendado».
 

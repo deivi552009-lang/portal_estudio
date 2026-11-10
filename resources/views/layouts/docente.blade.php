@@ -43,7 +43,26 @@
             <nav class="flex-1 px-4 py-6">
 
                 @php
-                    $grupoNavId = request()->route('grupoId');
+                    $docente = auth()->user()?->docente;
+
+                    $grupoNavId = request()->route('grupoId')
+                        ?? session('docente_ultimo_grupo');
+
+                    /*
+                     * Solo se usa el grupo de la sesión si pertenece al docente.
+                     * Si no hay grupo activo ni visitado, se toma el primero.
+                     */
+                    $grupoNavId = $docente && $grupoNavId
+                        ? $docente->grupos()->whereKey($grupoNavId)->value('id')
+                        : null;
+
+                    if (!$grupoNavId && $docente) {
+                        $grupoNavId = $docente->grupos()
+                            ->orderByDesc('anio')
+                            ->orderBy('semestre')
+                            ->orderBy('id')
+                            ->value('id');
+                    }
                 @endphp
 
                 <p class="px-3 mb-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">

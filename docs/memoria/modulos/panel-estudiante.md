@@ -1,8 +1,8 @@
 # Panel estudiante
-Última actualización: 2026-11-06
+Última actualización: 2026-11-10
 
 ## Qué hace
-Muestra al estudiante sus grupos, el estado de sus clases, su promedio general, sus notas por materia y sus talleres con opción de entrega.
+Muestra al estudiante sus grupos, el estado de sus clases, su promedio general, sus notas por materia, sus talleres con opción de entrega y su asistencia por materia.
 
 ## Archivos clave
 - `routes/web.php`: rutas `/estudiante/*` con `auth` + `role:estudiante`.
@@ -11,9 +11,12 @@ Muestra al estudiante sus grupos, el estado de sus clases, su promedio general, 
 - `app/Livewire/Estudiante/Talleres.php`: talleres, filtros y entregas.
 - `resources/views/components/estudiante/⚡dashboard.blade.php`, `⚡notas.blade.php`, `⚡talleres.blade.php`.
 - `resources/views/layouts/estudiante.blade.php`: sidebar y navegación.
+- `app/Livewire/Estudiante/Asistencia.php`: consulta de asistencia por materia.
+- `resources/views/components/estudiante/⚡asistencia.blade.php`: resumen y detalle de asistencia.
+- `tests/Feature/Estudiante/AsistenciaTest.php`: cobertura de la consulta (7 pruebas).
 
 ## Tablas/modelos que usa
-`grupos`, `estudiantes`, `grupo_estudiante`, `materias`, `docentes`, `users`, `evaluaciones`, `calificaciones`, `actividades`, `actividad_respuestas`.
+`grupos`, `estudiantes`, `grupo_estudiante`, `materias`, `docentes`, `users`, `evaluaciones`, `calificaciones`, `actividades`, `actividad_respuestas`, `asistencias`.
 
 ## Flujo principal
 1. Cada componente obtiene el estudiante desde `Auth::user()->estudiante` y responde 403 si no existe.
@@ -22,9 +25,10 @@ Muestra al estudiante sus grupos, el estado de sus clases, su promedio general, 
 4. Calcula el estado de la clase (`próxima`, `en_curso`, `finalizada`, `sin_horario`) y su progreso.
 5. `/estudiante/notas` muestra evaluaciones y promedio ponderado por asignatura.
 6. `/estudiante/talleres` muestra talleres, estado y formulario de entrega.
+7. `/estudiante/asistencia` muestra solo los registros del estudiante autenticado, con selector de sus materias, resumen por estado y detalle por fecha; el porcentaje es `(presente + tarde) / total` redondeado.
 
 ## Estado
-**En progreso.** Las tres páginas existen; el dashboard cuenta solo talleres vigentes sin entregar (corregido el 2026-11-06), faltan las secciones Guías, Calendario y Mensajes, y no hay vista de asistencias.
+**En progreso.** Las cuatro páginas existen; el dashboard cuenta solo talleres vigentes sin entregar (corregido el 2026-11-06), faltan las secciones Guías, Calendario y Mensajes.
 
 ## Puntos delicados o reglas que no se deben romper
 - Sin perfil `estudiante`, los componentes abortan con 403.
@@ -34,14 +38,13 @@ Muestra al estudiante sus grupos, el estado de sus clases, su promedio general, 
 - El dashboard usa `wire:poll.30s`, así que las consultas deben mantenerse razonablemente livianas.
 - En el dashboard, un taller vencido sin entregar no cuenta como pendiente; el filtro «Pendientes» de `/estudiante/talleres` no cambia y sigue mostrando vencidos con estado «Vencido».
 - Los enlaces Guías de Estudio, Calendario y Mensajes son `href="#"`.
-- No existe ruta de asistencia para el estudiante en `routes/web.php`.
+- `/estudiante/asistencia` es de solo lectura y solo muestra los registros propios; un grupo ajeno devuelve 404 y un usuario sin perfil de estudiante, 403.
 
 ## Hallazgos clasificados
-- **[Verificado en código]** No hay vista/ruta de asistencia para estudiantes.
+- **[Comprobado localmente]** Consulta de asistencia del estudiante implementada el 2026-11-10 con resumen, detalle y porcentaje; cubierta por `tests/Feature/Estudiante/AsistenciaTest.php` (7 pruebas, 18 aserciones). Confirmada por el usuario en el navegador.
 - **[Verificado en código]** Enlaces de navegación pendientes con `href="#"`.
 - **[Riesgo detectado]** El promedio y la nota final dependen de que las calificaciones no se confundan con ceros reales.
 - **[Decisión pendiente]** Alcance de las secciones pendientes del sidebar.
 
 ## Por confirmar
 - Si se implementarán las secciones pendientes del sidebar.
-- Si el estudiante debe ver su historial de asistencia.

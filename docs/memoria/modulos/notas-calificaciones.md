@@ -27,7 +27,7 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 9. El comentario de la calificación de un taller se captura y guarda en la entrega del taller («Ver respuestas» del docente) con `GrupoActividades::guardarNota()`, no en la matriz; aquí `calificaciones.comentario` solo se lee.
 
 ## Estado
-**En progreso.** La matriz, el guardado, la validación de propiedad y el selector de grupos están implementados; el comentario de la calificación del taller se captura desde la entrega («Ver respuestas»), no desde la matriz, y las evaluaciones dinámicas no tienen porcentaje editable.
+**En progreso.** La matriz, el guardado, la validación de propiedad y el selector de grupos están implementados; el comentario de la calificación del taller se captura desde la entrega («Ver respuestas»), no desde la matriz. La ponderación 20/20/20/30/10 y las evaluaciones personalizadas con `porcentaje = null` están aprobadas por el usuario el 2026-11-10.
 
 ## Puntos delicados o reglas que no se deben romper
 - La nota se guarda en `calificaciones`, nunca en `actividad_respuestas`.
@@ -35,8 +35,8 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 - Para grupos creados antes del commit `d6027d2` (2026-10-01) que no tengan las oficiales existe el comando `evaluaciones:completar-oficiales`: por defecto solo muestra el plan; `--ejecutar` inserta; `--grupo=*` limita a IDs. Solo inserta faltantes (P1 20%, P2 20%, P3 20%, P4 30%, A 10%, `tipo = parcial`), es idempotente y no modifica evaluaciones existentes, calificaciones ni grupos. Las A reparadas quedan con `tipo = parcial`; el A del grupo 1 conserva `tipo = asistencia_final` y el comando no lo toca.
 - El unique `evaluacion_id` + `estudiante_id` impide duplicados; el servicio usa `upsert`.
 - Los nombres `P1`, `P2`, `P3`, `P4` y `A` están reservados en el formulario de evaluaciones.
-- Las evaluaciones dinámicas se crean como `personalizada` y con `porcentaje = null`; no afectan la definitiva.
-- La ponderación actual P1 20%, P2 20%, P3 20%, P4 30% y A 10% está implementada, pero es una propuesta pendiente de aprobación; no implementar cambios hasta confirmarla. Sigue pendiente decidir si las evaluaciones personalizadas tendrán porcentaje editable y cómo participarán en la nota final.
+- Ponderación aprobada por el usuario el 2026-11-10: P1 20 %, P2 20 %, P3 20 %, P4 30 % y A 10 %. `GrupoEstudiantes::crearNuevoGrupo()` inserta esos porcentajes al crear el grupo y `evaluaciones:completar-oficiales` repara los grupos legados con los mismos valores. No cambiarla sin una nueva decisión del usuario.
+- Las evaluaciones personalizadas se crean como `personalizada` y con `porcentaje = null` (decisión del usuario, 2026-11-10): no tienen porcentaje editable y no suman a la nota final; `CalificacionesService::notasFinales()` y `Estudiante\Dashboard` excluyen las de `porcentaje === null`. No añadirles porcentaje sin una nueva decisión del usuario.
 - `GrupoNotas::mount()` solo carga grupos del docente autenticado (`whereHas('docente', ...)` sobre `user_id = Auth::id()`); un docente ajeno recibe 404.
 - `GrupoNotas::render()` aplica el mismo filtro para el selector de grupos; `seleccionarGrupo()` reutiliza `cargarGrupo()`, así que un grupo ajeno también devuelve 404. Cada grupo es una opción distinta aunque comparta materia con otro semestre o año.
 - La vista `⚡grupo-notas.blade.php` ya no contiene vallas Markdown (triple backtick); se retiraron las dos sueltas y la vista fue probada por el usuario.
@@ -53,8 +53,5 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 - **[Comprobado localmente]** Todo grupo nuevo recibe P1–P4/A en la transacción de `crearNuevoGrupo()`; grupos legados se reparan con `evaluaciones:completar-oficiales` (2026-11-05). Cubierto por `tests/Feature/Docente/GrupoCreacionTest.php` y `tests/Feature/Console/CompletarEvaluacionesOficialesTest.php`.
 - **[Comprobado en base remota]** El 2026-11-05 el comando insertó 15 evaluaciones en los grupos legados 2, 4 y 5 (5 en cada uno); un dry-run posterior mostró los 5 grupos del docente completos.
 - **[Comprobado en base remota]** El supuesto duplicado de P1 con IDs 3 y 4 no se reproduce: el ID 3 no existe y no hay P1 duplicados por grupo. No se modificaron registros.
-- **[Propuesta pendiente]** Ponderación P1–P4/A; pendiente de aprobación.
-- **[Decisión pendiente]** Porcentaje de evaluaciones personalizadas y ponderación definitiva.
-
-## Por confirmar
-- Si las evaluaciones personalizadas deben tener porcentaje y afectar la definitiva.
+- **[Verificado en código]** Ponderación oficial aprobada por el usuario el 2026-11-10: P1 20 %, P2 20 %, P3 20 %, P4 30 % y A 10 %; `GrupoEstudiantes::crearNuevoGrupo()` y `evaluaciones:completar-oficiales` la aplican.
+- **[Verificado en código]** Evaluaciones personalizadas con `porcentaje = null` (decisión del usuario, 2026-11-10): sin porcentaje editable y fuera de la nota final; `CalificacionesService::notasFinales()` y `Estudiante\Dashboard` excluyen `porcentaje === null`.

@@ -20,12 +20,14 @@
 - **Jornada y día por grupo, con cruces por docente y día.** Decisión del usuario: exigir siempre jornada (`Diurna`/`Nocturna`/`Sabatina`) y día de clase (`Lunes`–`Domingo`) al crear o editar un grupo. `GrupoEstudiantes::validarCruceDeHorario()` rechaza el solapamiento estricto con otro grupo del mismo docente y mismo día, sin importar la jornada y excluyendo el grupo editado; los horarios consecutivos están permitidos. Los grupos legados conservan NULL en la base y deben completar ambos campos para editarse. Cubierto por `tests/Feature/Docente/GrupoHorarioTest.php`.
 - **Un taller vencido sin entregar no cuenta como pendiente en el dashboard del estudiante.** Decisión del usuario (2026-11-06): alcance limitado al dashboard; `/estudiante/talleres` no cambia y sigue mostrando los vencidos en «Pendientes» con estado «Vencido». `Estudiante\Dashboard` carga solo `tipo = 'taller'` con las respuestas del estudiante y descarta entregados y vencidos (`tallerVencido()`); el mismo conjunto alimenta contador, lista y «Próxima Entrega». Cubierto por `tests/Feature/Estudiante/DashboardTalleresPendientesTest.php` (6 pruebas).
 - **El comentario de calificación de un taller se captura en la entrega.** Decisión del usuario (2026-11-10): el comentario se captura en la entrega del taller («Ver respuestas» del docente), no en la planilla de notas, y se guarda con el mismo botón que la nota. `GrupoActividades` precarga nota y comentario en `verRespuestas()`; `guardarNota()` valida el comentario como `nullable` con máximo 2000 caracteres y lo guarda en `calificaciones.comentario` (texto vacío → `null`). El estudiante lo ve en el detalle del taller en un bloque «Comentario de la calificación», separado del bloque «Mensaje del docente» del mensaje individual. Cubierto por `tests/Feature/Docente/CalificacionComentarioTest.php` (7 pruebas).
+- **Ponderación oficial P1–P4/A y personalizadas sin porcentaje.** Decisión del usuario (2026-11-10): P1 20 %, P2 20 %, P3 20 %, P4 30 % y A 10 %. `GrupoEstudiantes::crearNuevoGrupo()` ya inserta esos porcentajes dentro de la transacción del grupo. Las evaluaciones personalizadas mantienen `porcentaje = null`: no tienen porcentaje editable y no suman a la nota final, porque `CalificacionesService::notasFinales()` y `Estudiante\Dashboard` excluyen los registros con `porcentaje === null`. El código ya coincidía con la decisión; la tarea no cambió código, pruebas ni migraciones.
+- **Consulta de asistencia del estudiante, solo lectura.** Decisión del usuario (2026-11-10): el estudiante ve solo sus propios registros en `/estudiante/asistencia`, con selector de sus materias, resumen por estado y detalle por fecha. El porcentaje es `(presente + tarde) / total de registros`, redondeado; las excusas no suman como asistencia. Cubierto por `tests/Feature/Estudiante/AsistenciaTest.php` (7 pruebas).
+- **Navegación del sidebar docente al último grupo visitado.** Decisión del usuario (2026-11-10): «Historial» y «Tomar asistencia» usan el grupo de la ruta; sin grupo en la URL usan el último visitado guardado en la sesión `docente_ultimo_grupo`, validado como propio; si no, el primer grupo (año descendente, semestre, id); si no hay grupos, `docente.grupos`. Cubierto por `tests/Feature/Docente/NavegacionAsistenciaTest.php` (5 pruebas).
+
 ## Estados de preferencias, propuestas y decisiones pendientes
 | Tema | Estado | Decisión o nota |
 |---|---|---|
 | Comentario de calificación | Implementada y verificada (2026-11-10) | Se captura en la entrega del taller, se guarda con la nota y no se retira el campo. Detalle en «Decisiones implementadas y verificadas». |
-| Ponderación P1–P4/A | Propuesta pendiente de aprobación | P1 20%, P2 20%, P3 20%, P4 30% y A 10%. No implementar hasta confirmarla. |
-| Evaluaciones personalizadas | Decisión pendiente | Definir si tendrán porcentaje editable y cómo participarán en la nota final. |
 | Evaluaciones P1 IDs 3 y 4 | Verificación completada | El ID 3 no existe en la base remota (mínimo 4); no hay P1 duplicados por grupo y el duplicado no se pudo reproducir. El usuario indicó no modificar registros P1. |
 | Verificación de correo | Sin decisión | No modificar el sistema de autenticación por ahora. |
 | Períodos académicos | Diseño y reglas pendientes | No asumir criterios académicos ni implementarlos sin definirlos. |
@@ -40,6 +42,5 @@
 - **Archivos al eliminar grupos.** Revisar si deben borrarse los archivos de actividades/entregas.
 
 ## Por confirmar
-- Ponderación definitiva y porcentaje de evaluaciones personalizadas.
 - Verificación de correo, períodos académicos y esquema remoto de Supabase.
 - Los P1 con IDs 3 y 4 ya se verificaron; ningún punto pendiente relacionado con ellos.
