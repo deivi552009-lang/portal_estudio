@@ -1,5 +1,5 @@
 # Entregas de talleres
-Última actualización: 2026-11-02
+Última actualización: 2026-11-10
 
 ## Qué hace
 Permite al estudiante responder un taller con asunto, texto y/o archivo. El docente revisa la entrega, la califica y puede dejar mensajes generales del taller o individuales por entrega.
@@ -22,12 +22,12 @@ Permite al estudiante responder un taller con asunto, texto y/o archivo. El doce
 5. Se exige texto o archivo; si se edita sin subir otro archivo, se conserva el anterior.
 6. La entrega se guarda con `updateOrCreate` por `actividad_id` y `estudiante_id`.
 7. El docente abre la entrega; se marca `leida_at` si estaba sin leer.
-8. El docente guarda la nota en `calificaciones` mediante la evaluación vinculada.
+8. El docente guarda la nota y el comentario de la calificación juntos en `calificaciones` mediante la evaluación vinculada, desde «Ver respuestas»; el comentario es opcional (máximo 2000 caracteres).
 9. El docente puede guardar un mensaje general en la actividad y uno individual en la respuesta.
-10. El estudiante ve la nota, el mensaje general y el mensaje individual en el detalle.
+10. El estudiante ve la nota, el mensaje general y el mensaje individual en el detalle; el comentario de la calificación aparece en un bloque separado del mensaje individual.
 
 ## Estado
-**En progreso.** El flujo está implementado en código; faltan pruebas de negocio, la captura del comentario de calificación y la corrección del contador de talleres pendientes.
+**En progreso.** El flujo está implementado en código y el comentario de la calificación ya se captura en la entrega; faltan pruebas de negocio.
 
 ## Puntos delicados o reglas que no se deben romper
 - Solo existe una entrega por estudiante y actividad (unique en la tabla).
@@ -37,19 +37,16 @@ Permite al estudiante responder un taller con asunto, texto y/o archivo. El doce
 - Formatos permitidos: PDF, Word, Excel, PowerPoint y ZIP; máximo 10 MB.
 - `ActividadRespuesta` no declara `leida_at` en `fillable`; el docente lo asigna directamente.
 - El docente valida propiedad con `whereHas('actividad.grupo.docente', ...)`.
-- `calificaciones.comentario` se lee, pero no se escribe en el flujo del docente. La preferencia es implementar su captura y almacenamiento, no retirar el campo; sigue pendiente de desarrollo y pruebas.
+- `calificaciones.comentario` se guarda en `GrupoActividades::guardarNota()` desde «Ver respuestas», junto con la nota: nullable, string de máximo 2000 caracteres; vacío o solo espacios → `null`. La planilla de notas no lo escribe.
 - No confundir `calificaciones.comentario` (observación de la nota) con `actividades.mensaje_docente` (mensaje general) ni con `actividad_respuestas.mensaje_docente` (mensaje individual).
-- El dashboard del estudiante cuenta todas las actividades como talleres pendientes.
+- El dashboard del estudiante cuenta solo talleres vigentes sin entregar; los entregados y vencidos no cuentan como pendientes (2026-11-06).
 - Faltan pruebas de: texto, archivos o ambos; modificación/sustitución; conservación y borrado del archivo anterior; fecha límite; permisos y pertenencia al grupo.
 
 ## Hallazgos clasificados
 - **[Verificado en código]** Entrega con texto y/o archivo, bloqueo por calificación/plazo y conservación del archivo anterior.
-- **[Comprobado localmente]** `calificaciones.comentario` se lee en `Talleres.php`; no hay escritura en `GrupoActividades::guardarNota()`.
-- **[Riesgo detectado]** Falta de pruebas de negocio y contador de talleres pendientes incorrecto.
-- **[Preferencia expresada]** Implementar la captura y almacenamiento de `calificaciones.comentario`; no retirarlo. Pendiente de desarrollo y pruebas.
-- **[Decisión pendiente]** Diseño de la captura del comentario y su lugar en la interfaz.
+- **[Comprobado localmente]** `calificaciones.comentario` se guarda desde «Ver respuestas» con la nota y se lee en `Talleres.php` en un bloque separado del mensaje individual (2026-11-10). Cubierto por `tests/Feature/Docente/CalificacionComentarioTest.php`.
+- **[Riesgo detectado]** Falta de pruebas de negocio para las entregas de talleres.
 
 ## Por confirmar
-- Cómo se implementará la captura del comentario de calificación.
 - Si se permitirá reabrir una entrega calificada.
 - Si se agregarán pruebas de entrega, bloqueo por fecha y calificación.

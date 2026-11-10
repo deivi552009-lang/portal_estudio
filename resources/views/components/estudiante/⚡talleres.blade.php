@@ -320,9 +320,24 @@
                                 <p class="text-sm font-semibold text-emerald-800">
                                     Calificación: {{ $respuestaDetalle['nota'] }} / 5
                                 </p>
-                                <p class="mt-2 whitespace-pre-wrap text-sm text-emerald-900">
-                                    {{ $respuestaDetalle['mensaje_docente'] ?: 'El docente no agregó comentarios.' }}
-                                </p>
+
+                                @if ($respuestaDetalle['comentario'])
+                                    <div class="mt-3">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                            Comentario de la calificación
+                                        </p>
+                                        <p class="mt-1 whitespace-pre-wrap text-sm text-emerald-900">{{ $respuestaDetalle['comentario'] }}</p>
+                                    </div>
+                                @endif
+
+                                @if ($respuestaDetalle['mensaje_docente'])
+                                    <div class="mt-3 border-t border-emerald-100 pt-3">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                            Mensaje del docente
+                                        </p>
+                                        <p class="mt-1 whitespace-pre-wrap text-sm text-emerald-900">{{ $respuestaDetalle['mensaje_docente'] }}</p>
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     </div>

@@ -1,5 +1,5 @@
 # Actividades y talleres
-Última actualización: 2026-11-02
+Última actualización: 2026-11-10
 
 ## Qué hace
 Permite al docente crear, editar y eliminar actividades de un grupo, adjuntar archivos, definir fecha/hora límite, publicar mensajes y revisar las entregas de los talleres.
@@ -26,7 +26,7 @@ Permite al docente crear, editar y eliminar actividades de un grupo, adjuntar ar
 8. El docente puede abrir las respuestas, ver el detalle, calificar y escribir mensajes generales o individuales.
 
 ## Estado
-**En progreso.** El CRUD y las entregas están implementados; faltan la limpieza de archivos al eliminar el grupo, la sección global de talleres, la captura del comentario de calificación y pruebas de negocio.
+**En progreso.** El CRUD y las entregas están implementados; faltan la limpieza de archivos al eliminar el grupo, la sección global de talleres y pruebas de negocio.
 
 ## Puntos delicados o reglas que no se deben romper
 - El tipo se guarda en minúsculas y se compara sin distinguir mayúsculas.
@@ -34,21 +34,19 @@ Permite al docente crear, editar y eliminar actividades de un grupo, adjuntar ar
 - Los archivos permiten PDF, Word, Excel, PowerPoint y ZIP; máximo 10 MB.
 - El archivo de una actividad se sirve con control de propiedad en `ActividadArchivoController`; las entregas se enlazan directo a `storage/`.
 - Eliminar una actividad borra su archivo, pero eliminar un grupo no borra los archivos de sus actividades.
-- `guardarNota()` solo guarda `nota`; no escribe `calificaciones.comentario`. La preferencia es implementar su captura y almacenamiento, no retirar el campo; sigue pendiente de desarrollo y pruebas.
+- `guardarNota()` guarda la nota y el comentario de la calificación en `calificaciones`, desde «Ver respuestas»: el comentario es nullable, string de máximo 2000 caracteres y un valor vacío o solo con espacios se guarda como `null`. Mantenerlo separado de los dos `mensaje_docente`.
 - No confundir `calificaciones.comentario` (observación de la nota) con `actividades.mensaje_docente` (mensaje general) ni con `actividad_respuestas.mensaje_docente` (mensaje individual).
 - Los mensajes generales e individuales solo aplican a talleres.
 - La calificación de una entrega se guarda en `calificaciones`, no en la respuesta.
 
 ## Hallazgos clasificados
 - **[Verificado en código]** Transacción en creación/edición de actividades.
-- **[Verificado en código]** `guardarNota()` no escribe `comentario`; la vista no tiene campo para capturarlo.
-- **[Preferencia expresada]** Implementar la captura y almacenamiento de `calificaciones.comentario`; no retirar el campo. Pendiente de desarrollo y pruebas.
+- **[Comprobado localmente]** `guardarNota()` guarda nota y comentario de la calificación en `calificaciones` desde «Ver respuestas»; cubierto por `tests/Feature/Docente/CalificacionComentarioTest.php` (2026-11-10).
 - **[Verificado en código]** `confirmarEliminacion()` de grupos no limpia archivos del disco.
 - **[Riesgo detectado]** Archivos huérfanos tras eliminar un grupo.
 - **[Propuesta de mejora]** Añadir pruebas de creación, edición y eliminación de talleres.
 
 ## Por confirmar
-- Cómo se implementará la captura del comentario de calificación.
 - Si se implementará la sección global de talleres del sidebar.
 - Si la eliminación de grupos debe limpiar archivos.
 - Si se permitirán más tipos de archivo o un límite distinto.

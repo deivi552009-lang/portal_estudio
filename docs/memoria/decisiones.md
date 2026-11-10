@@ -1,5 +1,5 @@
 # Decisiones técnicas
-Última actualización: 2026-11-06
+Última actualización: 2026-11-10
 
 ## Decisiones implementadas y verificadas
 - **Autorización por nombre de rol.** `RoleMiddleware` compara el nombre en minúsculas (`app/Http/Middleware/RoleMiddleware.php`). Evita depender de IDs en las rutas; desde 2026-11-03 `GrupoEstudiantesService` también filtra por nombre de rol.
@@ -19,10 +19,11 @@
 - **Nota pendiente ≠ cero.** `CalificacionesService::guardarNotas()` ignora `null` (no guarda ni borra), borra solo con `''` y guarda `0` como cero real. `calcularDefinitiva` excluye las evaluaciones pendientes del cálculo y muestra `—`. Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php`.
 - **Jornada y día por grupo, con cruces por docente y día.** Decisión del usuario: exigir siempre jornada (`Diurna`/`Nocturna`/`Sabatina`) y día de clase (`Lunes`–`Domingo`) al crear o editar un grupo. `GrupoEstudiantes::validarCruceDeHorario()` rechaza el solapamiento estricto con otro grupo del mismo docente y mismo día, sin importar la jornada y excluyendo el grupo editado; los horarios consecutivos están permitidos. Los grupos legados conservan NULL en la base y deben completar ambos campos para editarse. Cubierto por `tests/Feature/Docente/GrupoHorarioTest.php`.
 - **Un taller vencido sin entregar no cuenta como pendiente en el dashboard del estudiante.** Decisión del usuario (2026-11-06): alcance limitado al dashboard; `/estudiante/talleres` no cambia y sigue mostrando los vencidos en «Pendientes» con estado «Vencido». `Estudiante\Dashboard` carga solo `tipo = 'taller'` con las respuestas del estudiante y descarta entregados y vencidos (`tallerVencido()`); el mismo conjunto alimenta contador, lista y «Próxima Entrega». Cubierto por `tests/Feature/Estudiante/DashboardTalleresPendientesTest.php` (6 pruebas).
+- **El comentario de calificación de un taller se captura en la entrega.** Decisión del usuario (2026-11-10): el comentario se captura en la entrega del taller («Ver respuestas» del docente), no en la planilla de notas, y se guarda con el mismo botón que la nota. `GrupoActividades` precarga nota y comentario en `verRespuestas()`; `guardarNota()` valida el comentario como `nullable` con máximo 2000 caracteres y lo guarda en `calificaciones.comentario` (texto vacío → `null`). El estudiante lo ve en el detalle del taller en un bloque «Comentario de la calificación», separado del bloque «Mensaje del docente» del mensaje individual. Cubierto por `tests/Feature/Docente/CalificacionComentarioTest.php` (7 pruebas).
 ## Estados de preferencias, propuestas y decisiones pendientes
 | Tema | Estado | Decisión o nota |
 |---|---|---|
-| Comentario de calificación | Preferencia expresada | Implementar su captura y almacenamiento; no retirar el campo. Sigue pendiente de desarrollo y pruebas. |
+| Comentario de calificación | Implementada y verificada (2026-11-10) | Se captura en la entrega del taller, se guarda con la nota y no se retira el campo. Detalle en «Decisiones implementadas y verificadas». |
 | Ponderación P1–P4/A | Propuesta pendiente de aprobación | P1 20%, P2 20%, P3 20%, P4 30% y A 10%. No implementar hasta confirmarla. |
 | Evaluaciones personalizadas | Decisión pendiente | Definir si tendrán porcentaje editable y cómo participarán en la nota final. |
 | Evaluaciones P1 IDs 3 y 4 | Verificación completada | El ID 3 no existe en la base remota (mínimo 4); no hay P1 duplicados por grupo y el duplicado no se pudo reproducir. El usuario indicó no modificar registros P1. |
@@ -40,6 +41,5 @@
 
 ## Por confirmar
 - Ponderación definitiva y porcentaje de evaluaciones personalizadas.
-- Cómo implementar la captura del comentario de calificación; la preferencia de conservarlo ya está expresada.
 - Verificación de correo, períodos académicos y esquema remoto de Supabase.
 - Los P1 con IDs 3 y 4 ya se verificaron; ningún punto pendiente relacionado con ellos.

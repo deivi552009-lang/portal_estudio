@@ -37,6 +37,7 @@ class GrupoActividades extends Component
     public bool $mostrarConfirmacionEliminar = false;
     public bool $mostrarRespuestas = false;
     public array $notas = [];
+    public array $comentarios = [];
     public bool $mostrarModalMensaje = false;
     public ?int $actividadMensajeId = null;
     public string $mensajeDocente = '';
@@ -314,17 +315,38 @@ public function abrirModalMensaje(int $actividadId): void
 
     public function verRespuestas(int $actividadId): void
 {
-    Actividad::query()
+    $actividad = Actividad::query()
         ->whereKey($actividadId)
         ->whereHas('grupo', function ($query) {
             $query->whereHas('docente', function ($q) {
                 $q->where('user_id', Auth::id());
             });
         })
+        ->with('evaluacion.calificaciones')
         ->firstOrFail();
 
     $this->actividadRespuestasId = $actividadId;
     $this->mostrarRespuestas = true;
+
+    /*
+     * Precarga la nota y el comentario ya guardados para que el docente
+     * pueda editarlos sin volver a escribirlos.
+     */
+    $this->notas = [];
+    $this->comentarios = [];
+
+    $respuestas = $actividad->respuestas()->get();
+
+    foreach ($respuestas as $respuesta) {
+        $calificacion = $actividad->evaluacion?->calificaciones
+            ->firstWhere('estudiante_id', $respuesta->estudiante_id);
+
+        $this->notas[$respuesta->id] = $calificacion
+            ? (float) $calificacion->nota
+            : null;
+
+        $this->comentarios[$respuesta->id] = $calificacion?->comentario ?? '';
+    }
 }
 
 public function cerrarRespuestas(): void
@@ -513,6 +535,7 @@ public function cerrarDetalleRespuesta(): void
 public function guardarNota(int $respuestaId): void
 {
     $nota = $this->notas[$respuestaId] ?? null;
+    $comentario = $this->comentarios[$respuestaId] ?? null;
     $respuesta = ActividadRespuesta::query()
         ->with('actividad')
         ->whereKey($respuestaId)
@@ -536,17 +559,25 @@ public function guardarNota(int $respuestaId): void
     }
 
     $datos = validator(
-        ['nota' => $nota],
-        ['nota' => ['required', 'numeric', 'min:0', 'max:5']]
+        [
+            'nota' => $nota,
+            'comentario' => $comentario,
+        ],
+        [
+            'nota' => ['required', 'numeric', 'min:0', 'max:5'],
+            'comentario' => ['nullable', 'string', 'max:2000'],
+        ]
     )->validate();
 
     $estudianteId = $respuesta->estudiante_id;
     $evaluacionId = $respuesta->actividad->evaluacion->id;
+    $comentario = trim($datos['comentario'] ?? '');
 
     DB::transaction(function () use (
         $estudianteId,
         $evaluacionId,
-        $datos
+        $datos,
+        $comentario
     ) {
         Calificacion::updateOrCreate(
             [
@@ -555,11 +586,12 @@ public function guardarNota(int $respuestaId): void
             ],
             [
                 'nota' => $datos['nota'],
+                'comentario' => $comentario === '' ? null : $comentario,
             ]
         );
     });
 
-    session()->flash('mensaje', 'La nota se guardó correctamente.');
+    session()->flash('mensaje', 'La calificación se guardó correctamente.');
 }
 
 

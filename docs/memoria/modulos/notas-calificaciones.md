@@ -1,5 +1,5 @@
 # Notas y calificaciones
-Última actualización: 2026-11-05
+Última actualización: 2026-11-10
 
 ## Qué hace
 Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un selector, crear o eliminar evaluaciones y guardar notas de 0 a 5. Calcula la definitiva ponderada y alimenta las vistas de notas del estudiante.
@@ -24,9 +24,10 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 6. Una nota vacía elimina la calificación correspondiente.
 7. La definitiva se calcula como suma de `nota × porcentaje / 100`; las evaluaciones con `porcentaje = null` no suman.
 8. El estudiante lee sus calificaciones por evaluación en `/estudiante/notas`.
+9. El comentario de la calificación de un taller se captura y guarda en la entrega del taller («Ver respuestas» del docente) con `GrupoActividades::guardarNota()`, no en la matriz; aquí `calificaciones.comentario` solo se lee.
 
 ## Estado
-**En progreso.** La matriz, el guardado, la validación de propiedad y el selector de grupos están implementados; el comentario de calificación aún no se captura y las evaluaciones dinámicas no tienen porcentaje editable.
+**En progreso.** La matriz, el guardado, la validación de propiedad y el selector de grupos están implementados; el comentario de la calificación del taller se captura desde la entrega («Ver respuestas»), no desde la matriz, y las evaluaciones dinámicas no tienen porcentaje editable.
 
 ## Puntos delicados o reglas que no se deben romper
 - La nota se guarda en `calificaciones`, nunca en `actividad_respuestas`.
@@ -39,23 +40,21 @@ Permite al docente ver la matriz de notas por grupo, cambiar de grupo desde un s
 - `GrupoNotas::mount()` solo carga grupos del docente autenticado (`whereHas('docente', ...)` sobre `user_id = Auth::id()`); un docente ajeno recibe 404.
 - `GrupoNotas::render()` aplica el mismo filtro para el selector de grupos; `seleccionarGrupo()` reutiliza `cargarGrupo()`, así que un grupo ajeno también devuelve 404. Cada grupo es una opción distinta aunque comparta materia con otro semestre o año.
 - La vista `⚡grupo-notas.blade.php` ya no contiene vallas Markdown (triple backtick); se retiraron las dos sueltas y la vista fue probada por el usuario.
-- `calificaciones.comentario` existe, está en `$fillable` y se lee en el panel estudiante, pero no hay flujo que lo guarde. La preferencia es implementar su captura y almacenamiento, no retirar el campo; sigue pendiente de desarrollo y pruebas. Mantenerlo separado de los mensajes del taller.
+- `calificaciones.comentario` se guarda en `GrupoActividades::guardarNota()`, invocado desde «Ver respuestas» del taller, junto con la nota: es nullable, string de máximo 2000 caracteres y un valor vacío o solo con espacios se guarda como `null`. La planilla de notas no lo edita, solo lo lee. Mantenerlo separado de `actividades.mensaje_docente` y `actividad_respuestas.mensaje_docente`.
 - **Distinción `null` vs `0.0`:** `matrizNotas()` y `cargarNotas()` conservan `null` para celdas sin calificar. `guardarNotas()` ignora `null` (no guarda ni borra), borra solo con `''` y guarda `0` como cero real. `calcularDefinitiva` en la vista excluye las pendientes y muestra `—`; ya no usa `|| 0`. Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php` y confirmado por el usuario en el navegador (2026-11-03).
 - Verificado en solo lectura (2026-11-03): el ID 3 no existe en la base remota y no hay P1 duplicados por grupo; no se modificaron registros.
 
 ## Hallazgos clasificados
 - **[Comprobado localmente]** `matrizNotas()` conserva `null`; `guardarNotas()` distingue `null`, `''` y `0`; la vista ya no usa `0` como fallback (2026-11-03). Cubierto por `tests/Feature/Services/CalificacionesServiceTest.php`.
-- **[Comprobado localmente]** `comentario` solo se lee en `Talleres.php`.
+- **[Comprobado localmente]** El comentario de la calificación del taller se captura en «Ver respuestas» y se guarda en `calificaciones.comentario` (vacío o solo espacios → `null`, máximo 2000); el estudiante lo ve en un bloque aparte del mensaje del docente (2026-11-10). Cubierto por `tests/Feature/Docente/CalificacionComentarioTest.php`.
 - **[Comprobado localmente]** `GrupoNotas::mount()` valida la propiedad del grupo (2026-11-03); cubierto por `tests/Feature/Docente/GrupoPropiedadTest.php`.
 - **[Comprobado localmente]** Selector de grupos en la planilla (2026-11-05): lista solo grupos del docente, separa grupos de la misma materia y redirige con `navigate: true`; cubierto por `tests/Feature/Docente/GrupoNotasSelectorTest.php` y confirmado por el usuario en el navegador.
 - **[Comprobado localmente]** Nota pendiente y cero real diferenciados desde 2026-11-03; la prueba cubre `null`, `''` y `0`.
 - **[Comprobado localmente]** Todo grupo nuevo recibe P1–P4/A en la transacción de `crearNuevoGrupo()`; grupos legados se reparan con `evaluaciones:completar-oficiales` (2026-11-05). Cubierto por `tests/Feature/Docente/GrupoCreacionTest.php` y `tests/Feature/Console/CompletarEvaluacionesOficialesTest.php`.
 - **[Comprobado en base remota]** El 2026-11-05 el comando insertó 15 evaluaciones en los grupos legados 2, 4 y 5 (5 en cada uno); un dry-run posterior mostró los 5 grupos del docente completos.
 - **[Comprobado en base remota]** El supuesto duplicado de P1 con IDs 3 y 4 no se reproduce: el ID 3 no existe y no hay P1 duplicados por grupo. No se modificaron registros.
-- **[Preferencia expresada]** Implementar la captura y almacenamiento de `calificaciones.comentario`; no retirar el campo. Pendiente de desarrollo y pruebas.
 - **[Propuesta pendiente]** Ponderación P1–P4/A; pendiente de aprobación.
 - **[Decisión pendiente]** Porcentaje de evaluaciones personalizadas y ponderación definitiva.
 
 ## Por confirmar
 - Si las evaluaciones personalizadas deben tener porcentaje y afectar la definitiva.
-- Cómo se implementará la captura del comentario de calificación.

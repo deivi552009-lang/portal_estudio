@@ -1,15 +1,17 @@
 # Relevo: sin tarea en curso
 
-Última actualización: 2026-11-06 · Modelo: big-pickle (documentación)
+Última actualización: 2026-11-10 · Modelo: Big Pickle
 
 ## Estado
-- **Sin tarea en curso.** La corrección del contador «Talleres Pendientes» del dashboard del estudiante (tarea 7 de `pendientes.md`) quedó **confirmada por el usuario en el navegador** el 2026-11-06.
-- Regla acordada: un taller **vencido sin entregar tampoco es pendiente**, solo en el dashboard (contador, lista «Talleres Pendientes» y «Próxima Entrega»). El filtro «Pendientes» de `/estudiante/talleres` no cambia y sigue mostrando vencidos con estado «Vencido».
-- Archivos tocados: `app/Livewire/Estudiante/Dashboard.php`, `resources/views/components/estudiante/⚡dashboard.blade.php` y `tests/Feature/Estudiante/DashboardTalleresPendientesTest.php` (nueva).
-- Pruebas: la nueva cubre 6 casos con fechas relativas; suite completa en verde (77 pruebas, 207 aserciones) el 2026-11-06.
-- Sin migraciones ni cambios de esquema.
-- Integración en `main`: se ejecuta con el add/commit/push de cierre del 2026-11-06; sin hash registrado todavía.
-- Pint: `Dashboard.php` mantiene dos avisos preexistentes (`concat_space`, `not_operator_with_successor_space`) ajenos a este cambio; el archivo de pruebas pasa.
+- **Sin tarea en curso.**
+- Última tarea cerrada: **capturar y almacenar el comentario de calificación del taller** (tarea 5 de `pendientes.md`). Implementada, probada y **confirmada por el usuario en el navegador** el 2026-11-10 («listo, todo se ve bien»).
+- Decisión del usuario (2026-11-10): el comentario se captura en la entrega del taller («Ver respuestas» del docente), **no** en la planilla de notas; se guarda con el mismo botón que la nota y el estudiante lo ve en el detalle del taller, en un bloque separado del mensaje individual.
+- Código: `app/Livewire/Docente/GrupoActividades.php` — propiedad `comentarios`; `verRespuestas()` precarga nota y comentario; `guardarNota()` valida (`nullable`, máx. 2000) y guarda en `calificaciones.comentario` (vacío → `null`); flash «La calificación se guardó correctamente.».
+- Vistas: `resources/views/components/docente/⚡grupo-actividades.blade.php` (textarea «Comentario de la calificación (opcional)» y botón «Guardar calificación») y `resources/views/components/estudiante/⚡talleres.blade.php` (bloques «Comentario de la calificación» y «Mensaje del docente»).
+- Pruebas: `tests/Feature/Docente/CalificacionComentarioTest.php` (7 pruebas, 17 aserciones; 6 de 7 fallan sin el cambio). Suite completa en verde: 84 pruebas, 224 aserciones (2026-11-10).
+- **Sin migraciones:** `calificaciones.comentario` ya existía.
+- Pint: `GrupoActividades.php` mantiene avisos de estilo preexistentes; no se reformateó el archivo completo.
+- Cambios aún en el árbol de trabajo: la integración en `main` se ejecuta con el add/commit/push de cierre del 2026-11-10; no se registra hash.
 
 ## Tarea anterior cerrada
 - El **selector de grupos en asistencia/historial y el ajuste del sidebar** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
@@ -30,7 +32,8 @@
 - Selector de grupos en asistencia e historial, distribución de ambas vistas y ajuste del sidebar docente (Historial/Tomar asistencia; sin Talleres/Mensajes). Pruebas en `tests/Feature/Docente/AsistenciaSelectorTest.php` (7); suite completa en verde (71 pruebas, 187 aserciones).
 
 ## Última tarea cerrada
-- Contador «Talleres Pendientes» del dashboard del estudiante; implementado, probado (77 pruebas, 207 aserciones) y **confirmado por el usuario en el navegador** el 2026-11-06. Integración en `main` prevista con el cierre del 2026-11-06. Sin migraciones.
+- Comentario de calificación del taller; implementado, probado (84 pruebas, 224 aserciones) y **confirmado por el usuario en el navegador** el 2026-11-10. Sin migraciones. La integración en `main` se hace con el add/commit/push de cierre del 2026-11-10. Detalle en `decisiones.md`.
+- Contador «Talleres Pendientes» del dashboard del estudiante; implementado, probado (77 pruebas, 207 aserciones), **confirmado por el usuario en el navegador** e **integrado en `main`** el 2026-11-06 (commit `c9fc988`). Sin migraciones.
 - Selector de grupos en asistencia/historial y ajuste del sidebar; implementado, probado (71 pruebas, 187 aserciones) y **confirmado por el usuario en el navegador** el 2026-11-05. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Jornada, día de clase y validación de cruces de horario; implementada, probada (64 pruebas, 164 aserciones) y **confirmada por el usuario en el navegador** el 2026-11-05. Migración aplicada en Supabase. Integrado en `main` el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.
 - Reparación de evaluaciones oficiales faltantes en los grupos legados 2, 4 y 5; ejecutada y verificada el 2026-11-05 (15 inserciones). Comando y pruebas **integrados en `main`** el 2026-11-05. Detalle en `bitacora/2026-11-05.md`.

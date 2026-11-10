@@ -1,5 +1,5 @@
 # Agentes de documentación — evaluación y prioridad
-Última actualización: 2026-11-06
+Última actualización: 2026-11-10
 
 ## Objetivo
 Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
@@ -11,7 +11,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 4. No tocar código, datos ni credenciales; no hacer commits.
 5. Necesitar cero correcciones del orquestador.
 
-## Evidencia disponible (al 2026-11-06)
+## Evidencia disponible (al 2026-11-10)
 | Modelo | Tarea | Resultado | Correcciones del orquestador |
 |---|---|---|---|
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector de grupos en la planilla de notas | Completado | 3: modelo «Free» en relevo, sección obsoleta de revisión, índice con P1 ya cerrado |
@@ -21,6 +21,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector en asistencia/historial y sidebar | Parcial: 4 archivos; faltaron `modulos/asistencia`, `modulos/panel-docente` y `relevo`, y la bitácora los daba por hechos | 3 archivos faltantes; los completó Big Pickle |
 | `opencode/big-pickle` | Completar la documentación anterior (3 archivos) | Completado; contenido correcto y etiquetas estándar | 0 correcciones detectadas |
 | `opencode/big-pickle` | Contador de talleres pendientes (2 encargos) | Completado; ambos encargos agotaron el límite de pasos | 1: faltó la fila de evidencia en este archivo (la añadió el orquestador) |
+| `opencode/big-pickle` | Comentario de calificación del taller (3 encargos) | Completado; los 3 encargos agotaron el límite de pasos | 2: repuesta la decisión del 2026-11-06 que se había perdido en `decisiones.md` y corregidas dos líneas obsoletas del contador en `entregas-talleres.md` |
 
 **Conclusión:** ninguno tiene cero errores acumulados. El titular acumula cuatro ejecuciones con correcciones y una parcial; Big Pickle tiene una tarea real limpia y una prueba controlada con errores de etiquetas. Big Pickle pasa a primera opción provisional, pero necesita una segunda tarea limpia para marcarse «recomendado».
 
