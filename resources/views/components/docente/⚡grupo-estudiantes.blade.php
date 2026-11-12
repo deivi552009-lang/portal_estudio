@@ -1011,7 +1011,7 @@
                         </p>
 
                         <p class="mt-2 text-xs leading-5 text-red-500">
-                            Esta acción eliminará también las asistencias y calificaciones asociadas al grupo.
+                            Esta acción eliminará también las asistencias, calificaciones y todos los documentos enviados y recibidos del grupo.
                             No se eliminarán las cuentas de los estudiantes.
                         </p>
 

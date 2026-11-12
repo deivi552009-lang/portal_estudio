@@ -1,5 +1,5 @@
 # Decisiones técnicas
-Última actualización: 2026-11-10
+Última actualización: 2026-11-12
 
 ## Decisiones implementadas y verificadas
 - **Autorización por nombre de rol.** `RoleMiddleware` compara el nombre en minúsculas (`app/Http/Middleware/RoleMiddleware.php`). Evita depender de IDs en las rutas; desde 2026-11-03 `GrupoEstudiantesService` también filtra por nombre de rol.
@@ -23,6 +23,7 @@
 - **Ponderación oficial P1–P4/A y personalizadas sin porcentaje.** Decisión del usuario (2026-11-10): P1 20 %, P2 20 %, P3 20 %, P4 30 % y A 10 %. `GrupoEstudiantes::crearNuevoGrupo()` ya inserta esos porcentajes dentro de la transacción del grupo. Las evaluaciones personalizadas mantienen `porcentaje = null`: no tienen porcentaje editable y no suman a la nota final, porque `CalificacionesService::notasFinales()` y `Estudiante\Dashboard` excluyen los registros con `porcentaje === null`. El código ya coincidía con la decisión; la tarea no cambió código, pruebas ni migraciones.
 - **Consulta de asistencia del estudiante, solo lectura.** Decisión del usuario (2026-11-10): el estudiante ve solo sus propios registros en `/estudiante/asistencia`, con selector de sus materias, resumen por estado y detalle por fecha. El porcentaje es `(presente + tarde) / total de registros`, redondeado; las excusas no suman como asistencia. Cubierto por `tests/Feature/Estudiante/AsistenciaTest.php` (7 pruebas).
 - **Navegación del sidebar docente al último grupo visitado.** Decisión del usuario (2026-11-10): «Historial» y «Tomar asistencia» usan el grupo de la ruta; sin grupo en la URL usan el último visitado guardado en la sesión `docente_ultimo_grupo`, validado como propio; si no, el primer grupo (año descendente, semestre, id); si no hay grupos, `docente.grupos`. Cubierto por `tests/Feature/Docente/NavegacionAsistenciaTest.php` (5 pruebas).
+- **Limpieza de archivos al eliminar un grupo.** Decisión del usuario (2026-11-12): al eliminar un grupo se borran del disco `public` los archivos de sus actividades y de las entregas de sus estudiantes. `GrupoEstudiantes::confirmarEliminacion()` recolecta las rutas antes de borrar, filtra solo las carpetas `actividades/` y `entregas/`, y elimina los archivos después de la transacción; conserva archivos de otros grupos y no referenciados. Cubierto por `tests/Feature/Docente/GrupoEliminacionArchivosTest.php` (5 pruebas).
 
 ## Estados de preferencias, propuestas y decisiones pendientes
 | Tema | Estado | Decisión o nota |
@@ -37,9 +38,6 @@
 - Una preferencia expresada **no equivale** a una funcionalidad implementada.
 - Una propuesta **no equivale** a una regla aprobada.
 - Una decisión pendiente **no debe convertirse** en una decisión por iniciativa del agente.
-
-## Otros pendientes técnicos
-- **Archivos al eliminar grupos.** Revisar si deben borrarse los archivos de actividades/entregas.
 
 ## Por confirmar
 - Verificación de correo, períodos académicos y esquema remoto de Supabase.

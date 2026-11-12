@@ -1,5 +1,5 @@
 # Pendientes
-Última actualización: 2026-11-10
+Última actualización: 2026-11-12
 
 ## Criterios de clasificación
 - `[Verificado en código]`: leído directamente en el archivo indicado.
@@ -36,7 +36,7 @@ Ninguna tarea pendiente se considera completada; este documento solo registra tr
 Sin pendientes de prioridad alta registrados.
 
 ## Prioridad media
-11. **Revisar limpieza de archivos al eliminar grupos.** `GrupoEstudiantes::confirmarEliminacion()` borra relaciones, asistencias, calificaciones, evaluaciones y grupo, pero no usa `Storage` para borrar archivos de actividades/entregas. **[Verificado en código] [Riesgo detectado]**
+12b. **Exportar a Excel la información de los grupos antes de eliminarlos.** El usuario definirá primero el modelo del documento; no implementar hasta que lo entregue. **[Diseño pendiente]**
 
 ## Prioridad de planificación
 12. **Definir períodos académicos.** Hoy solo se consulta el período `activo` al crear grupos; falta diseñar creación, asignación de grupos/estudiantes, conservación de históricos de notas y separación de información entre períodos. Diseño y reglas pendientes; no asumir criterios académicos ni implementarlos sin definirlos. **[Verificado en código] [Diseño pendiente]**
@@ -55,9 +55,10 @@ Sin pendientes de prioridad alta registrados.
 - Actualizar `docs/roadmap.md` y `docs/changelog.md`; algunas afirmaciones ya no coinciden con el código. **[Verificado en código] [Propuesta de mejora]**
 
 ## Por confirmar
-- Si se limpiarán archivos al eliminar grupos y si el acceso público es aceptable.
+- Si el acceso público a los archivos de `storage/` es aceptable.
 
 ## Resueltos
+- 2026-11-12 · antigua tarea 11: **Limpieza de archivos al eliminar grupos.** `GrupoEstudiantes::confirmarEliminacion()` recolecta `actividades.archivo` y `actividad_respuestas.archivo` antes de borrar, filtra solo rutas bajo `actividades/` o `entregas/` y las elimina del disco `public` después de la transacción; conserva archivos de otros grupos y no referenciados. El modal avisa que se eliminarán asistencias, calificaciones y todos los documentos enviados y recibidos. Pruebas en `tests/Feature/Docente/GrupoEliminacionArchivosTest.php` (5, 17 aserciones). Sin migraciones. Confirmado por el usuario en el navegador. Queda **pendiente de commit**. **[Verificado en código] [Comprobado localmente] [Reportado por el usuario]**
 - 2026-11-10 · antigua tarea 10: **Consulta de asistencia para estudiantes.** Ruta `/estudiante/asistencia`, selector de materias, resumen (presente/ausente/excusa/tarde y % de asistencia) y detalle por fecha con observación. Solo lectura y solo registros propios; grupo ajeno → 404 y sin perfil → 403. Porcentaje = (presente + tarde) / total, redondeado. Pruebas en `tests/Feature/Estudiante/AsistenciaTest.php` (7, 18 aserciones). Sin migraciones. Confirmado por el usuario en el navegador. Queda **pendiente de commit** en el árbol de trabajo; **no** integrado en `main`. **[Verificado en código] [Comprobado localmente] [Reportado por el usuario]**
 - 2026-11-10 · **Navegación del sidebar docente al último grupo.** «Historial» y «Tomar asistencia» usan el `grupoId` de la ruta; si no existe, el último grupo visitado guardado en sesión (validado como propio); si no, el primer grupo; si el docente no tiene grupos, `docente.grupos`. Pruebas en `tests/Feature/Docente/NavegacionAsistenciaTest.php` (5, 25 aserciones). Sin migraciones. Confirmado por el usuario en el navegador. Queda **pendiente de commit** en el árbol de trabajo; **no** integrado en `main`. **[Verificado en código] [Comprobado localmente] [Reportado por el usuario]**
 - 2026-11-10 · antigua tarea 8: **Ponderación definitiva y evaluaciones personalizadas.** Decisión del usuario: se confirma la ponderación P1 20 %, P2 20 %, P3 20 %, P4 30 % y A 10 %, y las evaluaciones personalizadas mantienen `porcentaje = null`: no tendrán porcentaje editable y **no suman** a la nota final. **Tarea de decisión: sin cambios de código, sin pruebas nuevas y sin migraciones**, porque el código ya coincidía (`GrupoEstudiantes::crearNuevoGrupo()` inserta P1–P4/A con esos porcentajes; `CalificacionesService::crearActividad()` crea las personalizadas con `tipo = 'personalizada'` y `porcentaje = null`; `CalificacionesService::notasFinales()` y `Estudiante\Dashboard` excluyen del cálculo las evaluaciones con `porcentaje === null`). No se consultó la base remota. Los cambios de memoria de esta tarea y las pruebas de la antigua tarea 6 siguen **pendientes de commit** en el árbol de trabajo; no están integrados en `main`. **[Verificado en código] [Reportado por el usuario]**

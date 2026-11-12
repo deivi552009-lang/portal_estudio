@@ -10,6 +10,7 @@ use App\Services\GrupoEstudiantesService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -457,10 +458,28 @@ private function actualizarGrupo(): void
         }
 
         $grupo = Grupo::query()
+            ->with('actividades.respuestas')
             ->whereHas('docente', function ($query) {
                 $query->where('user_id', Auth::id());
             })
             ->findOrFail($this->grupoEliminarId);
+
+        /*
+         * Se recogen los archivos antes de eliminar los registros.
+         * Solo se borran rutas de las carpetas que usa la aplicación.
+         */
+        $archivos = $grupo->actividades
+            ->flatMap(function ($actividad) {
+                return $actividad->respuestas
+                    ->pluck('archivo')
+                    ->prepend($actividad->archivo);
+            })
+            ->filter(fn ($archivo) => is_string($archivo) && $archivo !== '')
+            ->filter(fn ($archivo) => str_starts_with($archivo, 'actividades/')
+                || str_starts_with($archivo, 'entregas/'))
+            ->unique()
+            ->values()
+            ->all();
 
         DB::transaction(function () use ($grupo): void {
 
@@ -497,6 +516,10 @@ private function actualizarGrupo(): void
              */
             $grupo->delete();
         });
+
+        if ($archivos) {
+            Storage::disk('public')->delete($archivos);
+        }
 
         if ($this->grupoSeleccionadoId === $grupo->id) {
             $this->grupo = null;

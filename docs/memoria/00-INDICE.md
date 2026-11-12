@@ -1,5 +1,5 @@
 # Portal Estudio — Índice de memoria
-Última actualización: 2026-11-10
+Última actualización: 2026-11-12
 
 Proyecto académico Laravel 12 + Livewire para docentes y estudiantes.
 El panel docente gestiona grupos, notas, asistencia, actividades y talleres.
@@ -25,6 +25,7 @@ El panel estudiante consulta notas y talleres, y entrega respuestas; hay riesgos
 - [[bitacora/2026-11-05]] — Selector de grupos en la planilla y reparación de evaluaciones oficiales.
 - [[bitacora/2026-11-06]] — Contador de talleres pendientes en el dashboard del estudiante (sin entregados ni vencidos).
 - [[bitacora/2026-11-10]] — Comentario de la calificación del taller, pruebas de negocio de entregas, confirmación de la ponderación con personalizadas sin porcentaje, consulta de asistencia del estudiante y navegación del sidebar docente al último grupo.
+- [[bitacora/2026-11-12]] — Limpieza de archivos al eliminar grupos y aviso de documentos en el modal.
 
 ## Por confirmar
 - Esquema remoto de Supabase, ponderación académica y períodos académicos.

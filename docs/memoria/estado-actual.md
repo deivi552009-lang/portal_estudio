@@ -1,5 +1,5 @@
 # Estado actual
-Última actualización: 2026-11-10
+Última actualización: 2026-11-12
 
 ## En qué punto está
 - Los paneles docente y estudiante existen y tienen rutas protegidas por rol (`routes/web.php`).
@@ -21,9 +21,10 @@
 - 2026-11-10: confirmación de la ponderación y de las evaluaciones personalizadas (antigua tarea 8 de `pendientes.md`). Decisión del usuario: P1 20 %, P2 20 %, P3 20 %, P4 30 % y A 10 %, y las evaluaciones personalizadas se mantienen con `porcentaje = null` (sin porcentaje editable y sin sumar a la nota final). Es una **tarea de decisión: sin cambios de código, pruebas nuevas ni migraciones**, porque el código ya coincidía. No se consultó la base remota. Queda **pendiente de commit** junto con los cambios de memoria y las pruebas de la antigua tarea 6; no está integrado en `main`.
 - 2026-11-10: consulta de asistencia para estudiantes (antigua tarea 10 de `pendientes.md`). Nueva ruta `/estudiante/asistencia` (`estudiante.asistencia`) con componente `App\Livewire\Estudiante\Asistencia` y vista `resources/views/components/estudiante/⚡asistencia.blade.php`. Selector de materias inscritas, resumen por materia (presente, ausente, excusa, tarde) y detalle por fecha con estado y observación. Solo lectura y solo registros propios; porcentaje = (presente + tarde) / total de registros, redondeado; sin registros muestra `—`. Grupo ajeno → 404; usuario sin perfil de estudiante → 403. Enlaces en el sidebar y la navegación móvil. Pruebas en `tests/Feature/Estudiante/AsistenciaTest.php` (7 pruebas, 18 aserciones). Suite completa en verde: 108 pruebas, 312 aserciones. Sin migraciones. Confirmado por el usuario en el navegador; **pendiente de commit**, no integrado en `main`.
 - 2026-11-10: navegación del sidebar docente al último grupo visitado. El último grupo se guarda en la sesión (`docente_ultimo_grupo`) al montar `GrupoNotas`, `GrupoAsistencia`, `HistorialAsistencia` y `GrupoActividades` con grupo. El layout usa el grupo de la ruta; si no hay, el de sesión validando que sea del docente; si no, el primero (año descendente, semestre, id); solo si no hay grupos enlaza a `docente.grupos`. «Historial» y «Tomar asistencia» ya no caen en Grupos cuando no hay grupo en la URL. Pruebas en `tests/Feature/Docente/NavegacionAsistenciaTest.php` (5 pruebas, 25 aserciones). Suite completa en verde: 108 pruebas, 312 aserciones. Sin migraciones. Confirmado por el usuario en el navegador; **pendiente de commit**, no integrado en `main`.
+- 2026-11-12: al eliminar un grupo se borran del disco los archivos de sus actividades y entregas, después de eliminar los registros y solo para rutas de `actividades/` y `entregas/`; el modal de confirmación avisa de la eliminación de documentos enviados y recibidos. Pruebas en `tests/Feature/Docente/GrupoEliminacionArchivosTest.php` (5, 17 aserciones) y suite completa en verde (113 pruebas, 329 aserciones). Confirmado por el usuario en el navegador; pendiente de commit. Sin migraciones.
 
 ## Hallazgos priorizados
-- **Media:** al eliminar un grupo no se limpian los archivos de actividades/entregas del disco.
+Sin hallazgos priorizados registrados.
 
 ## Qué sigue
 - Definir períodos académicos, alta de docentes, panel administrativo y navegación; verificar Supabase y decidir la verificación de correo.

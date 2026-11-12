@@ -1,14 +1,14 @@
 # Relevo: sin tarea en curso
-**Tarea cerrada el 2026-11-10: consulta de asistencia del estudiante y corrección de navegación del sidebar docente.**
 
-Última actualización: 2026-11-10 · Modelo: Big Pickle / respaldos gratuitos
+Última actualización: 2026-11-12 · Modelo: Big Pickle / respaldos gratuitos
 
 ## Estado
-- **Sin tarea en curso.** Última tarea cerrada el 2026-11-10: consulta de asistencia del estudiante y corrección de navegación del sidebar docente.
-- Asistencia estudiantil: `/estudiante/asistencia`, solo lectura y solo registros propios, resumen y detalle; % = (presente + tarde) / total. Pruebas 7/18.
-- Navegación: «Historial» y «Tomar asistencia» usan el último grupo visitado (sesión) o el primero; ya no caen en Grupos. Pruebas 5/25.
-- Suite completa: 108 pruebas, 312 aserciones. Sin migraciones.
-- **Pendiente de commit:** las pruebas de la tarea 6, la decisión de la tarea 8, la asistencia estudiantil y esta corrección siguen en el árbol de trabajo; no están integradas en `main`.
+- **Sin tarea en curso.** Última tarea cerrada el 2026-11-12: limpieza de archivos al eliminar grupos.
+- `GrupoEstudiantes::confirmarEliminacion()` borra del disco los archivos de actividades y entregas del grupo después de la transacción; solo rutas de `actividades/` y `entregas/`; conserva otros grupos y no referenciados.
+- El modal avisa de la eliminación de documentos enviados y recibidos.
+- Pruebas 5/17; suite completa 113 pruebas, 329 aserciones. Sin migraciones.
+- **Pendiente de commit:** esta limpieza y su documentación siguen en el árbol de trabajo; no integradas en `main`.
+- **En pausa:** exportación a Excel de los grupos, pendiente del modelo que definirá el usuario.
 
 ## Detalle de una tarea cerrada anterior (2026-11-05)
 - El **selector de grupos en asistencia/historial y el ajuste del sidebar** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
@@ -29,6 +29,7 @@
 - Selector de grupos en asistencia e historial, distribución de ambas vistas y ajuste del sidebar docente (Historial/Tomar asistencia; sin Talleres/Mensajes). Pruebas en `tests/Feature/Docente/AsistenciaSelectorTest.php` (7); suite completa en verde (71 pruebas, 187 aserciones).
 
 ## Última tarea cerrada
+- Limpieza de archivos al eliminar grupos; implementada, probada (113/329) y confirmada por el usuario en el navegador el 2026-11-12. Sin migraciones. **Pendiente de commit.**
 - Consulta de asistencia del estudiante y navegación del sidebar al último grupo; implementadas, probadas (108/312) y confirmadas por el usuario en el navegador el 2026-11-10. Sin migraciones. **Pendiente de commit.**
 - Confirmación de ponderación y personalizadas; decidida por el usuario el 2026-11-10, sin cambios de código ni migraciones. **Pendiente de commit.**
 - Pruebas de negocio de las entregas de talleres; añadidas y en verde el 2026-11-10 (12 pruebas, 45 aserciones; suite completa 96 pruebas, 269 aserciones). Sin cambios en código de producción ni migraciones. **Pendiente de commit por indicación del usuario**.
