@@ -1,5 +1,5 @@
 # Portal Estudio — Índice de memoria
-Última actualización: 2026-11-16
+Última actualización: 2026-11-17
 
 Proyecto académico Laravel 12 + Livewire para docentes y estudiantes.
 El panel docente gestiona grupos, notas, asistencia, actividades y talleres.
@@ -13,14 +13,14 @@ El panel estudiante consulta notas, talleres, asistencia y evaluaciones digitale
 - [[agentes-documentacion]] — Evaluación y prioridad de modelos para documentar.
 - [[pendientes]] — Tareas por prioridad y hallazgos clasificados.
 - [[modulos/autenticacion-roles]] — Login, registro, perfil y control por rol.
-- [[modulos/panel-docente]] — Dashboard y accesos del docente, incluida la revisión/calificación de evaluaciones digitales.
+- [[modulos/panel-docente]] — Dashboard y accesos del docente, incluida la revisión/calificación de evaluaciones digitales: modalidad restringida a Preguntas, banner «Calificación guardada correctamente.» y traslado P1–P4 desde Revisión.
 - [[modulos/grupos-estudiantes]] — Grupos, materias e inscripción de estudiantes.
-- [[modulos/notas-calificaciones]] — Evaluaciones, matriz de notas y promedios.
+- [[modulos/notas-calificaciones]] — Evaluaciones, matriz de notas y promedios; la tabla `calificaciones` puede recibir nota oficial P1–P4 desde la revisión digital; sin cambios en `CalificacionesService` ni porcentajes.
 - [[modulos/asistencia]] — Registro e historial de asistencia.
 - [[modulos/actividades-talleres]] — Actividades, archivos y talleres.
 - [[modulos/entregas-talleres]] — Respuestas, calificación y mensajes.
-- [[modulos/quiz-parciales]] — Quiz y Parciales digitales: esquema, servicio y UI docente; Etapa 3 hasta el Paso 5.6 (auditoría realizada, cierre pendiente de aprobación); Etapa 6 (protección de borrado) y Etapa 7.1–7.7 (listado, detalle, disponibilidad, intentos, respuestas, envío definitivo, corrección automática y cálculo de nota) implementadas y probadas; migraciones de resultados aplicadas y verificadas; UI docente de revisión implementada en `/docente/quizzes/revision`; Archivo y Mixta bloqueadas; pendientes: resultados/nota al estudiante y traslado a notas oficiales P1–P4/A.
-- [[modulos/panel-estudiante]] — Dashboard, notas, talleres y evaluaciones digitales del estudiante (listado, detalle, disponibilidad, intentos, respuestas, envío definitivo y corrección en servidor, Etapa 7.1–7.7; sin resultados/nota visibles ni revisión docente).
+- [[modulos/quiz-parciales]] — Quiz y Parciales digitales: esquema, servicio y UI docente; Etapa 3 hasta el Paso 5.6 (auditoría realizada, cierre pendiente de aprobación); Etapa 6 (protección de borrado) y Etapa 7.1–7.7 (listado, detalle, disponibilidad, intentos, respuestas, envío definitivo, corrección automática y cálculo de nota) implementadas y probadas; migraciones de resultados aplicadas y verificadas; UI docente de revisión implementada en `/docente/quizzes/revision` con banner «Calificación guardada correctamente.»; rediseño del apartado del estudiante en dos paneles; estado «Con notas registradas» en `parcialesEstado()`; modalidades Archivo/Mixta deshabilitadas (borradores heredados corregidos a Preguntas); traslado de nota digital a P1–P4 implementado (automático, con confirmación si ya hay nota); pendientes: traslado a A, backfill, concurrencia, resultados/nota al estudiante.
+- [[modulos/panel-estudiante]] — Dashboard, notas, talleres y evaluaciones digitales del estudiante (listado, detalle, disponibilidad, intentos, respuestas, envío definitivo y corrección en servidor, Etapa 7.1–7.7); apartado de evaluaciones rediseñado en dos paneles con filtros Pendientes/Historial, solo lectura y modal de envío; pruebas 27 + 32; sin resultados/nota visibles.
 - [[bitacora/2026-11-02]] — Registro de esta documentación y actualización.
 - [[bitacora/2026-11-03]] — Configuración de permisos de agentes.
 - [[bitacora/2026-11-05]] — Selector de grupos en la planilla y reparación de evaluaciones oficiales.
@@ -29,6 +29,7 @@ El panel estudiante consulta notas, talleres, asistencia y evaluaciones digitale
 - [[bitacora/2026-11-12]] — Limpieza de archivos al eliminar grupos y aviso de documentos en el modal.
 - [[bitacora/2026-11-13]] — Pasos 4 y 5.1–5.5 de Quiz/Parciales: guardado/integridad/recuperación de borradores y publicación desde la UI (modalidad Preguntas).
 - [[bitacora/2026-11-16]] — Protección de borrado de digitales (Etapa 6), interfaz del estudiante con respuestas, envío y corrección (Etapa 7.1–7.7), migraciones de resultados aplicadas y verificadas, UI docente de revisión y calificación, y advertencia al reemplazar notas de parciales.
+- [[bitacora/2026-11-17]] — Rediseño del apartado del estudiante, estado «Con notas registradas», modalidades Archivo/Mixta deshabilitadas y recuperación de borradores heredados, banner de guardado en Revisión y traslado de nota a P1–P4.
 
 ## Por confirmar
 - Esquema remoto de Supabase y períodos académicos; confirmación en navegador de la advertencia de reemplazo de notas y cierre formal de las Etapas 6 y 7.

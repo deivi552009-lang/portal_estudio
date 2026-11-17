@@ -147,7 +147,8 @@ class EvaluacionesDigitalesTest extends TestCase
             ->assertSee('Lima')
             ->assertDontSee('es_correcta')
             ->assertDontSee('Correcta')
-            ->assertDontSee('wire:model');
+            ->assertDontSee('respuestasOpciones')
+            ->assertDontSee('respuestasTexto');
 
         $componente->assertViewHas(
             'detalle',
@@ -265,10 +266,9 @@ class EvaluacionesDigitalesTest extends TestCase
         $componente = Livewire::test(EvaluacionesDigitales::class)
             ->assertViewHas(
                 'evaluaciones',
-                fn ($evaluaciones) => $evaluaciones->first()['disponibilidad']['disponible'] === false
-                    && $evaluaciones->first()['disponibilidad']['etiqueta'] === 'Cerrada'
+                fn ($evaluaciones) => $evaluaciones->isEmpty()
             )
-            ->assertSee('Cerrada')
+            ->assertSee('No hay evaluaciones en esta lista.')
             ->assertDontSee('Ver detalle');
 
         $componente
@@ -562,6 +562,257 @@ class EvaluacionesDigitalesTest extends TestCase
         $this->actingAs($usuarioSinPerfil)
             ->get(route('estudiante.evaluaciones-digitales'))
             ->assertForbidden();
+    }
+
+    public function test_filtra_por_materia_y_guarda_la_ultima_seleccion(): void
+    {
+        $segundoGrupo = $this->crearGrupo(Docente::first(), 'Ciencias');
+        $segundoGrupo->estudiantes()->attach($this->estudiante->id);
+
+        $primera = $this->crearDigital(
+            $this->grupo,
+            'Evaluación de Matemáticas',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $segunda = $this->crearDigital(
+            $segundoGrupo,
+            'Evaluación de Ciencias',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $componente = Livewire::test(EvaluacionesDigitales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->assertHasNoErrors()
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$primera->id]
+            );
+
+        $componente
+            ->set('grupoSeleccionadoId', $segundoGrupo->id)
+            ->assertHasNoErrors()
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$segunda->id]
+            );
+
+        $this->assertSame(
+            $segundoGrupo->id,
+            session('estudiante_evaluaciones_ultimo_grupo')
+        );
+    }
+
+    public function test_filtro_pendientes_incluye_disponibles_y_en_curso(): void
+    {
+        $disponible = $this->crearDigital(
+            $this->grupo,
+            'Disponible sin intento',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $enCurso = $this->crearDigital(
+            $this->grupo,
+            'Intento en curso',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $enCurso->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_EN_CURSO,
+        ]);
+
+        $enviada = $this->crearDigital(
+            $this->grupo,
+            'Intento ya enviado',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $enviada->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_ENVIADA,
+            'enviada_at' => now(),
+        ]);
+
+        EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Evaluación cerrada sin intento',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-11-30',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
+            'publicada_at' => now(),
+        ]);
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->assertSet('filtroEstado', 'pendientes')
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$disponible->id, $enCurso->id]
+            );
+    }
+
+    public function test_filtro_historial_muestra_solo_intentos_enviados_o_calificados(): void
+    {
+        $enviada = $this->crearDigital(
+            $this->grupo,
+            'Intento enviado',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $enviada->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_ENVIADA,
+            'enviada_at' => now(),
+        ]);
+
+        $calificada = $this->crearDigital(
+            $this->grupo,
+            'Intento calificado',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $calificada->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            'enviada_at' => now(),
+            'calificada_at' => now(),
+        ]);
+
+        $this->crearDigital(
+            $this->grupo,
+            'Sin intento',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->call('cambiarFiltro', 'historial')
+            ->assertSet('filtroEstado', 'historial')
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$enviada->id, $calificada->id]
+            );
+    }
+
+    public function test_selecciona_una_evaluacion_y_la_muestra_en_el_panel_derecho(): void
+    {
+        $evaluacion = $this->crearDigital(
+            $this->grupo,
+            'Quiz en el panel derecho',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $pregunta = EvaluacionDigitalPregunta::create([
+            'evaluacion_digital_id' => $evaluacion->id,
+            'orden' => 1,
+            'enunciado' => 'Escribe la capital de Colombia',
+            'tipo' => EvaluacionDigitalPregunta::TIPO_ORACION,
+        ]);
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->call('seleccionarEvaluacion', $evaluacion->id)
+            ->assertHasNoErrors()
+            ->assertSet('evaluacionSeleccionadaId', $evaluacion->id)
+            ->assertSet('intentoActualId', null)
+            ->assertSee('Quiz en el panel derecho')
+            ->assertSee('Matemáticas')
+            ->assertSee('01/12/2026')
+            ->assertSee('08:00 – 09:00')
+            ->assertSee('Escribe la capital de Colombia')
+            ->assertSee('Iniciar evaluación')
+            ->assertViewHas(
+                'detalle',
+                fn ($detalle) => $detalle['id'] === $evaluacion->id
+                    && count($detalle['preguntas']) === 1
+                    && $detalle['preguntas'][0]['id'] === $pregunta->id
+            );
+    }
+
+    public function test_seleccionar_recupera_las_respuestas_de_un_intento_en_curso(): void
+    {
+        $evaluacion = $this->crearDigital(
+            $this->grupo,
+            'Intento recuperable',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $pregunta = EvaluacionDigitalPregunta::create([
+            'evaluacion_digital_id' => $evaluacion->id,
+            'orden' => 1,
+            'enunciado' => 'Elige una opción',
+            'tipo' => EvaluacionDigitalPregunta::TIPO_MULTIPLE,
+        ]);
+
+        $opcion = EvaluacionDigitalOpcion::create([
+            'pregunta_id' => $pregunta->id,
+            'texto' => 'Opción recuperada',
+            'es_correcta' => true,
+            'orden' => 1,
+        ]);
+
+        $intento = EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $evaluacion->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_EN_CURSO,
+        ]);
+
+        $intento->respuestas()->create([
+            'pregunta_id' => $pregunta->id,
+            'opcion_id' => $opcion->id,
+            'es_correcta' => null,
+        ]);
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->call('seleccionarEvaluacion', $evaluacion->id)
+            ->assertHasNoErrors()
+            ->assertSet('intentoActualId', $intento->id)
+            ->assertSet("respuestasOpciones.{$pregunta->id}", $opcion->id)
+            ->assertSee('En curso')
+            ->assertSee('Guardar respuesta')
+            ->assertSee('Enviar evaluación');
+    }
+
+    public function test_no_selecciona_una_evaluacion_de_otro_grupo(): void
+    {
+        $evaluacion = $this->crearDigital(
+            $this->grupoAjeno,
+            'Evaluación de otro grupo',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->call('seleccionarEvaluacion', $evaluacion->id)
+            ->assertHasErrors('evaluacion')
+            ->assertSet('evaluacionSeleccionadaId', null);
+    }
+
+    public function test_cambiar_de_filtro_limpia_la_seleccion(): void
+    {
+        $evaluacion = $this->crearDigital(
+            $this->grupo,
+            'Evaluación seleccionada',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->call('seleccionarEvaluacion', $evaluacion->id)
+            ->assertSet('evaluacionSeleccionadaId', $evaluacion->id)
+            ->call('cambiarFiltro', 'historial')
+            ->assertSet('evaluacionSeleccionadaId', null)
+            ->assertSet('filtroEstado', 'historial')
+            ->assertViewHas('detalle', null);
     }
 
     private function fijarHoraUtc(string $hora): void

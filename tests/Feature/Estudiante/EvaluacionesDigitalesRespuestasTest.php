@@ -842,7 +842,17 @@ class EvaluacionesDigitalesRespuestasTest extends TestCase
     public function test_recupera_el_intento_enviado_en_solo_lectura(): void
     {
         $digital = $this->crearDigital();
+        $pregunta = $this->crearPregunta(
+            $digital,
+            EvaluacionDigitalPregunta::TIPO_ORACION
+        );
+
         $componente = $this->iniciar($digital);
+
+        $componente
+            ->set("respuestasTexto.{$pregunta->id}", 'Mi respuesta guardada')
+            ->call('guardarRespuesta', $pregunta->id)
+            ->assertHasNoErrors();
 
         $componente
             ->call('solicitarEnvio')
@@ -858,12 +868,13 @@ class EvaluacionesDigitalesRespuestasTest extends TestCase
             ->assertHasNoErrors()
             ->assertSee('Solo lectura')
             ->assertSee('Enviada')
+            ->assertSee('Mi respuesta guardada')
             ->assertDontSee('Guardar respuesta')
             ->assertDontSee('Enviar evaluación')
             ->assertViewHas(
                 'intentoActual',
                 fn ($intento) => $intento['editable'] === false
-                    && $intento['preguntas'] === []
+                    && count($intento['preguntas']) === 1
             );
     }
 

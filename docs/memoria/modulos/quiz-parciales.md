@@ -1,19 +1,19 @@
 # Quiz / Parciales
-Última actualización: 2026-11-16
+Última actualización: 2026-11-17
 
 ## Qué hace
-Módulo de evaluaciones digitales para docente y estudiante. El docente crea Quiz (evaluación personalizada) y Parciales (P1–P4 oficiales del grupo), construye preguntas, guarda borradores, publica desde la interfaz y consulta las publicadas en solo lectura. El estudiante ve sus evaluaciones publicadas, consulta la disponibilidad, inicia o recupera su intento, responde pregunta por pregunta, guarda cada respuesta y envía el intento de forma definitiva con confirmación. El sistema corrige automáticamente las preguntas objetivas y deja las abiertas pendientes de valoración docente; cuando no quedan pendientes calcula la nota sobre 5 y marca el intento como calificado. El docente revisa y califica las respuestas abiertas desde la UI de revisión. La publicación funciona para modalidad Preguntas; Archivo y Mixta siguen bloqueadas. La vista de resultados/nota para el estudiante y el traslado a calificaciones oficiales siguen pendientes; no se escriben calificaciones oficiales. Las siete migraciones del módulo están aplicadas en Supabase/PostgreSQL.
+Módulo de evaluaciones digitales para docente y estudiante. El docente crea Quiz (evaluación personalizada) y Parciales (P1–P4 oficiales del grupo), construye preguntas, guarda borradores, publica desde la interfaz y consulta las publicadas en solo lectura. El estudiante ve sus evaluaciones publicadas, consulta la disponibilidad, inicia o recupera su intento, responde pregunta por pregunta, guarda cada respuesta y envía el intento de forma definitiva con confirmación. El sistema corrige automáticamente las preguntas objetivas y deja las abiertas pendientes de valoración docente; cuando no quedan pendientes calcula la nota sobre 5 y marca el intento como calificado. El docente revisa y califica las respuestas abiertas desde la UI de revisión. La publicación funciona para modalidad Preguntas; Archivo y Mixta siguen bloqueadas (deshabilitadas con «(próximamente)»). La vista de resultados/nota para el estudiante sigue pendiente. El traslado de la nota digital a la nota oficial P1–P4 del mismo grupo y estudiante queda autorizado y se ejecuta al guardar una calificación en `/docente/quizzes/revision` (solo Parciales vinculados a P1–P4; no aplica a Quiz personalizados ni a A). La vista del estudiante se rediseñó en dos paneles (filtros/lista a la izquierda, evaluación seleccionada a la derecha); el detalle está en `modulos/panel-estudiante.md`. Las siete migraciones del módulo están aplicadas en Supabase/PostgreSQL.
 
 ## Estado
 **En progreso — Etapa 3 implementada hasta el Paso 5.5; Paso 5.6 con auditoría y correcciones hechas, cierre formal pendiente de aprobación; Etapas 6 y 7.1–7.7 implementadas; interfaz docente de revisión implementada (ruta `/docente/quizzes/revision`).** Etapas 1–3 aprobadas; Pasos 5.1–5.5 implementados y verificados; Etapa 5 parcialmente implementada en el servicio (7.7) y con UI de revisión.
 - Etapa 1 (esquema y modelos): aprobada. Migraciones aplicadas en Supabase/PostgreSQL.
 - Etapa 2 (servicio de publicación): aprobada.
 - Etapa 3 (interfaz docente, `/docente/quizzes`): **Paso 4 cerrado y confirmado por el usuario el 2026-11-13** (guardado, integridad y recuperación de borradores). **Pasos 5.1–5.5 implementados y verificados**: publicación para modalidad Preguntas, huella de versión, publicación real, vínculo íntegro, estado publicado y solo lectura integral. **Paso 5.6: auditoría realizada; hallazgos de Pint y documentación corregidos, cierre pendiente de verificación final y aprobación del usuario.**
-- Etapa 4 (numeración anterior de la interfaz del estudiante; hoy Etapa 7): 7.1–7.7 implementadas en el árbol de trabajo; sin cierre formal.
-- Etapa 5 (revisión/calificación): corrección automática y calificación manual de abiertas implementadas en el servicio (7.7) e interfaz docente de revisión implementada (`/docente/quizzes/revision`); falta visualización de resultados para el estudiante y traslado a calificaciones oficiales. Sin cierre formal.
+- Etapa 4 (numeración anterior de la interfaz del estudiante; hoy Etapa 7): 7.1-7.7 implementadas y probadas; sin cierre formal.
+- Etapa 5 (revisión/calificación): corrección automática y calificación manual de abiertas implementadas en el servicio (7.7) e interfaz docente de revisión implementada (`/docente/quizzes/revision`); traslado de la nota digital a la nota oficial P1–P4 del mismo grupo y estudiante implementado al guardar en `/docente/quizzes/revision` (autorizado 2026-11-17). Falta visualización de resultados para el estudiante y traslado a A. Sin cierre formal.
 - Etapa 6 (archivos privados, seguridad, protección de borrado): **protección de borrado implementada y probada** (2026-11-16); archivos privados y seguridad restantes, pendientes. La revisión 6.3 quedó «aprobado con observaciones», sin aprobación formal registrada.
-- Etapa 7 (interfaz del estudiante): **7.1–7.7 implementadas y probadas en el árbol de trabajo** (listado y detalle, disponibilidad, inicio y recuperación de intento, respuestas, envío definitivo, corrección automática y preparación de calificación manual). Sin confirmación del usuario en navegador ni cierre formal.
-Las siete migraciones del módulo (`2026_11_12_000001` a `000005` y `2026_11_16_000001`/`000002`) están **Ran** en PostgreSQL/Supabase; las cinco tablas y las columnas de resultados se verificaron. No quedan migraciones pendientes del módulo. La exportación a Excel de grupos sigue en pausa, sin implementar.
+- Etapa 7 (interfaz del estudiante): **7.1-7.7 implementadas y probadas** (listado y detalle, disponibilidad, inicio y recuperación de intento, respuestas, envío definitivo, corrección automática y preparación de calificación manual). Sin confirmación del usuario en navegador ni cierre formal.
+- Ajustes del 2026-11-17 cerrados: rediseño de dos paneles en la vista del estudiante; estado «Con notas registradas» (`con_notas`) al crear parciales; restricción de modalidades Archivo/Mixta (deshabilitadas; solo Preguntas); traslado de la nota digital a la nota oficial P1–P4 del mismo grupo y estudiante al guardar en `/docente/quizzes/revision` (autorizado por el usuario el 2026-11-17). No se modificaron datos ni Supabase durante la verificación.
 
 ## Archivos clave
 - Migraciones: `2026_11_12_000001_create_evaluaciones_digitales_table.php` … `2026_11_12_000005_create_evaluacion_digital_respuestas_table.php` (Etapa 1); `2026_11_16_000001_add_resultados_to_evaluacion_digital_respuestas_table.php` y `2026_11_16_000002_add_resultados_to_evaluacion_digital_intentos_table.php` (Pasos 7.5–7.7). **Todas aplicadas en Supabase/PostgreSQL.**
@@ -21,7 +21,8 @@ Las siete migraciones del módulo (`2026_11_12_000001` a `000005` y `2026_11_16_
 - Servicios: `app/Services/EvaluacionesDigitalesService.php` (crear, actualizar, publicar); `app/Services/RespuestasDigitalesService.php` (guardar respuestas, envío definitivo); `app/Services/CorreccionDigitalService.php` (corrección automática, calificación manual de abiertas, `calcularNotaSugerida()` y `guardarValoraciones()`).
 - Componente docente: `app/Livewire/Docente/QuizParciales.php` y `resources/views/components/docente/⚡quiz-parciales.blade.php`.
 - Ruta: `/docente/quizzes` (`docente.quizzes`), protegida por `auth` + `role:docente`; enlace en el sidebar docente.
-- Componente docente de revisión: `app/Livewire/Docente/RevisionQuizParciales.php` y `resources/views/components/docente/⚡revision-quiz-parciales.blade.php`.
+- Servicio de traslado: `app/Services/TrasladoNotaParcialService.php` (`destino()` y `guardar()`), con modal de confirmación en la vista de revisión.
+- Componente docente de revisión: `app/Livewire/Docente/RevisionQuizParciales.php` y `resources/views/components/docente/⚡revision-quiz-parciales.blade.php` (añadidos `trasladoPendiente`, `confirmarTrasladoNota`, `cancelarTrasladoNota` y banner `session()->flash('mensaje', 'Calificación guardada correctamente.')`).
 - Ruta de revisión: `GET /docente/quizzes/revision` (`docente.quizzes.revision`), protegida por `auth` + `role:docente`; enlace «Revisión de calificaciones» desde la página de creación (`/docente/quizzes`).
 - Componente estudiante: `app/Livewire/Estudiante/EvaluacionesDigitales.php` y `resources/views/components/estudiante/⚡evaluaciones-digitales.blade.php`.
 - Ruta estudiante: `GET /estudiante/evaluaciones-digitales` (`estudiante.evaluaciones-digitales`), protegida por `auth` + `role:estudiante`; enlace «Evaluaciones» en `resources/views/layouts/estudiante.blade.php` (sidebar y navegación móvil).
@@ -43,19 +44,19 @@ Columnas de resultados (migraciones del 2026-11-16, aplicadas en Supabase/Postgr
 
 ## Flujo actual (docente hasta el Paso 5.5; estudiante hasta 7.7)
 1. El docente entra a `/docente/quizzes` y ve sus grupos propios.
-2. Elige Quiz o Parcial; en Parcial, P1–P4 oficiales con estados: publicada, borrador, duplicada, sin oficial.
+2. Elige Quiz o Parcial; en Parcial, P1–P4 oficiales con estados: publicada, borrador, duplicada, sin oficial y «Con notas registradas» (`con_notas`, ámbar) cuando existe al menos una nota en `calificaciones` de esa evaluación oficial del mismo grupo/materia (nota `0.00` cuenta; `nota = NULL` o inexistente no cuenta). El parcial sigue siendo seleccionable; `sin_oficial`, `duplicada`, `publicada` y `borrador` conservan prioridad sobre `con_notas`. No revisa otros grupos ni materias ni crea/modifica registros.
 3. Define título, fecha, horas y modalidad (oración, múltiple 2–6, verdadero/falso); paso 2: constructor de preguntas con opciones y una correcta.
 4. Puede confirmar, cancelar la evaluación completa, eliminar preguntas y ver la vista previa.
 5. Los Quiz crean una `Evaluacion` personalizada con `porcentaje=null`; los Parciales reutilizan la oficial P1–P4 sin crear otra.
 6. El servicio crea/actualiza borradores y publica: transacciones, `lockForUpdate`, idempotencia; la validación completa se exige al publicar (los borradores permiten preguntas incompletas); `es_correcta` se normaliza desde el índice; publicar no duplica.
-7. **Guarda borradores y publica desde la UI** (Pasos 4–5): configuración + preguntas con firma HMAC, grupo bloqueado al editar, detección de duplicados e indicador de cambios sin guardar. La solicitud de publicación se prepara con una huella de versión; «Publicar ahora» ejecuta la publicación real para modalidad Preguntas. Las publicadas aparecen en una sección aparte y se abren en solo lectura. Archivo y Mixta siguen bloqueadas y no hay carga de archivos; en esa etapa no existía interfaz de estudiante, que hoy corresponde a la Etapa 7 hasta el Paso 7.7.
-8. **Estudiante — listado y detalle (7.2).** Entra a `/estudiante/evaluaciones-digitales` y ve solo evaluaciones publicadas de grupos donde está inscrito. El detalle muestra la pregunta y sus opciones sin `es_correcta`; borradores, evaluaciones de otro grupo y accesos ajenos se bloquean.
+7. **Guarda borradores y publica desde la UI** (Pasos 4–5): configuración + preguntas con firma HMAC, grupo bloqueado al editar, detección de duplicados e indicador de cambios sin guardar. La solicitud de publicación se prepara con una huella de versión; «Publicar ahora» ejecuta la publicación real para modalidad Preguntas. Las publicadas aparecen en una sección aparte y se abren en solo lectura. Archivo y Mixta siguen bloqueadas: en el formulario están deshabilitadas con «(próximamente)» y una nota «Por ahora solo está disponible la modalidad Preguntas»; `generarConfiguracion()` rechaza en servidor modalidades distintas de Preguntas con ese mismo mensaje; como `guardarBorrador()` llama a `generarConfiguracion()`, un borrador heredado en Archivo/Mixta debe cambiarse a Preguntas para poder guardarse. Al publicar un borrador heredado en Archivo/Mixta, el mensaje nombra la modalidad y guía: «Vuelve a configuración, elige Preguntas y guarda el borrador». Se probó la recuperación de un borrador mixto a Preguntas hasta publicarlo. La publicación sigue siendo en dos pasos: confirmar y luego pulsar «Publicar ahora». No hay carga de archivos; en esa etapa no existía interfaz de estudiante, que hoy corresponde a la Etapa 7 hasta el Paso 7.7.
+8. **Estudiante — listado y detalle (7.2).** Entra a `/estudiante/evaluaciones-digitales` y ve solo evaluaciones publicadas de grupos donde está inscrito. La vista se rediseñó en dos paneles: filtros de materia/grupo, filtro Pendientes (por defecto)/Historial y lista a la izquierda; evaluación seleccionada a la derecha. No hay modal para el examen completo; el modal de confirmación de envío se conserva. El detalle está en `modulos/panel-estudiante.md`. El detalle muestra la pregunta y sus opciones sin `es_correcta`; borradores, evaluaciones de otro grupo y accesos ajenos se bloquean.
 9. **Estudiante — disponibilidad (7.3).** En `America/Bogota`, sin tolerancia: inicio inclusivo y cierre exclusivo. Estados Pendiente, Disponible y Cerrada; una ventana inválida muestra «No disponible». El control se aplica en listado, detalle e inicio de intento.
 10. **Estudiante — inicio y recuperación (7.4).** Al iniciar, dentro de una transacción, se crea o recupera un único intento `en_curso` por estudiante y evaluación; solo se accede al intento propio. «Cerrar» solo cierra la vista.
 11. **Estudiante — respuestas (7.5).** Captura y guardado de respuestas por pregunta, sin autoguardado: `RespuestasDigitalesService::guardar()` valida intento `en_curso`, pregunta de la evaluación del intento, opción de la pregunta, tipo, `trim`, vacío y máximo 5.000 caracteres; transacción, `lockForUpdate()` y `updateOrCreate` por `(intento_id, pregunta_id)`; `es_correcta` queda `null`; recuperación al abrir el intento. El estudiante no recibe `es_correcta`.
 12. **Estudiante — envío definitivo (7.6).** `RespuestasDigitalesService::enviar()` cambia a `enviada`, registra `enviada_at`, bloquea y no permite segundo envío; `abrirIntento`/`iniciarIntento` respetan la ventana. Después del envío la vista queda en solo lectura y no permite modificar respuestas. No hay envío automático al cierre.
 13. **Corrección y calificación (7.7).** `CorreccionDigitalService::corregir()` procesa solo intentos `enviada`, no reprocesa `calificada`, rechaza `en_curso`, bloquea con `lockForUpdate()` y usa transacción. Objetivas: correcta 1 punto, incorrecta 0, sin responder 0 sin crear fila. Abiertas respondidas sin valorar: `puntos_obtenidos = null` y pendientes; estado `enviada`, nota `null`. Abiertas sin responder: 0 puntos, sin fila ni pendiente. `calificarAbierta()` guarda valoración entera 0–10, `puntos_obtenidos = valoracion / 10`, `revisada_por`, `revisada_at`; valoración 0 queda revisada. Solo el docente responsable del grupo; solo intentos `enviada`; solo respuestas abiertas de esa evaluación. `respuestasAbiertas()` devuelve las abiertas al docente responsable. Fórmula: `nota = (suma de puntos / total de preguntas) * 5`, redondeo final a 2 decimales; suma en décimas enteras. Si hay pendientes, `nota = null`; si no hay pendientes y hay preguntas, estado `calificada`. Sin abiertas, calificación automática (`calificada_por` null); si la última revisión la hace el docente, `calificada_por` es ese docente. La corrección se ejecuta después del envío, en transacción independiente; si falla, el intento queda `enviada` y se puede reintentar.
-14. **Revisión docente (UI).** Ruta `GET /docente/quizzes/revision` (`docente.quizzes.revision`), componente `RevisionQuizParciales` y vista `⚡revision-quiz-parciales.blade.php`; enlace «Revisión de calificaciones» desde `/docente/quizzes`. Panel izquierdo: grupos/materias del docente, filtro Pendientes (por defecto) e Historial, lista de estudiantes, última materia en sesión `docente_revision_ultimo_grupo`. Panel derecho: examen del estudiante, preguntas objetivas en consulta, abiertas con selector 0–10, nota sugerida en vivo (`calcularNotaSugerida()`), bloqueo de guardado si hay pendientes y botón Guardar calificación (`guardarValoraciones()`). `guardarValoraciones()` permite `enviada` y `calificada` solo al docente responsable; en intentos `calificada` se pueden modificar valoraciones, actualizando `calificada_por`/`calificada_at` y `revisada_por`/`revisada_at`, sin crear otro intento. `corregir()` sigue sin reprocesar automáticamente `calificada`. No se escriben notas en P1–P4/A ni en `calificaciones`.
+14. **Revisión docente (UI).** Ruta `GET /docente/quizzes/revision` (`docente.quizzes.revision`), componente `RevisionQuizParciales` y vista `⚡revision-quiz-parciales.blade.php`; enlace «Revisión de calificaciones» desde `/docente/quizzes`. Panel izquierdo: grupos/materias del docente, filtro Pendientes (por defecto) e Historial, lista de estudiantes, última materia en sesión `docente_revision_ultimo_grupo`. Panel derecho: examen del estudiante, preguntas objetivas en consulta, abiertas con selector 0–10, nota sugerida en vivo (`calcularNotaSugerida()`), bloqueo de guardado si hay pendientes y botón Guardar calificación (`guardarValoraciones()`). `guardarValoraciones()` permite `enviada` y `calificada` solo al docente responsable; en intentos `calificada` se pueden modificar valoraciones, actualizando `calificada_por`/`calificada_at` y `revisada_por`/`revisada_at`, sin crear otro intento. `corregir()` sigue sin reprocesar automáticamente `calificada`. Al guardar una calificación se muestra un banner verde superior con «Calificación guardada correctamente.» mediante `session()->flash('mensaje', ...)`. No se escriben notas en P1–P4/A ni en `calificaciones` por la revisión en sí; el traslado a la nota oficial se ejecuta por `TrasladoNotaParcialService` (ver sección «Traslado de nota a P1–P4»).
 
 ## Paso 4 — guardado, integridad y recuperación de borradores (2026-11-13)
 Cerrado y confirmado por el usuario el 2026-11-13. Archivos: `app/Livewire/Docente/QuizParciales.php`, `resources/views/components/docente/⚡quiz-parciales.blade.php` y `tests/Feature/Docente/QuizParcialesBorradoresTest.php`. No se modificaron servicios, modelos, migraciones, rutas, layouts, `GrupoNotas`, `CalificacionesService`, `GrupoEstudiantes` ni otros módulos.
@@ -85,7 +86,7 @@ Implementada y probada; no modifica la lógica de publicación.
 - **Cierre.** La revisión 6.3 quedó «aprobado con observaciones»; no consta aprobación formal. **[Por confirmar]**
 
 ## Etapa 7 — interfaz del estudiante (2026-11-16)
-Implementada hasta 7.7 en el árbol de trabajo; sin confirmación del usuario en navegador ni cierre formal.
+Implementada hasta 7.7 y con el rediseño de dos paneles; sin confirmación del usuario en navegador ni cierre formal.
 
 - **7.1 Inspección.** Antes no existían listado, detalle, intentos, respuestas, corrección ni calificación de evaluaciones digitales en la vista del estudiante.
 - **7.2 Listado y detalle.** `app/Livewire/Estudiante/EvaluacionesDigitales.php` y `resources/views/components/estudiante/⚡evaluaciones-digitales.blade.php`; ruta `GET /estudiante/evaluaciones-digitales` (`estudiante.evaluaciones-digitales`), con `auth` + `role:estudiante`. Enlace «Evaluaciones» en `resources/views/layouts/estudiante.blade.php` (sidebar y navegación móvil). Lista solo `estado = publicada` de grupos donde el estudiante está inscrito. El detalle selecciona pregunta y opciones sin `es_correcta`; no expone respuestas correctas. Borradores, evaluaciones de otro grupo y accesos ajenos se bloquean. Pruebas: las primeras 5 del archivo (5 / 22).
@@ -123,6 +124,14 @@ Implementado y probado; sin cierre formal.
 - **Limitaciones.** No hay vista de resultados/nota para el estudiante; un intento `calificada` no se recalifica; si falla la corrección tras el envío no hay botón/comando de reintento. La interfaz docente de revisión está implementada (`/docente/quizzes/revision`).
 - **Pruebas.** `tests/Feature/Services/CorreccionDigitalServiceTest.php` 22 / 88.
 
+## Traslado de nota a P1–P4 (2026-11-17)
+Autorizado por el usuario el 2026-11-17. Al guardar una calificación en `/docente/quizzes/revision`, la nota digital se escribe automáticamente en la nota oficial P1–P4 del mismo grupo y estudiante, solo para evaluaciones digitales de tipo Parcial vinculadas a una evaluación oficial P1–P4 del mismo grupo. No aplica a Quiz personalizados ni a A.
+
+- **Servicio.** Nuevo `app/Services/TrasladoNotaParcialService.php` con `destino()` y `guardar()`.
+- **Componente.** `RevisionQuizParciales` añade `trasladoPendiente`, `confirmarTrasladoNota` y `cancelarTrasladoNota`; la vista de revisión añade el modal de confirmación.
+- **Reglas.** Nota 0–5 con 2 decimales; se guarda en `calificaciones` con `updateOrCreate` por `(evaluacion_id, estudiante_id)`, sin duplicar. Si el parcial no tiene nota oficial, se escribe automáticamente. Si ya existe nota (incluido `0.00`) y difiere, se muestra un modal con nota actual/nota digital para conservar o reemplazar; si coincide, no se reescribe. Cancelar conserva la nota oficial. La confirmación revalida el intento y el docente responsable. No se modifica `CalificacionesService`, la planilla ni los porcentajes. La planilla muestra la nota porque lee `calificaciones`.
+- **Banner.** Al guardar una calificación se muestra un banner verde superior con «Calificación guardada correctamente.» mediante `session()->flash('mensaje', ...)`.
+
 ## Decisiones aprobadas para el módulo (2026-11-12 y 2026-11-13)
 Implementadas hasta el Paso 5.5 de la Etapa 3 y, en Etapas 6–7, solo las reglas verificadas abajo (sin aprobación formal):
 - Tablas separadas para evaluaciones digitales, preguntas, opciones, intentos y respuestas; no se reutilizan `actividades` ni `actividad_respuestas`.
@@ -142,7 +151,7 @@ Decisiones aprobadas para la revisión docente (2026-11-16, por el usuario):
 - El docente responsable del grupo puede modificar valoraciones de intentos `calificada` (edición histórica permitida); se actualizan `calificada_por`/`calificada_at` y `revisada_por`/`revisada_at`, sin crear otro intento.
 - `guardarValoraciones()` permite estados `enviada` y `calificada`, solo al docente responsable.
 - `corregir()` sigue sin reprocesar automáticamente un intento `calificada`.
-- No se escriben notas en P1–P4/A ni en `calificaciones`.
+- Traslado autorizado por el usuario el 2026-11-17: al guardar en `/docente/quizzes/revision`, la nota digital se escribe automáticamente en la nota oficial P1–P4 del mismo grupo y estudiante, solo para Parciales vinculados a P1–P4; no aplica a Quiz personalizados ni a A. Nota 0–5 con 2 decimales, `updateOrCreate` por `(evaluacion_id, estudiante_id)` sin duplicar. Si no hay nota oficial, se escribe automáticamente; si existe (incluido `0.00`) y difiere, modal para conservar o reemplazar; si coincide, no se reescribe. Cancelar conserva la nota oficial; la confirmación revalida el intento y el docente responsable. No se modifica `CalificacionesService`, la planilla ni los porcentajes. El cero cuenta como nota existente.
 - Cada pregunta vale 1 punto.
 - La nota se calcula como `(suma de puntos / total de preguntas) * 5`, con redondeo final a 2 decimales (suma en décimas enteras, sin redondear antes).
 - La valoración docente de una respuesta abierta es entera de 0 a 10; `puntos_obtenidos = valoracion / 10`.
@@ -150,7 +159,7 @@ Decisiones aprobadas para la revisión docente (2026-11-16, por el usuario):
 - Una respuesta abierta pendiente de valoración tiene `puntos_obtenidos = null`.
 - Una respuesta abierta sin responder aporta 0 puntos, sin fila y sin pendiente.
 - La corrección se ejecuta después del envío, en transacción independiente; si falla, el intento queda `enviada` y se puede reintentar.
-- No se escriben calificaciones oficiales (P1–P4/A ni ponderación final); la nota queda en el intento digital.
+- Traslado de resultados a P1–P4/A y a `calificaciones`: implementado para Parciales vinculados a P1–P4 al guardar en `/docente/quizzes/revision` (autorizado 2026-11-17); la nota queda también en el intento digital. No aplica a Quiz personalizados ni a A; el traslado a A sigue pendiente.
 
 Reglas implementadas en Etapas 6 y 7 (2026-11-16) — **no son decisiones nuevas aprobadas por el usuario**:
 - Disponibilidad en `America/Bogota` sin tolerancia, con inicio inclusivo y cierre exclusivo (7.3).
@@ -161,7 +170,7 @@ La aprobación formal del cierre de las Etapas 6 y 7 está **por confirmar**.
 
 Pendientes de implementar (Etapa 5 restante y 7.8+):
 - Visualización de resultados/nota al estudiante (no implementada).
-- Traslado de resultados a P1–P4/A y a calificaciones oficiales (no implementado; decisión pendiente).
+- Traslado de la nota digital a P1–P4: implementado para Parciales vinculados a P1–P4 al guardar en `/docente/quizzes/revision` (autorizado 2026-11-17). El traslado a A sigue pendiente; no hay backfill automático (los intentos ya calificados deben volver a guardarse para trasladar).
 - Archivos del módulo en almacenamiento privado (Etapa 6 restante).
 - Confirmación en navegador de la interfaz de revisión y de la del estudiante; validación de concurrencia real en PostgreSQL.
 La ponderación de las personalizadas (`porcentaje = null`, sin sumar a la nota final) está aprobada e implementada en el módulo de notas; aquí los Quiz crean `Evaluacion` con ese patrón.
@@ -169,17 +178,17 @@ La ponderación de las personalizadas (`porcentaje = null`, sin sumar a la nota 
 ## Pruebas
 - `tests/Feature/Docente/EvaluacionDigitalSchemaTest.php` — 12 pruebas, 24 aserciones (esquema).
 - `tests/Feature/Services/EvaluacionDigitalBorradorTest.php` (13), `EvaluacionDigitalPublicacionTest.php` (19) y `EvaluacionDigitalValidacionTest.php` (15).
-- `tests/Feature/Docente/QuizParcialesTest.php` (18 pruebas / 72 aserciones) y `QuizParcialesPreguntasTest.php` (16 / 88).
+- `tests/Feature/Docente/QuizParcialesTest.php` — 26 casos (2026-11-17), incluidos 7 de estado «Con notas registradas» y modalidad; `QuizParcialesPreguntasTest.php` (16 / 88).
 - `tests/Feature/Docente/QuizParcialesBorradoresTest.php` — 67 pruebas, 488 aserciones, PASS (Paso 4). Incluye 6 pruebas de normalización de títulos duplicados (mayúsculas, espacios repetidos, espacios al inicio/final, actualización duplicada, actualización del mismo borrador y títulos diferentes) y pruebas de conversión de pregunta actual, manipulación estructural, recuperación de múltiple/verdadero-falso/oración, borrador sin preguntas, grupo bloqueado, duplicados al actualizar, rechazos de servicio/autorización y reintento.
-- `tests/Feature/Docente/QuizParcialesPublicacionTest.php` (40), `QuizParcialesPublicadasTest.php` (12 / 135) y `EvaluacionDigitalPublicacionTest.php` (19): conjunto de publicación con **71 pruebas / 639 aserciones, PASS** (cifra histórica del 2026-11-13).
+- `tests/Feature/Docente/QuizParcialesPublicacionTest.php` — 41 casos (2026-11-17): bloqueo de modalidades Archivo/Mixta, recuperación de borrador mixto a Preguntas hasta publicarlo, no publicación si cambia la modalidad. `QuizParcialesPublicadasTest.php` (12 / 135) y `EvaluacionDigitalPublicacionTest.php` (19): conjunto de publicación con **71 pruebas / 639 aserciones, PASS** (cifra histórica del 2026-11-13).
 - Etapa 6 (6.4): `tests/Feature/Docente/GrupoEliminacionArchivosTest.php` (12 / 56) y `GrupoNotasEliminacionEvaluacionTest.php` (3 / 15), PASS.
-- Etapa 7: `tests/Feature/Estudiante/EvaluacionesDigitalesTest.php`, PASS; desglose 7.2 (5 / 22), 7.3 (9 / 43) y 7.4 (16 / 81 al cerrar; archivo final 20 / 107).
-- Respuestas (7.5): `tests/Feature/Estudiante/EvaluacionesDigitalesRespuestasTest.php` 32 / 207, PASS.
+- Etapa 7: `tests/Feature/Estudiante/EvaluacionesDigitalesTest.php` — 27 casos (2026-11-17); desglose 7.2 (5 / 22), 7.3 (9 / 43) y 7.4 (16 / 81 al cerrar; archivo final 20 / 107).
+- Respuestas (7.5): `tests/Feature/Estudiante/EvaluacionesDigitalesRespuestasTest.php` — 32 / 207, PASS.
 - Corrección (7.7): `tests/Feature/Services/CorreccionDigitalServiceTest.php` 22 / 88, PASS.
-- Revisión docente: `tests/Feature/Docente/RevisionQuizParcialesTest.php` 15 / 56, PASS.
-- Suite completa el 2026-11-16: **432 pruebas / 2239 aserciones, PASS**.
+- Revisión docente: `tests/Feature/Docente/RevisionQuizParcialesTest.php` — 22 / 90, PASS (2026-11-17), con 7 pruebas nuevas del traslado: sin nota previa, Quiz sin traslado, confirmación con nota existente, cancelación, nota `0.00`, nota coincidente y exclusión de A.
+- Suite completa el 2026-11-17: **455 pruebas / 2344 aserciones, PASS**.
 - `php -l`: sin errores en los archivos PHP del módulo. Pint: correcto; `view:cache` correcto. Verificación en PostgreSQL real: `/docente/quizzes` y `/docente/quizzes/revision` devolvieron HTTP 200; sin errores nuevos en logs.
-- Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo.
+- Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo. Sin migraciones nuevas ni cambios de esquema en estos ajustes.
 
 ## Riesgos y dependencias
 - Protección de borrado de grupos y evaluaciones con contenido digital: **resuelta en Etapa 6 (2026-11-16)**. Bloquea con mensaje amigable, no borra ni archiva digitales y no existe UI de archivado. **[Implementado]**
@@ -191,9 +200,16 @@ La ponderación de las personalizadas (`porcentaje = null`, sin sumar a la nota 
 - SQLite no valida concurrencia real (sin `lockForUpdate` efectivo); la idempotencia está probada secuencialmente; la concurrencia definitiva debe validarse en PostgreSQL. **[Verificación pendiente]**
 - Paso 5.6: auditoría y correcciones de Pint/documentación hechas; el cierre formal y la aprobación del usuario siguen pendientes. **[Verificación pendiente]**
 - Archivos marcados como privados en decisiones pero los talleres aún usan `asset('storage/...')` público; la protección de archivos del módulo es alcance de Etapa 6. **[Diseño pendiente]**
-- Migraciones de 7.7 (y las de Etapa 1) **aplicadas** en Supabase/PostgreSQL; el esquema de resultados existe en la base. **[Verificado]**
-- La interfaz docente de revisión está implementada (`/docente/quizzes/revision`); falta la visualización de resultados/nota para el estudiante y el traslado a P1–P4/A. **[Pendiente]**
-- Sin traslado de resultados a P1–P4/A ni a `calificaciones`; la nota queda solo en el intento digital. **[Pendiente]**
+- Migraciones de 7.7 (y las de Etapa 1) **aplicadas** en Supabase/PostgreSQL; el esquema de resultados existe en la base. En los ajustes del 2026-11-17 no hubo migraciones nuevas ni cambios de esquema. **[Verificado]**
+- La interfaz docente de revisión está implementada (`/docente/quizzes/revision`); falta la visualización de resultados/nota para el estudiante. El traslado a P1–P4 está implementado (autorizado 2026-11-17); el traslado a A sigue pendiente. **[Pendiente]**
+- Traslado de la nota digital a P1–P4 implementado para Parciales vinculados a P1–P4 (autorizado 2026-11-17); la nota queda también en el intento digital. El traslado a A y el backfill automático siguen pendientes. **[Pendiente]**
+- Sin traslado a A: no soportado por `TrasladoNotaParcialService`. **[Limitación]**
+- Sin backfill automático: los intentos ya calificados antes de este cambio requieren volver a guardar la calificación para trasladar la nota. **[Limitación]**
+- Concurrencia PostgreSQL no probada para el traslado ni para el estado `con_notas`. **[Verificación pendiente]**
+- Confirmación en navegador del traslado pendiente. **[Verificación pendiente]**
+- Resultados/nota para el estudiante siguen pendientes. **[Pendiente]**
+- El paso «Publicar ahora» puede resultar poco visible tras confirmar la publicación. **[Mejora de usabilidad pendiente]**
+- Los borradores heredados en Archivo/Mixta deben corregirse a Preguntas para poder guardar/publicar. **[Limitación]**
 - Un intento `calificada` no se recalifica; decidir si se necesita regrade. **[Decisión pendiente]**
 - Si falla la corrección tras el envío, el intento queda `enviada` y no hay botón/comando de reintento. **[Limitación]**
 - El módulo cubre la UI docente hasta el Paso 5.5 (publicación para modalidad Preguntas y consulta en solo lectura) y la del estudiante hasta 7.7 (respuestas, envío, corrección y calificación en el servicio). Archivo/Mixta y la visualización de resultados para el estudiante siguen pendientes.
@@ -202,18 +218,22 @@ La ponderación de las personalizadas (`porcentaje = null`, sin sumar a la nota 
 1. **Cierre formal del Paso 5.6.** Auditoría y correcciones hechas; verificación final y aprobación del usuario pendientes. No declararlo cerrado todavía.
 2. **Etapa 6 restante:** archivos privados y seguridad.
 3. **Visualización de resultados/nota al estudiante.** Mostrar nota y estado del intento (no implementada).
-4. **Traslado de la nota a P1–P4/A** en una etapa posterior (decisión pendiente; hoy no se escriben calificaciones oficiales).
-6. **Validación de concurrencia en PostgreSQL** (hoy solo SQLite).
-7. **Decidir la recalificación** de intentos `calificada` si se necesita.
-8. **Commit de cierre** cuando el usuario lo autorice.
+4. **Traslado a A:** extender el traslado a evaluaciones de tipo A (no soportado hoy).
+5. **Backfill:** permitir trasladar notas de intentos ya calificados sin volver a guardar manualmente (no implementado).
+6. **Mejora de usabilidad:** hacer más visible el paso «Publicar ahora» tras confirmar la publicación.
+7. **Validación de concurrencia en PostgreSQL** (hoy solo SQLite).
+8. **Decidir la recalificación** de intentos `calificada` si se necesita.
+9. **Confirmación en navegador** de la interfaz de revisión y del traslado.
+10. **Commit de cierre** autorizado por el usuario el 2026-11-17.
 No declarar cerradas las Etapas 6–7 ni los Pasos 7.5–7.7 sin aprobación del usuario.
 
 ## Por confirmar
 - Cierre del Paso 5.6: auditoría y correcciones aplicadas, verificación final y aprobación pendientes.
 - Aprobación formal de la Etapa 6 (revisión 6.3, «aprobado con observaciones») y de las Etapas 7.1–7.7.
-- Confirmación del usuario en navegador para la interfaz del estudiante (listado, detalle, disponibilidad, intento, respuestas, envío, corrección).
+- Confirmación del usuario en navegador para la interfaz del estudiante (listado, detalle, disponibilidad, intento, respuestas, envío, corrección) y para el traslado de nota.
 - La numeración anterior de la memoria llamaba «Etapa 4» a la interfaz del estudiante; corresponde a la Etapa 7 actual. Confirmar la renumeración.
 - Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo.
-- Comportamiento en PostgreSQL bajo concurrencia real.
+- Comportamiento en PostgreSQL bajo concurrencia real (incluido el traslado y `con_notas`).
 - Necesidad de recalificación de intentos `calificada`.
-- Visualización de resultados/nota para el estudiante; traslado a P1–P4/A y `calificaciones`.
+- Visualización de resultados/nota para el estudiante.
+- Traslado a A y backfill automático de notas ya calificadas.

@@ -4,6 +4,7 @@ namespace App\Livewire\Estudiante;
 
 use App\Models\EvaluacionDigital;
 use App\Models\EvaluacionDigitalIntento;
+use App\Models\Grupo;
 use App\Services\RespuestasDigitalesService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -17,6 +18,10 @@ use Livewire\Component;
 class EvaluacionesDigitales extends Component
 {
     private const ZONA_HORARIA = 'America/Bogota';
+
+    public ?int $grupoSeleccionadoId = null;
+
+    public string $filtroEstado = 'pendientes';
 
     #[Locked]
     public ?int $evaluacionSeleccionadaId = null;
@@ -36,6 +41,110 @@ class EvaluacionesDigitales extends Component
 
     #[Locked]
     public ?string $mensajeEnvio = null;
+
+    public function mount(): void
+    {
+        $grupos = $this->gruposPropios();
+        $ultimoGrupo = (int) session('estudiante_evaluaciones_ultimo_grupo', 0);
+
+        $this->grupoSeleccionadoId = $grupos
+            ->firstWhere('id', $ultimoGrupo)?->id
+            ?? $grupos->first()?->id;
+
+        $this->filtroEstado = 'pendientes';
+    }
+
+    public function updatedGrupoSeleccionadoId(mixed $valor): void
+    {
+        $grupoId = (int) $valor;
+
+        if (! $this->gruposPropios()->contains('id', $grupoId)) {
+            $this->grupoSeleccionadoId = null;
+            $this->addError(
+                'evaluacion',
+                'El grupo seleccionado no pertenece al estudiante autenticado.'
+            );
+
+            return;
+        }
+
+        session(['estudiante_evaluaciones_ultimo_grupo' => $grupoId]);
+        $this->limpiarSeleccion();
+    }
+
+    public function updatedFiltroEstado(mixed $valor): void
+    {
+        if (! in_array($valor, ['pendientes', 'historial'], true)) {
+            $this->filtroEstado = 'pendientes';
+        }
+
+        $this->limpiarSeleccion();
+    }
+
+    public function cambiarFiltro(string $filtro): void
+    {
+        if (! in_array($filtro, ['pendientes', 'historial'], true)) {
+            return;
+        }
+
+        $this->filtroEstado = $filtro;
+        $this->limpiarSeleccion();
+    }
+
+    public function seleccionarEvaluacion(int $evaluacionId): void
+    {
+        $this->resetValidation();
+        $this->mensajeEnvio = null;
+
+        try {
+            $evaluacion = $this->buscarEvaluacionPropia($evaluacionId);
+        } catch (ModelNotFoundException) {
+            $this->addError(
+                'evaluacion',
+                'La evaluación no está disponible para tu cuenta.'
+            );
+
+            return;
+        }
+
+        if (
+            $this->grupoSeleccionadoId !== null
+            && $evaluacion->grupo_id !== $this->grupoSeleccionadoId
+        ) {
+            $this->addError(
+                'evaluacion',
+                'La evaluación no pertenece al grupo seleccionado.'
+            );
+
+            return;
+        }
+
+        $this->evaluacionSeleccionadaId = $evaluacion->id;
+
+        $intento = $this->buscarIntentoDeEvaluacion($evaluacion->id);
+
+        $this->intentoActualId = $intento?->id;
+
+        if ($intento !== null) {
+            $this->cargarRespuestasDelIntento($intento);
+        } else {
+            $this->respuestasOpciones = [];
+            $this->respuestasTexto = [];
+            $this->respuestaGuardadaId = null;
+        }
+    }
+
+    private function limpiarSeleccion(): void
+    {
+        $this->evaluacionSeleccionadaId = null;
+        $this->intentoActualId = null;
+        $this->respuestasOpciones = [];
+        $this->respuestasTexto = [];
+        $this->respuestaGuardadaId = null;
+        $this->mostrarConfirmacionEnvio = false;
+        $this->mensajeEnvio = null;
+        $this->resetValidation();
+    }
 
     public function updated(string $property): void
     {
@@ -70,7 +179,7 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
-        $this->evaluacionSeleccionadaId = $evaluacionId;
+        $this->seleccionarEvaluacion($evaluacionId);
     }
 
     public function iniciarIntento(int $evaluacionId): void
@@ -135,7 +244,7 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
-        $this->evaluacionSeleccionadaId = null;
+        $this->evaluacionSeleccionadaId = $intento->evaluacion_digital_id;
         $this->intentoActualId = $intento->id;
         $this->cargarRespuestasDelIntento($intento);
     }
@@ -163,7 +272,7 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
-        $this->evaluacionSeleccionadaId = null;
+        $this->evaluacionSeleccionadaId = $intento->evaluacion_digital_id;
         $this->intentoActualId = $intento->id;
         $this->cargarRespuestasDelIntento($intento);
     }
@@ -326,9 +435,7 @@ class EvaluacionesDigitales extends Component
         }
 
         $this->intentoActualId = $enviado->id;
-        $this->respuestasOpciones = [];
-        $this->respuestasTexto = [];
-        $this->respuestaGuardadaId = null;
+        $this->cargarRespuestasDelIntento($enviado);
         $this->mensajeEnvio = 'Evaluación enviada correctamente.';
     }
 
@@ -340,38 +447,25 @@ class EvaluacionesDigitales extends Component
             abort(403, 'El usuario no tiene un registro de estudiante.');
         }
 
-        $evaluaciones = $this->consultaPublicadas($estudiante->id)
-            ->with('grupo.materia')
-            ->orderByDesc('publicada_at')
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn (EvaluacionDigital $evaluacion) => [
-                'id' => $evaluacion->id,
-                'titulo' => $evaluacion->titulo,
-                'tipo' => $evaluacion->tipo === EvaluacionDigital::TIPO_PARCIAL
-                    ? 'Parcial'
-                    : 'Quiz',
-                'parcial' => $evaluacion->parcial,
-                'materia' => $evaluacion->grupo?->materia?->nombre ?? 'Sin materia',
-                'semestre' => $evaluacion->grupo?->semestre,
-                'anio' => $evaluacion->grupo?->anio,
-                'fecha' => $evaluacion->fecha?->format('d/m/Y') ?? 'Sin fecha',
-                'horario' => substr((string) $evaluacion->hora_inicio, 0, 5)
-                    .' – '.substr((string) $evaluacion->hora_fin, 0, 5),
-                'publicada_at' => $evaluacion->publicada_at
-                    ?->copy()
-                    ->setTimezone(self::ZONA_HORARIA)
-                    ->format('d/m/Y H:i') ?? '—',
-                'disponibilidad' => $this->estadoDisponibilidad(
-                    $evaluacion,
-                    Carbon::now(self::ZONA_HORARIA)
-                ),
-            ]);
+        $grupos = $this->gruposPropios();
+        $grupoSeleccionado = $grupos->firstWhere(
+            'id',
+            $this->grupoSeleccionadoId
+        );
+        $evaluaciones = $this->evaluacionesFiltradas($estudiante->id);
 
         $detalle = null;
+        $intentoActual = null;
 
         if ($this->evaluacionSeleccionadaId !== null) {
             $seleccionada = $this->consultaPublicadas($estudiante->id)
+                ->when(
+                    $this->grupoSeleccionadoId !== null,
+                    fn ($query) => $query->where(
+                        'grupo_id',
+                        $this->grupoSeleccionadoId
+                    )
+                )
                 ->with([
                     'grupo.materia',
                     'preguntas' => fn ($query) => $query->select(
@@ -393,50 +487,135 @@ class EvaluacionesDigitales extends Component
 
             if ($seleccionada === null) {
                 $this->evaluacionSeleccionadaId = null;
+                $this->intentoActualId = null;
             } else {
-                $error = $this->errorDisponibilidad($seleccionada);
+                $detalle = $this->detalleDesde($seleccionada);
+                $intento = $this->buscarIntentoDeEvaluacion($seleccionada->id);
 
-                if ($error !== null) {
-                    $this->evaluacionSeleccionadaId = null;
-                    $this->addError('evaluacion', $error);
+                if ($intento === null) {
+                    $this->intentoActualId = null;
                 } else {
-                    $detalle = $this->detalleDesde($seleccionada);
+                    $this->intentoActualId = $intento->id;
+                    $editable = $intento->estado === EvaluacionDigitalIntento::ESTADO_EN_CURSO
+                        && $this->errorDisponibilidad($intento->evaluacionDigital) === null;
+
+                    $intentoActual = [
+                        'id' => $intento->id,
+                        'evaluacion_id' => $intento->evaluacion_digital_id,
+                        'estado' => $intento->estado,
+                        'evaluacion_titulo' => $intento->evaluacionDigital?->titulo ?? '—',
+                        'enviada_at' => $intento->enviada_at
+                            ?->copy()
+                            ->setTimezone(self::ZONA_HORARIA)
+                            ->format('d/m/Y H:i'),
+                        'editable' => $editable,
+                        'preguntas' => $this->preguntasDelIntento($intento),
+                    ];
                 }
             }
         }
 
-        $intentoActual = null;
-
-        if ($this->intentoActualId !== null) {
-            $intento = $this->buscarIntentoPropio($this->intentoActualId);
-
-            if ($intento === null) {
-                $this->intentoActualId = null;
-            } else {
-                $editable = $intento->estado === EvaluacionDigitalIntento::ESTADO_EN_CURSO
-                    && $this->errorDisponibilidad($intento->evaluacionDigital) === null;
-
-                $intentoActual = [
-                    'id' => $intento->id,
-                    'estado' => $intento->estado,
-                    'evaluacion_titulo' => $intento->evaluacionDigital?->titulo ?? '—',
-                    'enviada_at' => $intento->enviada_at
-                        ?->copy()
-                        ->setTimezone(self::ZONA_HORARIA)
-                        ->format('d/m/Y H:i'),
-                    'editable' => $editable,
-                    'preguntas' => $editable
-                        ? $this->preguntasDelIntento($intento)
-                        : [],
-                ];
-            }
-        }
-
         return view('components.estudiante.⚡evaluaciones-digitales', [
+            'grupos' => $grupos,
+            'grupoSeleccionado' => $grupoSeleccionado,
             'evaluaciones' => $evaluaciones,
             'detalle' => $detalle,
             'intentoActual' => $intentoActual,
         ])->layout('layouts.estudiante');
+    }
+
+    private function gruposPropios()
+    {
+        $estudiante = Auth::user()?->estudiante;
+
+        abort_unless(
+            $estudiante,
+            403,
+            'El usuario no tiene un registro de estudiante.'
+        );
+
+        return $estudiante->grupos()
+            ->with('materia')
+            ->get()
+            ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
+                .'|'.$grupo->anio
+                .'|'.$grupo->semestre
+                .'|'.$grupo->id)
+            ->values();
+    }
+
+    private function evaluacionesFiltradas(int $estudianteId)
+    {
+        if ($this->grupoSeleccionadoId === null) {
+            return collect();
+        }
+
+        $ahora = Carbon::now(self::ZONA_HORARIA);
+
+        return $this->consultaPublicadas($estudianteId)
+            ->where('grupo_id', $this->grupoSeleccionadoId)
+            ->with([
+                'grupo.materia',
+                'intentos' => fn ($query) => $query->where(
+                    'estudiante_id',
+                    $estudianteId
+                ),
+            ])
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->orderBy('id')
+            ->get()
+            ->map(function (EvaluacionDigital $evaluacion) use ($ahora) {
+                $intento = $evaluacion->intentos->first();
+                $disponibilidad = $this->estadoDisponibilidad(
+                    $evaluacion,
+                    $ahora
+                );
+
+                return [
+                    'id' => $evaluacion->id,
+                    'titulo' => $evaluacion->titulo,
+                    'tipo' => $evaluacion->tipo === EvaluacionDigital::TIPO_PARCIAL
+                        ? 'Parcial '.($evaluacion->parcial ?? '')
+                        : 'Quiz',
+                    'parcial' => $evaluacion->parcial,
+                    'materia' => $evaluacion->grupo?->materia?->nombre ?? 'Sin materia',
+                    'semestre' => $evaluacion->grupo?->semestre,
+                    'anio' => $evaluacion->grupo?->anio,
+                    'fecha' => $evaluacion->fecha?->format('d/m/Y') ?? 'Sin fecha',
+                    'horario' => substr((string) $evaluacion->hora_inicio, 0, 5)
+                        .' – '.substr((string) $evaluacion->hora_fin, 0, 5),
+                    'publicada_at' => $evaluacion->publicada_at
+                        ?->copy()
+                        ->setTimezone(self::ZONA_HORARIA)
+                        ->format('d/m/Y H:i') ?? '—',
+                    'disponibilidad' => $disponibilidad,
+                    'intento_id' => $intento?->id,
+                    'intento_estado' => $intento?->estado,
+                ];
+            })
+            ->filter(function (array $evaluacion): bool {
+                if ($this->filtroEstado === 'historial') {
+                    return in_array($evaluacion['intento_estado'], [
+                        EvaluacionDigitalIntento::ESTADO_ENVIADA,
+                        EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+                    ], true);
+                }
+
+                if (
+                    $evaluacion['intento_estado']
+                    === EvaluacionDigitalIntento::ESTADO_EN_CURSO
+                ) {
+                    return true;
+                }
+
+                if ($evaluacion['intento_estado'] !== null) {
+                    return false;
+                }
+
+                return $evaluacion['disponibilidad']['etiqueta'] !== 'Cerrada';
+            })
+            ->values();
     }
 
     private function consultaPublicadas(int $estudianteId)
@@ -477,6 +656,44 @@ class EvaluacionesDigitales extends Component
         return EvaluacionDigitalIntento::query()
             ->with('evaluacionDigital')
             ->whereKey($intentoId)
+            ->where('estudiante_id', $estudiante->id)
+            ->whereHas(
+                'evaluacionDigital',
+                function ($query) use ($estudiante) {
+                    $query->where(
+                        'estado',
+                        EvaluacionDigital::ESTADO_PUBLICADA
+                    )->whereHas(
+                        'grupo.estudiantes',
+                        function ($query) use ($estudiante) {
+                            $query->where(
+                                'estudiantes.id',
+                                $estudiante->id
+                            );
+                        }
+                    );
+                }
+            )
+            ->first();
+    }
+
+    private function buscarIntentoDeEvaluacion(
+        int $evaluacionId
+    ): ?EvaluacionDigitalIntento {
+        $estudiante = Auth::user()?->estudiante;
+
+        abort_unless(
+            $estudiante,
+            403,
+            'El usuario no tiene un registro de estudiante.'
+        );
+
+        return EvaluacionDigitalIntento::query()
+            ->with([
+                'evaluacionDigital.grupo.materia',
+                'respuestas',
+            ])
+            ->where('evaluacion_digital_id', $evaluacionId)
             ->where('estudiante_id', $estudiante->id)
             ->whereHas(
                 'evaluacionDigital',
@@ -712,6 +929,10 @@ class EvaluacionesDigitales extends Component
                 ?->copy()
                 ->setTimezone(self::ZONA_HORARIA)
                 ->format('d/m/Y H:i') ?? '—',
+            'disponibilidad' => $this->estadoDisponibilidad(
+                $evaluacion,
+                Carbon::now(self::ZONA_HORARIA)
+            ),
             'preguntas' => $evaluacion->preguntas
                 ->map(fn ($pregunta) => [
                     'id' => $pregunta->id,

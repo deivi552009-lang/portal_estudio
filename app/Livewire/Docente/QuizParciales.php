@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Docente;
 
+use App\Models\Calificacion;
 use App\Models\Docente;
 use App\Models\Evaluacion;
 use App\Models\EvaluacionDigital;
@@ -225,6 +226,15 @@ class QuizParciales extends Component
             $this->addError(
                 'parcial',
                 'Un Quiz no puede tener un parcial asociado.'
+            );
+
+            return;
+        }
+
+        if ($this->modalidad !== EvaluacionDigital::MODALIDAD_PREGUNTAS) {
+            $this->addError(
+                'modalidad',
+                'Por ahora solo está disponible la modalidad Preguntas. Archivo y Mixta se habilitarán cuando se implemente la carga de archivos.'
             );
 
             return;
@@ -842,7 +852,11 @@ class QuizParciales extends Component
         }
 
         if ($borrador->modalidad !== EvaluacionDigital::MODALIDAD_PREGUNTAS) {
-            return 'La publicación de modalidades Archivo y Mixta estará disponible cuando se implemente la carga de archivos.';
+            $modalidad = $borrador->modalidad === EvaluacionDigital::MODALIDAD_ARCHIVO
+                ? 'Archivo'
+                : 'Mixta';
+
+            return "Este borrador está guardado en modalidad {$modalidad}. Las modalidades Archivo y Mixta aún no admiten publicación porque falta implementar la carga de archivos. Vuelve a configuración, elige Preguntas y guarda el borrador.";
         }
 
         if (! $this->preguntasAgregadasSonValidas()) {
@@ -2250,6 +2264,9 @@ class QuizParciales extends Component
 
         $oficiales = Evaluacion::query()
             ->where('grupo_id', $grupo->id)
+            ->whereHas('grupo', function ($query) use ($grupo) {
+                $query->where('materia_id', $grupo->materia_id);
+            })
             ->whereIn('nombre', EvaluacionDigital::PARCIALES)
             ->where('tipo', 'parcial')
             ->get()
@@ -2261,6 +2278,24 @@ class QuizParciales extends Component
             ->whereIn('parcial', EvaluacionDigital::PARCIALES)
             ->get()
             ->groupBy('parcial');
+
+        /*
+         * Una calificación existe si hay una fila en `calificaciones` con
+         * `nota` no nula. El cero es una nota válida y también cuenta.
+         * La consulta se limita a las evaluaciones oficiales del grupo
+         * seleccionado, que a su vez pertenecen a su materia.
+         */
+        $idsOficiales = $oficiales->flatten()->pluck('id');
+
+        $evaluacionesConNotas = $idsOficiales->isEmpty()
+            ? []
+            : Calificacion::query()
+                ->whereIn('evaluacion_id', $idsOficiales)
+                ->whereNotNull('nota')
+                ->distinct()
+                ->pluck('evaluacion_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
 
         $estados = [];
 
@@ -2321,6 +2356,26 @@ class QuizParciales extends Component
                     'clase' => 'bg-amber-50 text-amber-700',
                     'seleccionable' => true,
                     'mensaje' => '',
+                ];
+
+                continue;
+            }
+
+            $tieneNotas = $evaluaciones->contains(
+                fn (Evaluacion $evaluacion) => in_array(
+                    $evaluacion->id,
+                    $evaluacionesConNotas,
+                    true
+                )
+            );
+
+            if ($tieneNotas) {
+                $estados[$parcial] = [
+                    'estado' => 'con_notas',
+                    'etiqueta' => 'Con notas registradas',
+                    'clase' => 'bg-amber-50 text-amber-700',
+                    'seleccionable' => true,
+                    'mensaje' => "El parcial {$parcial} ya tiene calificaciones registradas.",
                 ];
 
                 continue;

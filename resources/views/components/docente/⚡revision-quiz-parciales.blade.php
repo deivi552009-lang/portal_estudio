@@ -55,6 +55,12 @@
             </div>
         @enderror
 
+        @error('traslado')
+            <div class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                {{ $message }}
+            </div>
+        @enderror
+
         <div class="grid gap-6 lg:grid-cols-3">
 
             {{-- PANEL IZQUIERDO --}}
@@ -227,12 +233,6 @@
                             </div>
                         </div>
 
-                        @if ($mensaje)
-                            <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                                {{ $mensaje }}
-                            </div>
-                        @endif
-
                         {{-- PREGUNTAS --}}
                         <div class="mt-5 space-y-4">
                             @foreach ($examen['preguntas'] as $pregunta)
@@ -337,5 +337,61 @@
                 @endif
             </div>
         </div>
+
+        @if ($trasladoPendiente)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-6">
+                <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+                    <h3 class="text-lg font-bold text-slate-900">
+                        Reemplazar nota oficial
+                    </h3>
+
+                    <p class="mt-3 text-sm text-slate-600">
+                        El parcial {{ $trasladoPendiente['parcial'] }} ya tiene una nota oficial registrada para este estudiante.
+                    </p>
+
+                    <div class="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 text-sm">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                Nota actual
+                            </p>
+                            <p class="mt-1 text-lg font-bold text-slate-800">
+                                {{ number_format((float) $trasladoPendiente['nota_anterior'], 2) }}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                Nota digital
+                            </p>
+                            <p class="mt-1 text-lg font-bold text-blue-800">
+                                {{ number_format((float) $trasladoPendiente['nota_nueva'], 2) }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <p class="mt-4 text-sm text-slate-600">
+                        ¿Deseas reemplazar la nota oficial con la nota de la revisión digital?
+                    </p>
+
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button
+                            type="button"
+                            wire:click="cancelarTrasladoNota"
+                            class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                            Conservar nota actual
+                        </button>
+
+                        <button
+                            type="button"
+                            wire:click="confirmarTrasladoNota"
+                            class="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                        >
+                            Sí, reemplazar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 </div>

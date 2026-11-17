@@ -205,11 +205,14 @@ class QuizParcialesPublicacionTest extends TestCase
             EvaluacionDigital::MODALIDAD_ARCHIVO,
             EvaluacionDigital::MODALIDAD_MIXTA,
         ] as $modalidad) {
-            $componente = $this->constructor()
-                ->set('titulo', 'Quiz '.$modalidad)
-                ->set('modalidad', $modalidad)
-                ->call('guardarBorrador')
-                ->assertHasNoErrors();
+            $borrador = $this->crearBorradorDirecto(
+                'Borrador '.$modalidad,
+                modalidad: $modalidad
+            );
+
+            $componente = Livewire::test(QuizParciales::class)
+                ->call('solicitarEditarBorrador', $borrador->id)
+                ->assertSet('pasoDos', true);
 
             $componente
                 ->call('solicitarPublicacion')
@@ -220,7 +223,49 @@ class QuizParcialesPublicacionTest extends TestCase
                 'carga de archivos',
                 $componente->instance()->getErrorBag()->first('borrador')
             );
+
+            $this->assertStringContainsString(
+                ucfirst($modalidad),
+                $componente->instance()->getErrorBag()->first('borrador')
+            );
+
+            $this->assertStringContainsString(
+                'Vuelve a configuración, elige Preguntas',
+                $componente->instance()->getErrorBag()->first('borrador')
+            );
         }
+    }
+
+    public function test_un_borrador_mixto_puede_corregirse_a_preguntas_y_publicarse(): void
+    {
+        $borrador = $this->crearBorradorDirecto(
+            'Borrador mixto',
+            modalidad: EvaluacionDigital::MODALIDAD_MIXTA
+        );
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->call('solicitarEditarBorrador', $borrador->id)
+            ->assertSet('pasoDos', true)
+            ->assertSet('modalidad', EvaluacionDigital::MODALIDAD_MIXTA)
+            ->set('modalidad', EvaluacionDigital::MODALIDAD_PREGUNTAS)
+            ->call('cambiarTipoPregunta', 'oracion')
+            ->set('preguntaActual.enunciado', 'Pregunta recuperada')
+            ->call('guardarBorrador')
+            ->assertHasNoErrors();
+
+        $this->prepararPublicacion($componente);
+        $this->publicar($componente);
+
+        $publicada = EvaluacionDigital::findOrFail($borrador->id);
+
+        $this->assertSame(
+            EvaluacionDigital::ESTADO_PUBLICADA,
+            $publicada->estado
+        );
+        $this->assertSame(
+            EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            $publicada->modalidad
+        );
     }
 
     public function test_una_firma_invalida_impide_solicitar_publicacion(): void

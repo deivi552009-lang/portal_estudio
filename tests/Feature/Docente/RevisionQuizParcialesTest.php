@@ -3,8 +3,10 @@
 namespace Tests\Feature\Docente;
 
 use App\Livewire\Docente\RevisionQuizParciales;
+use App\Models\Calificacion;
 use App\Models\Docente;
 use App\Models\Estudiante;
+use App\Models\Evaluacion;
 use App\Models\EvaluacionDigital;
 use App\Models\EvaluacionDigitalIntento;
 use App\Models\EvaluacionDigitalOpcion;
@@ -336,6 +338,246 @@ class RevisionQuizParcialesTest extends TestCase
         );
     }
 
+    public function test_traslada_la_nota_al_parcial_oficial_sin_nota_previa(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $oficial] =
+            $this->crearExamenParcial($this->grupoA);
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors()
+            ->assertSet('trasladoPendiente', null)
+            ->assertSee('Nota trasladada a P1: 3.75.');
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.75,
+        ]);
+        $this->assertDatabaseCount('calificaciones', 1);
+    }
+
+    public function test_no_traslada_la_nota_de_un_quiz_personalizado(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta] = $this->crearExamenMixto(
+            $this->grupoA
+        );
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('calificaciones', 0);
+    }
+
+    public function test_pide_confirmacion_antes_de_reemplazar_una_nota_oficial(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $oficial] =
+            $this->crearExamenParcial($this->grupoA);
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 4.00,
+        ]);
+
+        $componente = Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors()
+            ->assertSee('no se reemplazó; confirma el reemplazo');
+
+        $pendiente = $componente->get('trasladoPendiente');
+
+        $this->assertIsArray($pendiente);
+        $this->assertSame('P1', $pendiente['parcial']);
+        $this->assertSame(4.0, $pendiente['nota_anterior']);
+        $this->assertSame(3.75, $pendiente['nota_nueva']);
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 4.00,
+        ]);
+
+        $componente
+            ->call('confirmarTrasladoNota')
+            ->assertHasNoErrors()
+            ->assertSet('trasladoPendiente', null)
+            ->assertSee('Nota oficial de P1 actualizada a 3.75.');
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.75,
+        ]);
+        $this->assertDatabaseCount('calificaciones', 1);
+    }
+
+    public function test_cancelar_el_reemplazo_conserva_la_nota_oficial(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $oficial] =
+            $this->crearExamenParcial($this->grupoA);
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 4.00,
+        ]);
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertSet('trasladoPendiente.parcial', 'P1')
+            ->call('cancelarTrasladoNota')
+            ->assertSet('trasladoPendiente', null)
+            ->assertSee('Se conservó la nota oficial existente.');
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 4.00,
+        ]);
+    }
+
+    public function test_una_nota_oficial_cero_tambien_pide_confirmacion(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $oficial] =
+            $this->crearExamenParcial($this->grupoA);
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 0.00,
+        ]);
+
+        $componente = Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors();
+
+        $pendiente = $componente->get('trasladoPendiente');
+
+        $this->assertIsArray($pendiente);
+        $this->assertSame(0.0, $pendiente['nota_anterior']);
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 0.00,
+        ]);
+    }
+
+    public function test_no_reemplaza_si_la_nota_oficial_ya_coincide(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $oficial] =
+            $this->crearExamenParcial($this->grupoA);
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.75,
+        ]);
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors()
+            ->assertSet('trasladoPendiente', null)
+            ->assertSee('ya coincidía (3.75)');
+
+        $this->assertDatabaseCount('calificaciones', 1);
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.75,
+        ]);
+    }
+
+    public function test_no_traslada_a_la_evaluacion_a(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta] =
+            $this->crearExamenParcial($this->grupoA, 'A');
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseCount('calificaciones', 0);
+    }
+
     public function test_permite_editar_una_calificacion_del_historial_sin_crear_otro_intento(): void
     {
         [$digital, $objetiva, $abierta, $correcta] = $this->crearExamenMixto(
@@ -464,6 +706,34 @@ class RevisionQuizParcialesTest extends TestCase
             'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
             'publicada_at' => now(),
         ]);
+    }
+
+    /**
+     * @return array{0: EvaluacionDigital, 1: EvaluacionDigitalPregunta, 2: EvaluacionDigitalPregunta, 3: EvaluacionDigitalOpcion, 4: Evaluacion}
+     */
+    private function crearExamenParcial(
+        Grupo $grupo,
+        string $parcial = 'P1'
+    ): array {
+        [$digital, $objetiva, $abierta, $correcta] = $this->crearExamenMixto(
+            $grupo
+        );
+
+        $oficial = Evaluacion::create([
+            'grupo_id' => $grupo->id,
+            'nombre' => $parcial,
+            'tipo' => 'parcial',
+            'porcentaje' => 20,
+        ]);
+
+        $digital->update([
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => $parcial,
+            'evaluacion_id' => $oficial->id,
+            'titulo' => 'Parcial '.$parcial,
+        ]);
+
+        return [$digital, $objetiva, $abierta, $correcta, $oficial];
     }
 
     /**

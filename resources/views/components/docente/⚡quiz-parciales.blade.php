@@ -280,9 +280,13 @@
                                     class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 >
                                     <option value="preguntas">Preguntas</option>
-                                    <option value="archivo">Archivo</option>
-                                    <option value="mixta">Mixta</option>
+                                    <option value="archivo" disabled>Archivo (próximamente)</option>
+                                    <option value="mixta" disabled>Mixta (próximamente)</option>
                                 </select>
+
+                                <p class="mt-1 text-xs text-slate-400">
+                                    Por ahora solo está disponible la modalidad Preguntas.
+                                </p>
 
                                 @error('modalidad')
                                     <p class="mt-1 text-xs text-red-500">{{ $message }}</p>

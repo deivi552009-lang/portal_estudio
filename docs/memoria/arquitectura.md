@@ -1,5 +1,5 @@
 # Arquitectura
-Última actualización: 2026-11-16
+Última actualización: 2026-11-17
 
 ## Vista general
 - Aplicación Laravel 12 + Livewire de página completa, Blade/Tailwind, PHP 8.2+ y Vite; no existe `routes/api.php` ni API REST visible.
@@ -8,8 +8,8 @@
 
 ## Carpetas relevantes
 - `app/Livewire/Docente/`: dashboard, grupos, notas, asistencia, actividades y Quiz/Parciales (`QuizParciales`, `RevisionQuizParciales`).
-- `app/Livewire/Estudiante/`: dashboard, notas, talleres, asistencia (`Asistencia`) y evaluaciones digitales (`EvaluacionesDigitales`).
-- `app/Services/`: `CalificacionesService`, `AsistenciasService`, `GrupoEstudiantesService`, `EvaluacionesDigitalesService`, `RespuestasDigitalesService`, `CorreccionDigitalService`.
+- `app/Livewire/Estudiante/`: dashboard, notas, talleres, asistencia (`Asistencia`) y evaluaciones digitales (`EvaluacionesDigitales`: mantiene la lógica del intento y entrega filtros, `grupos`, `grupoSeleccionado`, `evaluaciones`, `detalle` e `intentoActual`).
+- `app/Services/`: `CalificacionesService`, `AsistenciasService`, `GrupoEstudiantesService`, `EvaluacionesDigitalesService`, `RespuestasDigitalesService`, `CorreccionDigitalService`, `TrasladoNotaParcialService`.
 - `app/Models/`: modelos Eloquent del dominio.
 - `app/Http/Controllers/`: perfil, autenticación y visualización de archivos.
 - `resources/views/components/{docente,estudiante}/`: vistas Livewire con prefijo `⚡`; `resources/views/layouts/` contiene los layouts.
@@ -56,6 +56,7 @@
 - `GrupoEstudiantes::crearNuevoGrupo()` no usa transacción: crea el grupo y luego inserta las evaluaciones iniciales P1–P4/A.
 - `confirmarEliminacion()` borra relaciones, asistencias, calificaciones, evaluaciones y grupo, pero no archivos del disco.
 - Actividades y entregas usan el disco `public` (`config/filesystems.php`); los archivos de actividades se sirven con control de propiedad en `ActividadArchivoController`.
+- La revisión docente puede trasladar la nota digital a `calificaciones` (P1–P4) mediante `TrasladoNotaParcialService`, sin modificar `CalificacionesService` ni los porcentajes. No hay rutas ni migraciones nuevas para este traslado.
 
 ## Base de datos
 - `config/database.php` define la conexión `pgsql` mediante variables `DB_*`; no se documentan valores.

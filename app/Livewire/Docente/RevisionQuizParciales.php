@@ -8,6 +8,7 @@ use App\Models\EvaluacionDigitalIntento;
 use App\Models\EvaluacionDigitalPregunta;
 use App\Models\Grupo;
 use App\Services\CorreccionDigitalService;
+use App\Services\TrasladoNotaParcialService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -24,7 +25,8 @@ class RevisionQuizParciales extends Component
 
     public array $valoraciones = [];
 
-    public ?string $mensaje = null;
+    #[Locked]
+    public ?array $trasladoPendiente = null;
 
     public function mount(): void
     {
@@ -81,7 +83,8 @@ class RevisionQuizParciales extends Component
     public function seleccionarIntento(int $intentoId): void
     {
         $this->resetValidation();
-        $this->mensaje = null;
+        $this->trasladoPendiente = null;
+        session()->forget('mensaje');
 
         $intento = $this->buscarIntentoPropio($intentoId);
 
@@ -101,7 +104,6 @@ class RevisionQuizParciales extends Component
     public function guardarCalificacion(): void
     {
         $this->resetValidation('revision');
-        $this->mensaje = null;
 
         if ($this->intentoSeleccionadoId === null) {
             $this->addError('revision', 'Selecciona un estudiante para calificar.');
@@ -144,7 +146,100 @@ class RevisionQuizParciales extends Component
         $intento->load(['respuestas.pregunta']);
         $this->intentoSeleccionadoId = $intento->id;
         $this->cargarValoraciones($intento);
-        $this->mensaje = 'Calificación guardada correctamente.';
+
+        $this->trasladoPendiente = null;
+        $mensaje = 'Calificación guardada correctamente.';
+        $servicio = app(TrasladoNotaParcialService::class);
+        $destino = $servicio->destino($intento);
+
+        if ($destino !== null) {
+            $nota = number_format($destino['nota'], 2);
+
+            if ($destino['nota_anterior'] === null) {
+                $servicio->guardar($intento);
+                $mensaje .= " Nota trasladada a {$destino['parcial']}: {$nota}.";
+            } elseif (
+                abs($destino['nota_anterior'] - $destino['nota']) < 0.005
+            ) {
+                $mensaje .= " La nota oficial de {$destino['parcial']} ya coincidía ({$nota}).";
+            } else {
+                $this->trasladoPendiente = [
+                    'intento_id' => $intento->id,
+                    'parcial' => $destino['parcial'],
+                    'nota_anterior' => $destino['nota_anterior'],
+                    'nota_nueva' => $destino['nota'],
+                ];
+
+                $mensaje .= " La nota oficial de {$destino['parcial']} no se reemplazó; confirma el reemplazo.";
+            }
+        }
+
+        session()->flash('mensaje', $mensaje);
+    }
+
+    public function confirmarTrasladoNota(): void
+    {
+        $this->resetValidation('traslado');
+
+        if ($this->trasladoPendiente === null) {
+            $this->addError(
+                'traslado',
+                'No hay una nota pendiente de trasladar.'
+            );
+
+            return;
+        }
+
+        $intento = $this->buscarIntentoPropio(
+            (int) $this->trasladoPendiente['intento_id']
+        );
+
+        if (
+            $intento === null
+            || $intento->estado !== EvaluacionDigitalIntento::ESTADO_CALIFICADA
+        ) {
+            $this->trasladoPendiente = null;
+            $this->addError(
+                'traslado',
+                'El intento ya no está disponible para trasladar la nota.'
+            );
+
+            return;
+        }
+
+        $servicio = app(TrasladoNotaParcialService::class);
+        $destino = $servicio->destino($intento);
+
+        if ($destino === null) {
+            $this->trasladoPendiente = null;
+            $this->addError(
+                'traslado',
+                'El intento no corresponde a un parcial P1-P4 con nota.'
+            );
+
+            return;
+        }
+
+        $servicio->guardar($intento);
+
+        $this->trasladoPendiente = null;
+
+        session()->flash(
+            'mensaje',
+            "Nota oficial de {$destino['parcial']} actualizada a "
+                .number_format($destino['nota'], 2).'.'
+        );
+    }
+
+    public function cancelarTrasladoNota(): void
+    {
+        $this->trasladoPendiente = null;
+        $this->resetValidation('traslado');
+
+        session()->flash(
+            'mensaje',
+            'Se conservó la nota oficial existente.'
+        );
     }
 
     public function render()
@@ -380,7 +475,9 @@ class RevisionQuizParciales extends Component
     {
         $this->intentoSeleccionadoId = null;
         $this->valoraciones = [];
-        $this->mensaje = null;
+        $this->trasladoPendiente = null;
+        session()->forget('mensaje');
         $this->resetValidation('revision');
+        $this->resetValidation('traslado');
     }
 }

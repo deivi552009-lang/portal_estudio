@@ -3,7 +3,9 @@
 namespace Tests\Feature\Docente;
 
 use App\Livewire\Docente\QuizParciales;
+use App\Models\Calificacion;
 use App\Models\Docente;
+use App\Models\Estudiante;
 use App\Models\Evaluacion;
 use App\Models\EvaluacionDigital;
 use App\Models\Grupo;
@@ -351,6 +353,26 @@ class QuizParcialesTest extends TestCase
             ->assertSet('pasoDos', false);
     }
 
+    public function test_solo_permite_generar_con_modalidad_preguntas(): void
+    {
+        $this->actingAs($this->usuarioDocente);
+
+        foreach (['archivo', 'mixta'] as $modalidad) {
+            Livewire::test(QuizParciales::class)
+                ->set('grupoSeleccionadoId', $this->grupo->id)
+                ->set('titulo', 'Evaluación sin modalidad disponible')
+                ->set('fecha', '2026-12-01')
+                ->set('horaInicio', '08:00')
+                ->set('horaFin', '09:00')
+                ->set('modalidad', $modalidad)
+                ->call('generarConfiguracion')
+                ->assertHasErrors('modalidad')
+                ->assertSet('pasoDos', false);
+        }
+
+        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+    }
+
     public function test_rechaza_una_modalidad_invalida(): void
     {
         $this->actingAs($this->usuarioDocente);
@@ -363,6 +385,250 @@ class QuizParcialesTest extends TestCase
             ->call('generarConfiguracion')
             ->assertHasErrors('modalidad')
             ->assertSet('pasoDos', false);
+    }
+
+    public function test_los_cuatro_parciales_estan_disponibles_sin_calificaciones(): void
+    {
+        foreach (EvaluacionDigital::PARCIALES as $parcial) {
+            $this->crearOficial($parcial);
+        }
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => collect(EvaluacionDigital::PARCIALES)->every(
+                    fn ($parcial) => $estados[$parcial]['estado'] === 'disponible'
+                        && $estados[$parcial]['etiqueta'] === 'Disponible'
+                        && $estados[$parcial]['seleccionable'] === true
+                )
+            );
+    }
+
+    public function test_un_parcial_con_calificacion_cambia_a_con_notas_registradas(): void
+    {
+        $oficiales = [];
+
+        foreach (EvaluacionDigital::PARCIALES as $parcial) {
+            $oficiales[$parcial] = $this->crearOficial($parcial);
+        }
+
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficiales['P1']->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 3.5,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'con_notas'
+                    && $estados['P1']['etiqueta'] === 'Con notas registradas'
+                    && $estados['P1']['seleccionable'] === true
+                    && $estados['P2']['estado'] === 'disponible'
+                    && $estados['P3']['estado'] === 'disponible'
+                    && $estados['P4']['estado'] === 'disponible'
+            );
+    }
+
+    public function test_una_nota_de_cero_cuenta_como_calificacion_registrada(): void
+    {
+        $oficial = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 0.00,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'con_notas'
+                    && $estados['P1']['etiqueta'] === 'Con notas registradas'
+            );
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 0.00,
+        ]);
+    }
+
+    public function test_las_notas_de_otros_grupos_o_materias_no_afectan_el_estado(): void
+    {
+        $oficialPropio = $this->crearOficial('P1');
+
+        $grupoMismaMateria = Grupo::create([
+            'materia_id' => $this->grupo->materia_id,
+            'docente_id' => $this->docente->id,
+            'semestre' => 1,
+            'anio' => 2026,
+            'fecha_creacion' => now()->toDateString(),
+        ]);
+
+        $grupoOtraMateria = $this->crearGrupo($this->docente, 'Biología');
+
+        $oficialMismaMateria = $this->crearOficialEn(
+            $grupoMismaMateria,
+            'P1'
+        );
+
+        $oficialOtraMateria = $this->crearOficialEn(
+            $grupoOtraMateria,
+            'P1'
+        );
+
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficialMismaMateria->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 4.0,
+        ]);
+
+        Calificacion::create([
+            'evaluacion_id' => $oficialOtraMateria->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 4.5,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'disponible'
+                    && $estados['P1']['etiqueta'] === 'Disponible'
+            );
+
+        $this->assertDatabaseMissing('calificaciones', [
+            'evaluacion_id' => $oficialPropio->id,
+        ]);
+    }
+
+    public function test_el_estado_del_parcial_se_actualiza_al_cambiar_de_grupo(): void
+    {
+        $oficialConNotas = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficialConNotas->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 2.5,
+        ]);
+
+        $grupoSinNotas = $this->crearGrupo($this->docente, 'Historia');
+        $this->crearOficialEn($grupoSinNotas, 'P1');
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('tipo', 'parcial')
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'con_notas'
+            )
+            ->set('grupoSeleccionadoId', $grupoSinNotas->id)
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'disponible'
+            );
+    }
+
+    public function test_consultar_los_estados_no_crea_ni_modifica_registros(): void
+    {
+        $oficial = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 4.25,
+        ]);
+
+        $this->assertDatabaseCount('calificaciones', 1);
+        $this->assertDatabaseCount('evaluaciones', 1);
+        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'con_notas'
+            );
+
+        $this->assertDatabaseCount('calificaciones', 1);
+        $this->assertDatabaseCount('evaluaciones', 1);
+        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseHas('calificaciones', [
+            'id' => Calificacion::firstOrFail()->id,
+            'nota' => 4.25,
+        ]);
+    }
+
+    public function test_una_calificacion_sin_nota_no_cuenta_como_registrada(): void
+    {
+        $oficial = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'disponible'
+                    && $estados['P1']['etiqueta'] === 'Disponible'
+            );
+    }
+
+    private function crearEstudiante(): Estudiante
+    {
+        $rolEstudiante = Role::firstOrCreate(['nombre' => 'Estudiante']);
+
+        return Estudiante::create([
+            'user_id' => User::factory()->create([
+                'role_id' => $rolEstudiante->id,
+            ])->id,
+        ]);
+    }
+
+    private function crearOficialEn(Grupo $grupo, string $nombre): Evaluacion
+    {
+        return Evaluacion::create([
+            'grupo_id' => $grupo->id,
+            'nombre' => $nombre,
+            'tipo' => 'parcial',
+            'porcentaje' => 20,
+        ]);
     }
 
     private function crearBorradorParcial(string $parcial): EvaluacionDigital

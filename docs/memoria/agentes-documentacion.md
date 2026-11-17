@@ -1,5 +1,5 @@
 # Agentes de documentación — evaluación y prioridad
-Última actualización: 2026-11-16
+Última actualización: 2026-11-17
 
 ## Objetivo
 Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
@@ -11,7 +11,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 4. No tocar código, datos ni credenciales; no hacer commits.
 5. Necesitar cero correcciones del orquestador.
 
-## Evidencia disponible (al 2026-11-16)
+## Evidencia disponible (al 2026-11-17)
 | Modelo | Tarea | Resultado | Correcciones del orquestador |
 |---|---|---|---|
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector de grupos en la planilla de notas | Completado | 3: modelo «Free» en relevo, sección obsoleta de revisión, índice con P1 ya cerrado |
@@ -50,8 +50,15 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `opencode/beam-free` | Estado y pendientes (`estado-actual.md`, `pendientes.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 1: quedaron entradas históricas contradictorias que se corrigieron después. |
 | `opencode/beam-free` | Decisiones (`decisiones.md`) | Completado | 1: comilla suelta al final de una entrada. |
 | `opencode/beam-free` | Relevo, índice, arquitectura y bitácora | Parcial: máximo de pasos; necesitó 2 ejecuciones | 1: faltaban la ruta de revisión y las secciones de migraciones aplicadas/UI en la bitácora. |
+| `opencode/beam-free` | Quiz/Parciales (`modulos/quiz-parciales.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 2: faltaban «Pruebas», «Riesgos/limitaciones» y «Por confirmar»; quedaban frases de «árbol de trabajo» y «commit de cierre». |
+| `opencode/beam-free` | Panel docente y notas (`modulos/panel-docente.md`, `modulos/notas-calificaciones.md`) | Completado, con máximo de pasos | 0. |
+| `opencode/beam-free` | Panel estudiante y arquitectura (`modulos/panel-estudiante.md`, `arquitectura.md`) | Completado, con máximo de pasos | 1: se restauró el encabezado «Hallazgos clasificados». |
+| `opencode/beam-free` | Decisiones (`decisiones.md`) | Completado | 0. |
+| `opencode/beam-free` | Pendientes y estado (`pendientes.md`, `estado-actual.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 0 en contenido; el orquestador ajustó cifras 15/56→22/90. |
+| `opencode/beam-free` | Relevo, índice y bitácora (`relevo.md`, `00-INDICE.md`, `bitacora/2026-11-17.md`) | Parcial: máximo de pasos; necesitó 3 ejecuciones; no creó la bitácora | 1: el orquestador corrigió frases de «árbol de trabajo», «no escribe calificaciones oficiales» y «pendiente de commit»; el índice se completó en una ejecución aparte. |
+| `opencode/big-pickle` | Bitácora 2026-11-17 (`bitacora/2026-11-17.md`) | Completado en 1 ejecución | 0. |
 
-**Conclusión:** Los cuatro primeros modelos no pudieron documentar por límite de uso gratuito el 2026-11-16; `opencode/beam-free` fue el único operativo y completó panel, Quiz/Parciales, relevo/índice/arquitectura/bitácora, estado/pendientes y decisiones, con límite de pasos y correcciones del orquestador. La documentación de cierre de Quiz/Parciales se completó con Beam, hubo límite de pasos y correcciones del orquestador; Beam sigue como primera opción operativa mientras tenga cuota y no se marca «recomendado» por cero errores. La revisión del orquestador sigue siendo obligatoria.
+**Conclusión:** Los cuatro primeros modelos no pudieron documentar por límite de uso gratuito el 2026-11-16; `opencode/beam-free` fue el único operativo y completó panel, Quiz/Parciales, relevo/índice/arquitectura/bitácora, estado/pendientes y decisiones, con límite de pasos y correcciones del orquestador. La documentación de cierre de Quiz/Parciales se completó con Beam, hubo límite de pasos y correcciones del orquestador; Beam sigue como primera opción operativa mientras tenga cuota y no se marca «recomendado» por cero errores. El 2026-11-17 Beam completó módulos, decisiones, pendientes, estado, relevo e índice con límite de pasos y correcciones del orquestador; la bitácora la completó Big Pickle. La revisión del orquestador sigue siendo obligatoria.
 
 ## Lista de prioridad (provisional)
 Orden operativo 2026-11-16: empezar por `opencode/beam-free` si sigue disponible; Big Pickle, DeepSeek, MiMo y GLM agotaron la cuota gratuita en esta ejecución.
