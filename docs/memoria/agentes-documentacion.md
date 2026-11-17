@@ -1,5 +1,5 @@
 # Agentes de documentación — evaluación y prioridad
-Última actualización: 2026-11-10
+Última actualización: 2026-11-16
 
 ## Objetivo
 Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
@@ -11,7 +11,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 4. No tocar código, datos ni credenciales; no hacer commits.
 5. Necesitar cero correcciones del orquestador.
 
-## Evidencia disponible (al 2026-11-10)
+## Evidencia disponible (al 2026-11-16)
 | Modelo | Tarea | Resultado | Correcciones del orquestador |
 |---|---|---|---|
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector de grupos en la planilla de notas | Completado | 3: modelo «Free» en relevo, sección obsoleta de revisión, índice con P1 ya cerrado |
@@ -27,15 +27,39 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `openrouter/thinkingmachines/inkling-2-small:free` | Completar documentación de ponderación (3 encargos) | Completado; corrigió filas de `pendientes.md` y añadió la sección de bitácora | 2: sección duplicada en la bitácora y línea en blanco en `estado-actual.md` |
 | `openrouter/thinkingmachines/inkling-2-small:free` | Documentación de asistencia estudiantil y navegación (3 encargos) | Completado; un encargo agotó el límite de pasos | 1: en `panel-estudiante.md` seguía «tres páginas» y faltaba `asistencias` en las tablas |
 | `openrouter/thinkingmachines/inkling-2-small:free` | Documentación de limpieza de archivos (3 encargos) | Completado; un encargo agotó el límite de pasos y lo completó el respaldo | — |
+| `openrouter/thinkingmachines/inkling-2-small:free` | Documentación del módulo Quiz/Parciales, etapas 1–3 (3 encargos) | Completado; dos encargos agotaron el límite de pasos | 3: referencia obsoleta al módulo en `relevo.md`, conteo/pruebas y decisiones no separadas en `quiz-parciales.md`, y estado del módulo sin actualizar en `panel-docente.md` |
+| `documentador configurado` | Cierre del Paso 4 de Quiz/Parciales (encargo inicial) | Parcial: 4 archivos; máximo de pasos; no pudo usar shell | 2 correcciones: fecha de `estado-actual.md` y regla de Parciales; faltaron 5 archivos |
+| `opencode/big-pickle` | Cierre del Paso 4 (bloque A: decisiones, pendientes, estado, quiz) | Parcial: máximo de pasos; decisiones y pendientes completos; estado parcial; no pudo usar shell | 3 correcciones: «Qué sigue», regla de Parciales en `quiz-parciales.md` y decisión histórica del constructor |
+| `opencode/big-pickle` | Cierre del Paso 4 (bloque B: índice y panel docente) | Completado | 0 correcciones |
+| `opencode/big-pickle` | Cierre del Paso 4 (bloque C: correcciones finales) | Completado | 0 correcciones posteriores |
+| `opencode/big-pickle` | Documentación de Quiz/Parciales: Etapas 6 y 7.1–7.4 y advertencia de notas (`modulos/quiz-parciales.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones; contenido correcto tras correcciones | 3: faltaban «Riesgos y dependencias», «Próximos pasos» y «Por confirmar» en la primera ejecución; una frase seguía negando la interfaz del estudiante; faltaba el mapeo Etapa 4 → Etapa 7 |
+| `opencode/big-pickle` | Documentación de notas y panel del estudiante (`modulos/notas-calificaciones.md` y `modulos/panel-estudiante.md`) | Parcial: máximo de pasos; necesitó 3 ejecuciones | 3: contradicción entre «matrizNotas conserva null» y el defecto null → 0; faltaban las tablas digitales en «Tablas/modelos que usa»; faltaba la línea de confirmación en navegador en «Por confirmar» |
+| `opencode/big-pickle` | Documentación de estado, pendientes y decisiones (`estado-actual.md`, `pendientes.md`, `decisiones.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 2: faltaba la entrada en «Resueltos» de la protección de borrado; `decisiones.md` quedó sin actualizar en la primera ejecución |
+| `opencode/big-pickle` | Documentación de relevo, índice, arquitectura y bitácora (`relevo.md`, `00-INDICE.md`, `arquitectura.md`, `bitacora/2026-11-16.md`) | Completó los cuatro archivos en una ejecución, pero agotó el máximo de pasos | 2: nombres de archivos de prueba como «por confirmar» en la bitácora; línea obsoleta de `matrizNotas()` en `arquitectura.md` |
+| `opencode/big-pickle` | Documentación 7.5–7.7 (Quiz/Parciales, panel estudiante, estado/pendientes/decisiones, relevo/índice/arquitectura/bitácora) | No completado: límite de uso gratuito; sin ediciones completadas | — (no arrancó) |
+| `opencode/deepseek-v4.1-flash-free` | Documentación 7.5–7.7 (Quiz, panel, estado/decisiones) | No completado: límite de uso gratuito | — (no arrancó) |
+| `opencode/mimo-v2.6-flash-free` | Documentación 7.5–7.7 (panel, relevo/índice, Quiz, estado/decisiones) | No completado: límite de uso gratuito | — (no arrancó) |
+| `opencode/glm-5.3-flash-free` | Documentación 7.5–7.7 (panel, relevo/índice, Quiz, estado/decisiones) | No completado: límite de uso gratuito | — (no arrancó) |
+| `opencode/beam-free` | Panel estudiante (`modulos/panel-estudiante.md`) | Completado | 0 correcciones posteriores |
+| `opencode/beam-free` | Quiz/Parciales 7.5–7.7 (`modulos/quiz-parciales.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 2: cifra 16/81→20/107 y frase antigua de 7.4; se completaron «Riesgos y dependencias», «Próximos pasos» y «Por confirmar» en la segunda ejecución |
+| `opencode/beam-free` | Relevo, índice, arquitectura y bitácora (`relevo.md`, `00-INDICE.md`, `arquitectura.md`, `bitacora/2026-11-16.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 1: cifra 16/81→20/107; la bitácora 7.5–7.7 se completó en la segunda ejecución |
+| `opencode/beam-free` | Estado y pendientes (`estado-actual.md`, `pendientes.md`) | Completado | 3 correcciones aplicadas después: entrada duplicada, entrada antigua “7.5 sin autorizar” y entrada de 7.5–7.7 en “Resueltos” |
+| `opencode/beam-free` | Decisiones (`decisiones.md`) | Completado | 0 |
+| `opencode/beam-free` | Panel estudiante (`modulos/panel-estudiante.md`) | Completado | 0 correcciones. |
+| `opencode/beam-free` | Quiz/Parciales y panel docente (`modulos/quiz-parciales.md`, `modulos/panel-docente.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 2: faltaba panel docente; quedaban frases de «migraciones no aplicadas»/«sin UI». |
+| `opencode/beam-free` | Estado y pendientes (`estado-actual.md`, `pendientes.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 1: quedaron entradas históricas contradictorias que se corrigieron después. |
+| `opencode/beam-free` | Decisiones (`decisiones.md`) | Completado | 1: comilla suelta al final de una entrada. |
+| `opencode/beam-free` | Relevo, índice, arquitectura y bitácora | Parcial: máximo de pasos; necesitó 2 ejecuciones | 1: faltaban la ruta de revisión y las secciones de migraciones aplicadas/UI en la bitácora. |
 
-**Conclusión:** ninguno tiene cero errores acumulados. El titular acumula cuatro ejecuciones con correcciones y una parcial; Big Pickle tiene una tarea real limpia y una prueba controlada con errores de etiquetas. Big Pickle pasa a primera opción provisional, pero necesita una segunda tarea limpia para marcarse «recomendado».
+**Conclusión:** Los cuatro primeros modelos no pudieron documentar por límite de uso gratuito el 2026-11-16; `opencode/beam-free` fue el único operativo y completó panel, Quiz/Parciales, relevo/índice/arquitectura/bitácora, estado/pendientes y decisiones, con límite de pasos y correcciones del orquestador. La documentación de cierre de Quiz/Parciales se completó con Beam, hubo límite de pasos y correcciones del orquestador; Beam sigue como primera opción operativa mientras tenga cuota y no se marca «recomendado» por cero errores. La revisión del orquestador sigue siendo obligatoria.
 
 ## Lista de prioridad (provisional)
-1. `opencode/big-pickle` — **evaluado**: 1 tarea real sin correcciones; 1 prueba con errores de etiquetas. Primera opción provisional; revisar siempre.
+Orden operativo 2026-11-16: empezar por `opencode/beam-free` si sigue disponible; Big Pickle, DeepSeek, MiMo y GLM agotaron la cuota gratuita en esta ejecución.
+1. `opencode/big-pickle` — **evaluado**: completó los bloques B y C del cierre del Paso 4 sin correcciones; el bloque A quedó parcial solo por límite de pasos y su contenido fue corregido por el orquestador. Primera opción provisional; revisar siempre y aún no se marca «recomendado».
 2. `opencode/deepseek-v4.1-flash-free` — **evaluado con reservas**: 3 tareas con correcciones y 1 parcial (faltaron archivos). Segunda opción.
 3. `opencode/mimo-v2.6-flash-free` — sin evaluar.
 4. `opencode/glm-5.3-flash-free` — sin evaluar.
-5. `opencode/beam-free` — sin evaluar.
+5. `opencode/beam-free` — **evaluado**: única opción operativa el 2026-11-16; completó la documentación con límite de pasos y correcciones del orquestador. Primera opción operativa mientras tenga cuota; no se marca “recomendado” por cero errores.
 6. `opencode/nemotron-3.5-super-vl-free` — sin evaluar.
 7. `opencode/flint-40b-free` — sin evaluar.
 8. `opencode/pulse-alpha-free` — sin evaluar.
@@ -70,3 +94,5 @@ El orden de los modelos sin evaluar sigue la lista aportada por el usuario; **no
 
 ## Observación operativa
 El titular tiene `steps: 15` en `.opencode/agents/documentador.md`. En tareas que tocan 5–6 archivos de memoria agotó el límite. Si vuelve a pasar, conviene dividir la documentación en dos encargos o subir el límite, sin perder la revisión posterior.
+
+El 2026-11-16 Big Pickle, DeepSeek, MiMo y GLM agotaron la cuota gratuita; Beam fue el único operativo y completó la documentación con límite de pasos y correcciones. Recomendación: dividir en encargos de 1–2 archivos y empezar por Beam si sigue disponible. Los encargos deben ser de 1–2 archivos; los de 4–6 agotaron el límite de pasos.

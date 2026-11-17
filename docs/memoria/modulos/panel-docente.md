@@ -1,5 +1,5 @@
 # Panel docente
-Última actualización: 2026-11-05
+Última actualización: 2026-11-16
 
 ## Qué hace
 Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y cantidad de talleres. Desde ahí se accede a notas, asistencia, historial y actividades.
@@ -9,6 +9,8 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 - `app/Livewire/Docente/Dashboard.php`: carga grupos del docente y calcula totales.
 - `resources/views/components/docente/dashboard.blade.php`: tarjetas, lista de grupos y acciones rápidas.
 - `resources/views/layouts/docente.blade.php`: sidebar y cabecera del panel.
+- `routes/web.php`: ruta `/docente/quizzes` (`docente.quizzes`) con componente `App\Livewire\Docente\QuizParciales`. Acceso del docente al módulo Quiz / Parciales; Etapa 3 implementada hasta el Paso 5.5 (guarda borradores y publica para modalidad Preguntas); auditoría 5.6 realizada, cierre pendiente de verificación final.
+- `routes/web.php`: ruta `GET /docente/quizzes/revision` (`docente.quizzes.revision`), `auth` + `role:docente`, componente `App\Livewire\Docente\RevisionQuizParciales` y vista `resources/views/components/docente/⚡revision-quiz-parciales.blade.php`. Enlace «Revisión de calificaciones» desde `/docente/quizzes`. Panel izquierdo: grupos/materias, filtros Pendientes (por defecto) e Historial, lista de estudiantes, última materia en sesión `docente_revision_ultimo_grupo`. Panel derecho: examen del estudiante, preguntas objetivas en consulta, abiertas con selector 0–10, nota sugerida en vivo (`calcularNotaSugerida()`) y botón Guardar calificación (`guardarValoraciones()`). Edición histórica permitida para el docente responsable sobre intentos `calificada`, actualizando `calificada_por`/`calificada_at` y `revisada_por`/`revisada_at`. Pruebas: `RevisionQuizParcialesTest` 15/56.
 
 ## Tablas/modelos que usa
 `grupos`, `docentes`, `users`, `estudiantes`, `grupo_estudiante`, `actividades`. Modelos `Grupo`, `Docente`, `Actividad`.
@@ -20,9 +22,10 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 4. La vista muestra los totales y enlaces a notas, asistencia e historial de cada grupo.
 5. Dentro de la planilla de notas, el selector «Materia» permite cambiar de grupo sin volver al dashboard.
 6. El sidebar enlaza Dashboard, Grupos, Actividades, Historial y Tomar asistencia; Estudiantes, Asignaturas, Guías de Estudio, Calendario, Notas, Reportes y Configuración siguen como marcadores.
+7. El docente accede a Quiz / Parciales desde `/docente/quizzes` (`docente.quizzes`, componente `App\Livewire\Docente\QuizParciales`): configuración, estados P1–P4, constructor de tres tipos de pregunta, confirmaciones, cancelar evaluación y vista previa. Desde 2026-11-13 guarda y recupera borradores (Paso 4) y publica para modalidad Preguntas (Pasos 5.1–5.5); las publicadas se consultan en solo lectura. La revisión y calificación de respuestas abiertas se hace en `/docente/quizzes/revision` (`docente.quizzes.revision`): filtros Pendientes/Historial, nota sugerida en vivo y edición de calificaciones históricas. Archivo y Mixta siguen bloqueadas.
 
 ## Estado
-**En progreso.** El dashboard y los enlaces de notas/asistencia funcionan; varias secciones del sidebar y de “Acciones rápidas” siguen sin destino.
+**En progreso.** El dashboard y los enlaces de notas/asistencia funcionan; varias secciones del sidebar y de “Acciones rápidas” siguen sin destino. El módulo Quiz / Parciales tiene la Etapa 3 implementada hasta el Paso 5.5 (2026-11-13): configuración, estados P1–P4, constructor de preguntas, vista previa, guardado/recuperación de borradores, publicación para modalidad Preguntas y consulta de publicadas en solo lectura. La interfaz docente de revisión está implementada en `/docente/quizzes/revision` (filtros Pendientes/Historial, nota sugerida, edición de calificaciones históricas; pruebas `RevisionQuizParcialesTest` 15/56). El Paso 5.6 tiene auditoría realizada y hallazgos corregidos; cierre pendiente de verificación final. Archivo/Mixta y la visualización de resultados para el estudiante siguen pendientes; no se escriben calificaciones oficiales. Las siete migraciones del módulo están aplicadas en Supabase/PostgreSQL.
 
 ## Puntos delicados o reglas que no se deben romper
 - El conteo de talleres compara `tipo` en minúsculas para tolerar `Taller` y `taller` en PostgreSQL.
@@ -32,6 +35,7 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 - Las secciones de notas/asistencia enlazadas desde el dashboard cargan ahora solo grupos del docente autenticado.
 - En «Principal», «Historial» y «Tomar asistencia» van después de Actividades; Talleres y Mensajes ya no están en el sidebar.
 - `$grupoNavId = request()->route('grupoId')`: con grupo, Historial y Tomar asistencia enlazan a `docente.grupo.asistencia.historial` y `docente.grupo.asistencia`; sin grupo, ambas caen en `docente.grupos`. El estado activo se resuelve con `routeIs`.
+- **Concurrencia PostgreSQL no comprobada.** Las pruebas actuales usan SQLite en memoria; la concurrencia real y el comportamiento de `lockForUpdate()` en PostgreSQL no han sido comprobados. Sigue siendo una limitación pendiente de validación.
 
 ## Hallazgos clasificados
 - **[Verificado en código]** Accesos rápidos y varios enlaces del sidebar siguen siendo `href="#"`.
@@ -39,6 +43,7 @@ Muestra el dashboard del docente con sus grupos, cantidad de estudiantes y canti
 - **[Comprobado localmente]** Notas, asistencia e historial validan la propiedad del grupo en su `mount()` (2026-11-03); cubierto por `tests/Feature/Docente/GrupoPropiedadTest.php`.
 - **[Comprobado localmente]** La planilla de notas permite cambiar de grupo con un selector, sin pasar por el dashboard (2026-11-05); cubierto por `tests/Feature/Docente/GrupoNotasSelectorTest.php`.
 - **[Comprobado localmente]** El sidebar enlaza Historial y Tomar asistencia al grupo actual y no muestra Talleres ni Mensajes (2026-11-05); cubierto por `tests/Feature/Docente/AsistenciaSelectorTest.php` y confirmado por el usuario en el navegador.
+- **[Comprobado localmente]** Quiz / Parciales accesible en `/docente/quizzes` con UI docente de la Etapa 3 hasta el Paso 5.5: configuración, estados P1–P4, constructor de preguntas y vista previa, guardado/recuperación de borradores con integridad, publicación para modalidad Preguntas y consulta de publicadas en solo lectura (2026-11-13). La UI de revisión está implementada en `/docente/quizzes/revision` (filtros Pendientes/Historial, nota sugerida, edición de calificaciones históricas; `RevisionQuizParcialesTest` 15/56). Archivo y Mixta siguen bloqueadas. El Paso 5.6 tiene auditoría realizada y hallazgos corregidos; cierre pendiente de verificación final.
 - **[Decisión pendiente]** Alcance de las secciones pendientes y del panel administrativo.
 
 ## Por confirmar

@@ -35,7 +35,12 @@ class Estudiante extends Model
 
     public function actividadRespuestas(): HasMany
     {
-    return $this->hasMany(ActividadRespuesta::class);
+        return $this->hasMany(ActividadRespuesta::class);
+    }
+
+    public function intentosEvaluacionDigital(): HasMany
+    {
+        return $this->hasMany(EvaluacionDigitalIntento::class);
     }
 
     /**
@@ -47,7 +52,7 @@ class Estudiante extends Model
             ->with('evaluacion')
             ->get()
             ->sum(function ($calificacion) {
-                if (!$calificacion->evaluacion || $calificacion->nota === null) {
+                if (! $calificacion->evaluacion || $calificacion->nota === null) {
                     return 0;
                 }
 

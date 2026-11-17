@@ -6,10 +6,12 @@ use App\Models\Grupo;
 use App\Models\Materia;
 use App\Models\PeriodoAcademico;
 use App\Models\Evaluacion;
+use App\Models\EvaluacionDigital;
 use App\Services\GrupoEstudiantesService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -414,6 +416,8 @@ private function actualizarGrupo(): void
 
     public function solicitarEliminacion(int $grupoId): void
     {
+        $this->resetValidation('eliminarGrupo');
+
         $grupo = Grupo::query()
             ->with('materia')
             ->whereHas('docente', function ($query) {
@@ -442,6 +446,8 @@ private function actualizarGrupo(): void
         $this->grupoEliminarId = null;
 
         $this->nombreGrupoEliminar = '';
+
+        $this->resetValidation('eliminarGrupo');
     }
 
 
@@ -463,6 +469,20 @@ private function actualizarGrupo(): void
                 $query->where('user_id', Auth::id());
             })
             ->findOrFail($this->grupoEliminarId);
+
+        if (
+            Schema::hasTable('evaluaciones_digitales')
+            && EvaluacionDigital::query()
+                ->where('grupo_id', $grupo->id)
+                ->exists()
+        ) {
+            $this->addError(
+                'eliminarGrupo',
+                'No se puede eliminar el grupo porque tiene evaluaciones digitales asociadas. Elimina o archiva primero ese contenido.'
+            );
+
+            return;
+        }
 
         /*
          * Se recogen los archivos antes de eliminar los registros.

@@ -1,9 +1,9 @@
 # Portal Estudio — Índice de memoria
-Última actualización: 2026-11-12
+Última actualización: 2026-11-16
 
 Proyecto académico Laravel 12 + Livewire para docentes y estudiantes.
 El panel docente gestiona grupos, notas, asistencia, actividades y talleres.
-El panel estudiante consulta notas y talleres, y entrega respuestas; hay riesgos y tareas abiertas.
+El panel estudiante consulta notas, talleres, asistencia y evaluaciones digitales, y entrega respuestas; hay riesgos y tareas abiertas.
 
 **Stack:** Laravel 12, Livewire, PHP 8.2+, Blade/Tailwind y PostgreSQL; Supabase pendiente de verificación en el entorno real.
 
@@ -13,19 +13,22 @@ El panel estudiante consulta notas y talleres, y entrega respuestas; hay riesgos
 - [[agentes-documentacion]] — Evaluación y prioridad de modelos para documentar.
 - [[pendientes]] — Tareas por prioridad y hallazgos clasificados.
 - [[modulos/autenticacion-roles]] — Login, registro, perfil y control por rol.
-- [[modulos/panel-docente]] — Dashboard y accesos del docente.
+- [[modulos/panel-docente]] — Dashboard y accesos del docente, incluida la revisión/calificación de evaluaciones digitales.
 - [[modulos/grupos-estudiantes]] — Grupos, materias e inscripción de estudiantes.
 - [[modulos/notas-calificaciones]] — Evaluaciones, matriz de notas y promedios.
 - [[modulos/asistencia]] — Registro e historial de asistencia.
 - [[modulos/actividades-talleres]] — Actividades, archivos y talleres.
 - [[modulos/entregas-talleres]] — Respuestas, calificación y mensajes.
-- [[modulos/panel-estudiante]] — Dashboard, notas y talleres del estudiante.
+- [[modulos/quiz-parciales]] — Quiz y Parciales digitales: esquema, servicio y UI docente; Etapa 3 hasta el Paso 5.6 (auditoría realizada, cierre pendiente de aprobación); Etapa 6 (protección de borrado) y Etapa 7.1–7.7 (listado, detalle, disponibilidad, intentos, respuestas, envío definitivo, corrección automática y cálculo de nota) implementadas y probadas; migraciones de resultados aplicadas y verificadas; UI docente de revisión implementada en `/docente/quizzes/revision`; Archivo y Mixta bloqueadas; pendientes: resultados/nota al estudiante y traslado a notas oficiales P1–P4/A.
+- [[modulos/panel-estudiante]] — Dashboard, notas, talleres y evaluaciones digitales del estudiante (listado, detalle, disponibilidad, intentos, respuestas, envío definitivo y corrección en servidor, Etapa 7.1–7.7; sin resultados/nota visibles ni revisión docente).
 - [[bitacora/2026-11-02]] — Registro de esta documentación y actualización.
 - [[bitacora/2026-11-03]] — Configuración de permisos de agentes.
 - [[bitacora/2026-11-05]] — Selector de grupos en la planilla y reparación de evaluaciones oficiales.
 - [[bitacora/2026-11-06]] — Contador de talleres pendientes en el dashboard del estudiante (sin entregados ni vencidos).
 - [[bitacora/2026-11-10]] — Comentario de la calificación del taller, pruebas de negocio de entregas, confirmación de la ponderación con personalizadas sin porcentaje, consulta de asistencia del estudiante y navegación del sidebar docente al último grupo.
 - [[bitacora/2026-11-12]] — Limpieza de archivos al eliminar grupos y aviso de documentos en el modal.
+- [[bitacora/2026-11-13]] — Pasos 4 y 5.1–5.5 de Quiz/Parciales: guardado/integridad/recuperación de borradores y publicación desde la UI (modalidad Preguntas).
+- [[bitacora/2026-11-16]] — Protección de borrado de digitales (Etapa 6), interfaz del estudiante con respuestas, envío y corrección (Etapa 7.1–7.7), migraciones de resultados aplicadas y verificadas, UI docente de revisión y calificación, y advertencia al reemplazar notas de parciales.
 
 ## Por confirmar
-- Esquema remoto de Supabase, ponderación académica y períodos académicos.
+- Esquema remoto de Supabase y períodos académicos; confirmación en navegador de la advertencia de reemplazo de notas y cierre formal de las Etapas 6 y 7.

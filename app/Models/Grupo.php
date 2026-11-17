@@ -60,5 +60,8 @@ class Grupo extends Model
         return $this->hasMany(Actividad::class);
     }
 
-
+    public function evaluacionesDigitales(): HasMany
+    {
+        return $this->hasMany(EvaluacionDigital::class);
+    }
 }

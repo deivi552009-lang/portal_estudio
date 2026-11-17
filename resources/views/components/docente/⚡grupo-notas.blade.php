@@ -212,6 +212,18 @@
 
     @enderror
 
+    @error('eliminarEvaluacion')
+
+        <div style="
+            color: #dc3545;
+            margin-top: 8px;
+            font-size: 13px;
+        ">
+            {{ $message }}
+        </div>
+
+    @enderror
+
 </div>
 
 
@@ -223,7 +235,11 @@
 
         notas: @js($matrizNotas),
 
+        notasOriginales: @js($matrizNotas),
+
         notasModificadas: {},
+
+        mensajeGuardado: false,
 
         evaluaciones: @js($grupo->evaluaciones->toArray()),
 
@@ -306,15 +322,23 @@
                 return;
             }
 
-            await $wire.guardarNotas(
+            await $wire.solicitarGuardarNotas(
                 this.notasModificadas
             );
-
-            this.notasModificadas = {};
 
         }
 
     }"
+    @notas-guardadas.window="
+        notasOriginales = JSON.parse(JSON.stringify(notas));
+        notasModificadas = {};
+        mensajeGuardado = true;
+        setTimeout(() => mensajeGuardado = false, 4000);
+    "
+    @notas-reemplazo-cancelado.window="
+        notas = JSON.parse(JSON.stringify(notasOriginales));
+        notasModificadas = {};
+    "
 >
 
     <div style="
@@ -598,13 +622,25 @@
         display: flex;
         justify-content: flex-end;
         align-items: center;
+        gap: 12px;
     ">
+
+        <span
+            x-show="mensajeGuardado"
+            style="
+                color: #198754;
+                font-weight: bold;
+                font-size: 14px;
+            "
+        >
+            ✅ Calificaciones guardadas
+        </span>
 
         <button
             type="button"
             @click="guardarNotas()"
             wire:loading.attr="disabled"
-            wire:target="guardarNotas"
+            wire:target="solicitarGuardarNotas"
             style="
                 background-color: #0d6efd;
                 color: white;
@@ -619,14 +655,14 @@
 
             <span
                 wire:loading.remove
-                wire:target="guardarNotas"
+                wire:target="solicitarGuardarNotas"
             >
                 💾 Guardar Calificaciones
             </span>
 
             <span
                 wire:loading
-                wire:target="guardarNotas"
+                wire:target="solicitarGuardarNotas"
             >
                 ⏳ Guardando...
             </span>
@@ -634,6 +670,125 @@
         </button>
 
     </div>
+
+
+    <!-- ADVERTENCIA DE REEMPLAZO DE NOTAS DE PARCIALES -->
+
+    <template x-if="$wire.mostrarConfirmacionReemplazoNotas">
+
+        <div style="
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1050;
+            padding: 20px;
+        ">
+
+            <div style="
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                max-width: 640px;
+                width: 100%;
+                padding: 22px;
+            ">
+
+                <h3 style="
+                    margin: 0 0 10px 0;
+                    color: #b02a37;
+                ">
+                    ⚠️ Reemplazo de notas de parciales
+                </h3>
+
+                <p style="
+                    margin: 0 0 12px 0;
+                    line-height: 1.5;
+                ">
+                    Las siguientes calificaciones de parciales ya tienen
+                    una nota registrada. Si confirmas, la nota anterior
+                    será reemplazada por la nueva calificación.
+                </p>
+
+                <ul style="
+                    margin: 0 0 18px 0;
+                    padding-left: 22px;
+                    line-height: 1.6;
+                ">
+
+                    <template
+                        x-for="(reemplazo, indice) in $wire.reemplazosNotas"
+                        :key="indice"
+                    >
+
+                        <li>
+
+                            <strong x-text="reemplazo.estudiante"></strong>
+                            —
+                            <span x-text="reemplazo.evaluacion"></span>:
+                            nota actual
+                            <strong x-text="reemplazo.anterior"></strong>
+                            →
+                            nota nueva
+                            <strong x-text="reemplazo.nueva"></strong>
+
+                        </li>
+
+                    </template>
+
+                </ul>
+
+                <div style="
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 10px;
+                ">
+
+                    <button
+                        type="button"
+                        @click="$wire.cancelarReemplazoNotas()"
+                        wire:loading.attr="disabled"
+                        style="
+                            background-color: #6c757d;
+                            color: white;
+                            border: none;
+                            padding: 10px 18px;
+                            border-radius: 6px;
+                            font-size: 14px;
+                            cursor: pointer;
+                            font-weight: bold;
+                        "
+                    >
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="$wire.confirmarReemplazoNotas()"
+                        wire:loading.attr="disabled"
+                        style="
+                            background-color: #dc3545;
+                            color: white;
+                            border: none;
+                            padding: 10px 18px;
+                            border-radius: 6px;
+                            font-size: 14px;
+                            cursor: pointer;
+                            font-weight: bold;
+                        "
+                    >
+                        Sí, reemplazar nota
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </template>
 
 </div>
 

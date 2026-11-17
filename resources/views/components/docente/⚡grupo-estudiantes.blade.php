@@ -1015,6 +1015,12 @@
                             No se eliminarán las cuentas de los estudiantes.
                         </p>
 
+                        @error('eliminarGrupo')
+                            <p class="mt-2 text-xs font-medium text-red-600">
+                                {{ $message }}
+                            </p>
+                        @enderror
+
                     </div>
 
                 </div>

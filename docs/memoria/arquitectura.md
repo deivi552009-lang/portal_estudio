@@ -1,5 +1,5 @@
 # Arquitectura
-Última actualización: 2026-11-03
+Última actualización: 2026-11-16
 
 ## Vista general
 - Aplicación Laravel 12 + Livewire de página completa, Blade/Tailwind, PHP 8.2+ y Vite; no existe `routes/api.php` ni API REST visible.
@@ -7,9 +7,9 @@
 - Los paneles se separan por rol mediante el middleware `role` (`bootstrap/app.php`, `app/Http/Middleware/RoleMiddleware.php`).
 
 ## Carpetas relevantes
-- `app/Livewire/Docente/`: dashboard, grupos, notas, asistencia y actividades.
-- `app/Livewire/Estudiante/`: dashboard, notas y talleres.
-- `app/Services/`: `CalificacionesService`, `AsistenciasService`, `GrupoEstudiantesService`.
+- `app/Livewire/Docente/`: dashboard, grupos, notas, asistencia, actividades y Quiz/Parciales (`QuizParciales`, `RevisionQuizParciales`).
+- `app/Livewire/Estudiante/`: dashboard, notas, talleres, asistencia (`Asistencia`) y evaluaciones digitales (`EvaluacionesDigitales`).
+- `app/Services/`: `CalificacionesService`, `AsistenciasService`, `GrupoEstudiantesService`, `EvaluacionesDigitalesService`, `RespuestasDigitalesService`, `CorreccionDigitalService`.
 - `app/Models/`: modelos Eloquent del dominio.
 - `app/Http/Controllers/`: perfil, autenticación y visualización de archivos.
 - `resources/views/components/{docente,estudiante}/`: vistas Livewire con prefijo `⚡`; `resources/views/layouts/` contiene los layouts.
@@ -20,8 +20,10 @@
 |---|---|---|
 | Público | `/`, `/login`, `/register`, recuperación de contraseña | `routes/auth.php`, `resources/views/inicio.blade.php` |
 | Autenticado | `/dashboard`, `/profile` | redirección por rol; `ProfileController` |
-| Docente | `/docente/dashboard`, `/docente/grupos`, `/docente/grupo/{id}/notas`, `/docente/grupo/{id}/asistencia`, `/docente/grupo/{id}/asistencia/historial`, `/docente/actividades`, `/docente/grupo/{id}/actividades`, `/docente/actividad/{id}/archivo` | `auth` + `role:docente` |
-| Estudiante | `/estudiante/dashboard`, `/estudiante/notas`, `/estudiante/talleres` | `auth` + `role:estudiante` |
+| Docente | `/docente/dashboard`, `/docente/grupos`, `/docente/grupo/{id}/notas`, `/docente/grupo/{id}/asistencia`, `/docente/grupo/{id}/asistencia/historial`, `/docente/actividades`, `/docente/grupo/{id}/actividades`, `/docente/actividad/{id}/archivo`, `/docente/quizzes`, `/docente/quizzes/revision` | `auth` + `role:docente` |
+| Estudiante | `/estudiante/dashboard`, `/estudiante/notas`, `/estudiante/talleres`, `/estudiante/asistencia`, `/estudiante/evaluaciones-digitales` | `auth` + `role:estudiante` |
+
+- El sidebar docente enlaza «Quiz / Parciales» y el del estudiante enlaza «Evaluaciones».
 
 ## Roles y autorización
 - `RoleSeeder` crea `Superadministrador`, `Administrativo`, `Docente` y `Estudiante` con `updateOrInsert`; el orden no garantiza IDs concretos.
@@ -46,7 +48,7 @@
 | `periodos_academicos` | sin relaciones; se usa el período `activo` al crear grupos |
 
 - Un taller se vincula a su evaluación mediante `evaluaciones.actividad_id` (nullable y único); la nota vive en `calificaciones`, no en `actividad_respuestas`.
-- `CalificacionesService::matrizNotas()` devuelve `null` para celdas sin calificación; la vista de notas usa `0` solo como fallback de cálculo. No se encontró guardado automático de ceros, pero debe probarse.
+- `CalificacionesService::matrizNotas()` devuelve `null` cuando no existe fila de calificación, pero una fila existente con `nota = null` se muestra como `0` (defecto diagnosticado y no corregido, 2026-11-16); la definitiva excluye pendientes y muestra `—`.
 - Verificado en solo lectura (2026-11-03): el ID 3 no existe en la base remota y no hay P1 duplicados por grupo; no se modificaron registros.
 
 ## Transacciones y archivos

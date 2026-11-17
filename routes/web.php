@@ -3,15 +3,18 @@
 use App\Http\Controllers\ActividadArchivoController;
 use App\Http\Controllers\ProfileController;
 use App\Livewire\Docente\Dashboard;
+use App\Livewire\Docente\GrupoActividades;
 use App\Livewire\Docente\GrupoAsistencia;
 use App\Livewire\Docente\GrupoEstudiantes;
 use App\Livewire\Docente\GrupoNotas;
+use App\Livewire\Docente\HistorialAsistencia;
+use App\Livewire\Docente\QuizParciales;
+use App\Livewire\Docente\RevisionQuizParciales;
 use App\Livewire\Estudiante\Asistencia;
 use App\Livewire\Estudiante\Dashboard as EstudianteDashboard;
+use App\Livewire\Estudiante\EvaluacionesDigitales;
 use App\Livewire\Estudiante\Notas;
 use App\Livewire\Estudiante\Talleres;
-use App\Livewire\Docente\HistorialAsistencia;
-use App\Livewire\Docente\GrupoActividades;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -32,7 +35,6 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-
 // ============================================================
 // PERFIL DEL USUARIO
 // ============================================================
@@ -49,7 +51,6 @@ Route::middleware('auth')->group(function () {
         ->name('profile.destroy');
 
 });
-
 
 // ============================================================
 // RUTAS DEL DOCENTE
@@ -92,6 +93,13 @@ Route::middleware(['auth', 'role:docente'])->group(function () {
     Route::get('/docente/grupo/{grupoId}/actividades', GrupoActividades::class)
         ->name('docente.grupo.actividades');
 
+    // Quiz / Parciales
+    Route::get('/docente/quizzes', QuizParciales::class)
+        ->name('docente.quizzes');
+
+    Route::get('/docente/quizzes/revision', RevisionQuizParciales::class)
+        ->name('docente.quizzes.revision');
+
 });
 
 // ============================================================
@@ -109,9 +117,11 @@ Route::middleware(['auth', 'role:estudiante'])->group(function () {
     Route::get('/estudiante/talleres', Talleres::class)
         ->name('estudiante.talleres');
 
+    Route::get('/estudiante/evaluaciones-digitales', EvaluacionesDigitales::class)
+        ->name('estudiante.evaluaciones-digitales');
+
     Route::get('/estudiante/asistencia', Asistencia::class)
         ->name('estudiante.asistencia');
 });
-
 
 require __DIR__.'/auth.php';

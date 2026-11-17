@@ -1,14 +1,26 @@
 # Relevo: sin tarea en curso
+**Módulo Quiz / Parciales — Etapas 6 y 7.1–7.7 implementadas y probadas; migraciones de resultados aplicadas y verificadas en PostgreSQL/Supabase; UI docente de revisión implementada en `/docente/quizzes/revision`. Punto de reanudación: resultados/nota al estudiante y traslado a notas oficiales P1–P4/A. Suite 432/2239 PASS.**
 
-Última actualización: 2026-11-12 · Modelo: Big Pickle / respaldos gratuitos
+Última actualización: 2026-11-16
 
 ## Estado
-- **Sin tarea en curso.** Última tarea cerrada el 2026-11-12: limpieza de archivos al eliminar grupos.
-- `GrupoEstudiantes::confirmarEliminacion()` borra del disco los archivos de actividades y entregas del grupo después de la transacción; solo rutas de `actividades/` y `entregas/`; conserva otros grupos y no referenciados.
-- El modal avisa de la eliminación de documentos enviados y recibidos.
-- Pruebas 5/17; suite completa 113 pruebas, 329 aserciones. Sin migraciones.
-- **Pendiente de commit:** esta limpieza y su documentación siguen en el árbol de trabajo; no integradas en `main`.
-- **En pausa:** exportación a Excel de los grupos, pendiente del modelo que definirá el usuario.
+- **Sin tarea en curso.** Punto de reanudación: **resultados/nota al estudiante y traslado a las notas oficiales P1–P4/A**. Las migraciones `2026_11_16_000001` y `2026_11_16_000002` están aplicadas y verificadas en PostgreSQL/Supabase, y la UI docente de revisión está implementada en `/docente/quizzes/revision` (`docente.quizzes.revision`). Archivo y Mixta siguen bloqueadas; pendientes: confirmación en navegador y concurrencia real en PostgreSQL.
+- **Etapa 3:** Pasos 4 y 5.1–5.5 cerrados y verificados. **Paso 5.6** con auditoría realizada y correcciones de Pint/documentación aplicadas; **cierre formal pendiente de aprobación del usuario**.
+- **Etapa 6 (6.1–6.4): protección de borrado implementada y probada, sin aprobación formal registrada.** `GrupoEstudiantes::confirmarEliminacion()` bloquea grupos con evaluaciones digitales y `GrupoNotas::eliminarEvaluacion()` bloquea evaluaciones vinculadas. Pruebas 15/71 (12/56 + 3/15). No hay UI de borrado ni archivado digital.
+- **Etapa 7.1–7.4: interfaz del estudiante, disponibilidad e intentos, sin aprobación formal registrada.** Listado en `/estudiante/evaluaciones-digitales`, detalle sin respuestas correctas, disponibilidad exacta en `America/Bogota`, inicio/recuperación de intento con `en_curso` y un intento por evaluación y estudiante. Pruebas 20/107 (cifra final; 16/81 al cerrar 7.4).
+- **Etapa 7.5: responder por pregunta, sin cierre formal.** Respuestas por pregunta con guardado seguro y recuperación, máximo 5.000 caracteres y `es_correcta` en `null` mientras no se corrige. Pruebas en `tests/Feature/Estudiante/EvaluacionesDigitalesRespuestasTest.php` (32/207).
+- **Etapa 7.6: envío definitivo, sin cierre formal.** Confirmación previa al envío, `enviada_at`, paso a solo lectura, sin segundo envío y **sin envío automático al cierre de la ventana**; lo cubren las mismas pruebas 32/207.
+- **Etapa 7.7: corrección y nota, sin cierre formal.** `app/Services/CorreccionDigitalService.php`: objetivas corregidas 1/0; abiertas quedan pendientes de valoración docente; abiertas sin responder valen 0; valoración docente 0–10 y `puntos = valoracion / 10`; nota `(suma / total) * 5` redondeada a 2 decimales; estado `calificada` solo sin pendientes; **no escribe calificaciones oficiales**. Pruebas `tests/Feature/Services/CorreccionDigitalServiceTest.php` (21/81).
+- **Migraciones aplicadas y verificadas en PostgreSQL/Supabase:** las siete migraciones del módulo (Etapa 1: `2026_11_12_000001` … `2026_11_12_000005`; resultados: `2026_11_16_000001` y `2026_11_16_000002`) están **Ran**; tablas y columnas nuevas verificadas. `intentos.puntaje` es un entero heredado sin uso nuevo. Ya no están pendientes.
+- **Interfaz docente de revisión (nuevo).** `/docente/quizzes/revision` (`docente.quizzes.revision`), componente `RevisionQuizParciales`, vista `⚡revision-quiz-parciales.blade.php`, enlace desde la página de creación. Filtros Pendientes (por defecto)/Historial, última materia en sesión `docente_revision_ultimo_grupo`, examen con objetivas en consulta, abiertas 0–10, nota sugerida en vivo, guardado bloqueado con pendientes y edición de calificaciones históricas por el docente responsable. `CorreccionDigitalService::calcularNotaSugerida()` y `guardarValoraciones()`. Pruebas `RevisionQuizParcialesTest` 15/56. `/docente/quizzes` y `/docente/quizzes/revision` devolvieron HTTP 200 con PostgreSQL real.
+- **Limitaciones de la Etapa 7.5–7.7:** sin resultados visibles para el estudiante; sin traslado a P1–P4/A; concurrencia real en PostgreSQL no probada; `calificada` no se recalcula; no hay reintento visible de corrección.
+- **Advertencia al reemplazar notas de parciales implementada:** se activa solo en parciales P1–P4 con nota previa no nula (el 0 cuenta); cancelar conserva y confirmar reemplaza; Quiz no advierte. Pruebas 8/28. **Pendiente de confirmación del usuario en el navegador.**
+- **Defectos diagnosticados y no corregidos:** `CalificacionesService::matrizNotas()` convierte `nota = null` en `0` (también riesgo en `notasFinales()`); no hay unique `(grupo_id, nombre, tipo)` en `evaluaciones`; el bloqueo de nombres oficiales es sensible a mayúsculas.
+- **Última verificación (2026-11-16):** suite completa 432 pruebas / 2239 aserciones, PASS; `RevisionQuizParcialesTest` 15/56; `CorreccionDigitalServiceTest` 22/88; `EvaluacionesDigitalesRespuestasTest` 32/207; Pint y `php -l` correctos.
+- Los cambios siguen en el árbol de trabajo; las migraciones de resultados ya se aplicaron y verificaron.
+- Archivo y Mixta siguen bloqueadas; no hay UI de borrado/archivado. Pendientes: resultados/nota al estudiante, traslado a P1–P4/A, confirmación en navegador y concurrencia en PostgreSQL.
+- **Concurrencia real en PostgreSQL:** no probada; las pruebas son secuenciales con SQLite aislado.
+- **En pausa:** exportación a Excel de grupos, sin implementar.
 
 ## Detalle de una tarea cerrada anterior (2026-11-05)
 - El **selector de grupos en asistencia/historial y el ajuste del sidebar** (2026-11-05); detalle en `bitacora/2026-11-05.md`.
@@ -29,6 +41,8 @@
 - Selector de grupos en asistencia e historial, distribución de ambas vistas y ajuste del sidebar docente (Historial/Tomar asistencia; sin Talleres/Mensajes). Pruebas en `tests/Feature/Docente/AsistenciaSelectorTest.php` (7); suite completa en verde (71 pruebas, 187 aserciones).
 
 ## Última tarea cerrada
+- Módulo Quiz / Parciales, Etapa 3, **Pasos 5.1–5.5**: publicación desde la UI para modalidad Preguntas, huella de versión, publicación real, idempotencia, validación del vínculo, lista de publicadas y solo lectura integral; implementados y verificados el 2026-11-13. Última verificación: publicación 71/639, filtro 212/1370 y suite completa 325/1699, PASS; `php -l` sin errores. Sin migraciones. **Pendiente de commit**; `main` sin tocar. El **Paso 5.6 tiene auditoría realizada y hallazgos de Pint/documentación corregidos; cierre pendiente de verificación final y aprobación.**
+- Módulo Quiz / Parciales, Etapas 1–2 y UI inicial de la Etapa 3; aprobadas el 2026-11-12. UI docente y servicio de publicación probados (196/604). Sin migraciones aplicadas. **Pendiente de commit.**
 - Limpieza de archivos al eliminar grupos; implementada, probada (113/329) y confirmada por el usuario en el navegador el 2026-11-12. Sin migraciones. **Pendiente de commit.**
 - Consulta de asistencia del estudiante y navegación del sidebar al último grupo; implementadas, probadas (108/312) y confirmadas por el usuario en el navegador el 2026-11-10. Sin migraciones. **Pendiente de commit.**
 - Confirmación de ponderación y personalizadas; decidida por el usuario el 2026-11-10, sin cambios de código ni migraciones. **Pendiente de commit.**

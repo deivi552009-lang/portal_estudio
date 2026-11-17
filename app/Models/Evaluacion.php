@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Evaluacion extends Model
 {
     protected $table = 'evaluaciones';
+
     protected $fillable = [
         'grupo_id',
         'actividad_id',
@@ -30,5 +32,10 @@ class Evaluacion extends Model
     public function actividad(): BelongsTo
     {
         return $this->belongsTo(Actividad::class);
+    }
+
+    public function evaluacionDigital(): HasOne
+    {
+        return $this->hasOne(EvaluacionDigital::class);
     }
 }
