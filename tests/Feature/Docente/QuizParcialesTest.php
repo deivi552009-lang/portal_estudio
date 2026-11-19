@@ -109,7 +109,7 @@ class QuizParcialesTest extends TestCase
     {
         $this->actingAs($this->usuarioDocente);
 
-        Livewire::test(QuizParciales::class)
+        $componente = Livewire::test(QuizParciales::class)
             ->set('grupoSeleccionadoId', $this->grupo->id)
             ->set('titulo', 'Quiz de álgebra')
             ->set('fecha', '2026-12-01')
@@ -121,8 +121,16 @@ class QuizParcialesTest extends TestCase
             ->assertSet('pasoDos', true)
             ->assertSee('Configuración completada');
 
+        $this->assertNotNull($componente->get('borradorId'));
         $this->assertDatabaseCount('evaluaciones', 0);
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $componente->get('borradorId'),
+            'grupo_id' => $this->grupo->id,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'titulo' => 'Quiz de álgebra',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+        ]);
     }
 
     public function test_genera_la_configuracion_de_un_parcial_valido(): void
@@ -130,7 +138,7 @@ class QuizParcialesTest extends TestCase
         $this->crearOficial('P1');
         $this->actingAs($this->usuarioDocente);
 
-        Livewire::test(QuizParciales::class)
+        $componente = Livewire::test(QuizParciales::class)
             ->set('grupoSeleccionadoId', $this->grupo->id)
             ->set('tipo', 'parcial')
             ->set('parcial', 'P1')
@@ -143,8 +151,17 @@ class QuizParcialesTest extends TestCase
             ->assertHasNoErrors()
             ->assertSet('pasoDos', true);
 
+        $this->assertNotNull($componente->get('borradorId'));
         $this->assertDatabaseCount('evaluaciones', 1);
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $componente->get('borradorId'),
+            'grupo_id' => $this->grupo->id,
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => 'P1',
+            'titulo' => 'Parcial de álgebra',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+        ]);
     }
 
     public function test_muestra_un_borrador_de_parcial_existente_y_permite_seleccionarlo(): void
@@ -168,7 +185,13 @@ class QuizParcialesTest extends TestCase
             ->set('horaInicio', '08:00')
             ->set('horaFin', '09:00')
             ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
+
+        Livewire::test(QuizParciales::class)
+            ->call('solicitarEditarBorrador', $borrador->id)
             ->assertHasNoErrors()
+            ->assertSet('borradorId', $borrador->id)
             ->assertSet('pasoDos', true);
 
         $this->assertDatabaseHas('evaluaciones_digitales', [
@@ -999,6 +1022,224 @@ class QuizParcialesTest extends TestCase
             'id' => $publicada->id,
             'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
         ]);
+    }
+
+    public function test_paso_uno_usa_wire_model_diferido_y_mantiene_live_en_selectores_dependientes(): void
+    {
+        $this->crearOficial('P1');
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->assertSee('wire:model="titulo"', false)
+            ->assertSee('wire:model="fecha"', false)
+            ->assertSee('wire:model="horaInicio"', false)
+            ->assertSee('wire:model="horaFin"', false)
+            ->assertSee('wire:model="modalidad"', false)
+            ->assertDontSee('wire:model.live="titulo"', false)
+            ->assertDontSee('wire:model.live="fecha"', false)
+            ->assertDontSee('wire:model.live="horaInicio"', false)
+            ->assertDontSee('wire:model.live="horaFin"', false)
+            ->assertDontSee('wire:model.live="modalidad"', false)
+            ->assertSee('wire:model.live="grupoSeleccionadoId"', false)
+            ->assertSee('wire:model.live="tipo"', false)
+            ->assertSee('wire:model.live="parcial"', false)
+            ->assertSee('x-data', false)
+            ->assertSee('$wire.titulo', false)
+            ->assertSee('$wire.fecha', false)
+            ->assertSee('$wire.horaInicio', false)
+            ->assertSee('$wire.horaFin', false)
+            ->assertSee('$wire.modalidad', false);
+    }
+
+    public function test_primer_generar_guarda_borrador_y_carga_configuracion_persistida_en_quiz_y_parcial(): void
+    {
+        $this->crearOficial('P2');
+        $this->actingAs($this->usuarioDocente);
+
+        $quiz = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'quiz')
+            ->set('titulo', 'Quiz guardado al generar')
+            ->set('fecha', '2026-12-10')
+            ->set('horaInicio', '09:30')
+            ->set('horaFin', '10:45')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasNoErrors()
+            ->assertSet('pasoDos', true)
+            ->assertSee('Quiz guardado al generar')
+            ->assertSee('2026-12-10')
+            ->assertSee('09:30 – 10:45');
+
+        $quizId = $quiz->get('borradorId');
+        $this->assertNotNull($quizId);
+        $this->assertSame([
+            'titulo' => 'Quiz guardado al generar',
+            'materia' => 'Matemáticas',
+            'semestre' => 1,
+            'anio' => 2026,
+            'tipo' => 'Quiz',
+            'parcial' => null,
+            'fecha' => '2026-12-10',
+            'horario' => '09:30 – 10:45',
+            'modalidad' => 'Preguntas',
+        ], $quiz->get('configuracionPersistida'));
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $quizId,
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'titulo' => 'Quiz guardado al generar',
+        ]);
+
+        $parcial = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->set('parcial', 'P2')
+            ->set('titulo', 'Parcial P2 guardado al generar')
+            ->set('fecha', '2026-12-15')
+            ->set('horaInicio', '14:00')
+            ->set('horaFin', '16:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasNoErrors()
+            ->assertSet('pasoDos', true)
+            ->assertSee('Parcial P2 guardado al generar')
+            ->assertSee('Parcial P2');
+
+        $parcialId = $parcial->get('borradorId');
+        $this->assertNotNull($parcialId);
+        $this->assertSame([
+            'titulo' => 'Parcial P2 guardado al generar',
+            'materia' => 'Matemáticas',
+            'semestre' => 1,
+            'anio' => 2026,
+            'tipo' => 'Parcial',
+            'parcial' => 'P2',
+            'fecha' => '2026-12-15',
+            'horario' => '14:00 – 16:00',
+            'modalidad' => 'Preguntas',
+        ], $parcial->get('configuracionPersistida'));
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $parcialId,
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => 'P2',
+            'titulo' => 'Parcial P2 guardado al generar',
+        ]);
+    }
+
+    public function test_generar_con_titulo_duplicado_de_quiz_no_pasa_al_paso_dos_ni_crea_registro(): void
+    {
+        EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Quiz de estructuras',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'quiz')
+            ->set('titulo', '  quiz   de estructuras ')
+            ->set('fecha', '2026-12-02')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false)
+            ->assertSet('borradorId', null)
+            ->assertSet('configuracionPersistida', null);
+
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+    }
+
+    public function test_parcial_con_notas_no_crea_borrador_antes_de_confirmar_y_si_tras_confirmar(): void
+    {
+        $oficial = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 3.50,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->set('parcial', 'P1')
+            ->set('titulo', 'Parcial P1 con notas')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertSet('mostrarConfirmacionParcialConNotas', true)
+            ->assertSet('pasoDos', false)
+            ->assertSet('borradorId', null)
+            ->assertSet('configuracionPersistida', null);
+
+        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+
+        $componente
+            ->call('confirmarParcialConNotas')
+            ->assertHasNoErrors()
+            ->assertSet('mostrarConfirmacionParcialConNotas', false)
+            ->assertSet('pasoDos', true)
+            ->assertSee('Parcial P1 con notas');
+
+        $this->assertNotNull($componente->get('borradorId'));
+        $this->assertSame('Parcial P1 con notas', $componente->get('configuracionPersistida')['titulo']);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $componente->get('borradorId'),
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => 'P1',
+            'titulo' => 'Parcial P1 con notas',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+        ]);
+    }
+
+    public function test_mis_borradores_muestra_fecha_hora_inicio_y_hora_fin(): void
+    {
+        EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Quiz con horario en borradores',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:30:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->assertSee('Quiz con horario en borradores')
+            ->assertSee('01/12/2026')
+            ->assertSee('08:00')
+            ->assertSee('09:30')
+            ->assertSee('08:00 – 09:30');
     }
 
     private function crearEstudiante(): Estudiante

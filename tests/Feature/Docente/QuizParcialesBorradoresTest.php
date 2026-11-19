@@ -165,7 +165,8 @@ class QuizParcialesBorradoresTest extends TestCase
         );
         $this->assertSame($preguntasInvalidas, $componente->get('preguntas'));
         $this->assertSame('Quiz de prueba', $componente->get('titulo'));
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
     }
 
     public function test_recupera_un_borrador_y_continua_editandolo(): void
@@ -261,9 +262,18 @@ class QuizParcialesBorradoresTest extends TestCase
             parcial: 'P1'
         );
 
-        $this->configurarParcial('P1')
-            ->call('guardarBorrador')
-            ->assertHasErrors('borrador');
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->set('parcial', 'P1')
+            ->set('titulo', 'Parcial de prueba')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
 
         $this->assertDatabaseCount('evaluaciones_digitales', 1);
     }
@@ -272,9 +282,16 @@ class QuizParcialesBorradoresTest extends TestCase
     {
         $this->crearBorradorDirecto('Quiz de prueba');
 
-        $this->constructor()
-            ->call('guardarBorrador')
-            ->assertHasErrors('borrador');
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Quiz de prueba')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
 
         $this->assertDatabaseCount('evaluaciones_digitales', 1);
     }
@@ -431,7 +448,16 @@ class QuizParcialesBorradoresTest extends TestCase
             ->assertHasErrors('preguntas');
 
         $this->assertSame(0, $componente->get('preguntas')[0]['indice_correcto']);
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'Lima',
+            'es_correcta' => false,
+        ]);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'Bogotá',
+            'es_correcta' => true,
+        ]);
     }
 
     public function test_manipular_textos_u_orden_de_opciones_rechaza_el_guardado(): void
@@ -449,7 +475,18 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'Lima',
+            'orden' => 1,
+            'es_correcta' => false,
+        ]);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'Bogotá',
+            'orden' => 2,
+            'es_correcta' => true,
+        ]);
     }
 
     public function test_manipular_la_firma_de_las_preguntas_rechaza_el_guardado(): void
@@ -462,11 +499,17 @@ class QuizParcialesBorradoresTest extends TestCase
         );
 
         $componente
+            ->set('titulo', 'Título manipulado')
             ->set('firmaPreguntas', str_repeat('a', 64))
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $componente->get('borradorId'),
+            'titulo' => 'Quiz de prueba',
+        ]);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
     }
 
     public function test_guardar_y_recuperar_conserva_la_respuesta_correcta(): void
@@ -561,20 +604,26 @@ class QuizParcialesBorradoresTest extends TestCase
 
         $this->agregarMultiple($componente, 'Pregunta nueva', ['A', 'B'], 0);
 
+        $this->assertFalse($componente->instance()->tieneCambiosSinGuardar());
+
+        $componente->set('preguntaActual.enunciado', 'Pregunta en curso');
+
         $this->assertTrue($componente->instance()->tieneCambiosSinGuardar());
     }
 
     public function test_un_rechazo_del_servicio_conserva_todo_el_estado(): void
     {
+        $componente = $this->constructor();
+
         $this->mock(EvaluacionesDigitalesService::class, function ($mock) {
-            $mock->shouldReceive('crearBorrador')
+            $mock->shouldReceive('actualizarBorrador')
                 ->once()
                 ->andThrow(ValidationException::withMessages([
                     'titulo' => 'Título rechazado por el servicio.',
                 ]));
         });
 
-        $componente = $this->constructor()
+        $componente
             ->set('preguntaActual.enunciado', 'Pregunta en curso')
             ->call('guardarBorrador')
             ->assertHasErrors('titulo');
@@ -585,7 +634,8 @@ class QuizParcialesBorradoresTest extends TestCase
         );
         $this->assertSame('Quiz de prueba', $componente->get('titulo'));
         $this->assertNotSame('', $componente->get('firmaPreguntas'));
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
     }
 
     public function test_agregar_otra_pregunta_tras_manipular_rechaza_y_no_refirma(): void
@@ -616,7 +666,12 @@ class QuizParcialesBorradoresTest extends TestCase
 
         $componente->call('guardarBorrador')->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'B',
+            'es_correcta' => true,
+        ]);
     }
 
     public function test_eliminar_otra_pregunta_tras_manipular_rechaza_y_no_refirma(): void
@@ -640,7 +695,11 @@ class QuizParcialesBorradoresTest extends TestCase
 
         $componente->call('guardarBorrador')->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 2);
+        $this->assertDatabaseHas('evaluacion_digital_preguntas', [
+            'enunciado' => 'Segunda pregunta',
+        ]);
     }
 
     public function test_no_reutiliza_la_firma_de_un_borrador_en_otro_borrador_del_mismo_docente(): void
@@ -804,7 +863,8 @@ class QuizParcialesBorradoresTest extends TestCase
             $componente->get('preguntaActual')['enunciado']
         );
         $this->assertSame('invalida', $componente->get('preguntaActual')['opciones']);
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
     }
 
     public function test_una_pregunta_actual_con_indice_invalido_rechaza_el_guardado(): void
@@ -819,7 +879,8 @@ class QuizParcialesBorradoresTest extends TestCase
             ->assertHasErrors('preguntaActual');
 
         $this->assertSame(5, $componente->get('indiceCorrecto'));
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
     }
 
     public function test_una_pregunta_actual_con_opciones_null_rechaza_el_guardado(): void
@@ -832,7 +893,8 @@ class QuizParcialesBorradoresTest extends TestCase
             ->assertHasErrors('preguntaActual');
 
         $this->assertNull($componente->get('preguntaActual')['opciones']);
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
     }
 
     public function test_una_pregunta_actual_con_una_opcion_no_array_rechaza_el_guardado(): void
@@ -845,7 +907,8 @@ class QuizParcialesBorradoresTest extends TestCase
             ->assertHasErrors('preguntaActual');
 
         $this->assertSame('A', $componente->get('preguntaActual')['opciones'][0]);
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
     }
 
     public function test_es_correcta_manipulada_en_la_pregunta_actual_se_neutraliza_al_guardar(): void
@@ -886,7 +949,9 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 2);
     }
 
     public function test_manipular_opciones_agregadas_con_null_rechaza_el_guardado(): void
@@ -903,7 +968,9 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 2);
     }
 
     public function test_manipular_una_opcion_agregada_con_cadena_rechaza_el_guardado(): void
@@ -920,7 +987,9 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 2);
     }
 
     public function test_eliminar_una_opcion_agregada_rechaza_el_guardado(): void
@@ -939,7 +1008,9 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 2);
     }
 
     public function test_insertar_opciones_en_una_pregunta_agregada_rechaza_el_guardado(): void
@@ -960,7 +1031,9 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 2);
     }
 
     public function test_indice_correcto_negativo_en_pregunta_agregada_rechaza_el_guardado(): void
@@ -977,7 +1050,12 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'B',
+            'es_correcta' => true,
+        ]);
     }
 
     public function test_indice_correcto_fuera_de_rango_en_pregunta_agregada_rechaza_el_guardado(): void
@@ -994,7 +1072,12 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'B',
+            'es_correcta' => true,
+        ]);
     }
 
     public function test_indice_correcto_con_tipo_incorrecto_en_pregunta_agregada_rechaza_el_guardado(): void
@@ -1011,7 +1094,12 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_opciones', [
+            'texto' => 'B',
+            'es_correcta' => true,
+        ]);
     }
 
     public function test_tipo_no_permitido_en_pregunta_agregada_rechaza_el_guardado(): void
@@ -1028,7 +1116,12 @@ class QuizParcialesBorradoresTest extends TestCase
             ->call('guardarBorrador')
             ->assertHasErrors('preguntas');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseHas('evaluacion_digital_preguntas', [
+            'enunciado' => 'Pregunta',
+            'tipo' => 'multiple',
+        ]);
     }
 
     public function test_guardar_y_recuperar_verdadero_falso_conserva_la_opcion_correcta(): void
@@ -1222,17 +1315,17 @@ class QuizParcialesBorradoresTest extends TestCase
     public function test_el_rechazo_del_servicio_conserva_preguntas_agregadas_y_pregunta_actual(): void
     {
         $real = app(EvaluacionesDigitalesService::class);
+        $componente = $this->constructor();
+
+        $this->agregarMultiple($componente, 'Agregada', ['A', 'B'], 1);
 
         $this->mock(EvaluacionesDigitalesService::class, function ($mock) {
-            $mock->shouldReceive('crearBorrador')
+            $mock->shouldReceive('actualizarBorrador')
                 ->once()
                 ->andThrow(ValidationException::withMessages([
                     'titulo' => 'Título rechazado por el servicio.',
                 ]));
         });
-
-        $componente = $this->constructor();
-        $this->agregarMultiple($componente, 'Agregada', ['A', 'B'], 1);
 
         $componente
             ->call('cambiarTipoPregunta', 'multiple')
@@ -1248,7 +1341,8 @@ class QuizParcialesBorradoresTest extends TestCase
         $this->assertSame('C', $componente->get('preguntaActual')['opciones'][0]['texto']);
         $this->assertSame(0, $componente->get('indiceCorrecto'));
         $this->assertNotSame('', $componente->get('firmaPreguntas'));
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
 
         $this->app->instance(EvaluacionesDigitalesService::class, $real);
 
@@ -1317,15 +1411,17 @@ class QuizParcialesBorradoresTest extends TestCase
                 ->andThrow(new AuthorizationException('No autorizado.'));
         });
 
-        $componente = $this->constructor()
-            ->set('preguntaActual.enunciado', 'Pregunta en curso')
-            ->call('guardarBorrador')
-            ->assertHasErrors('borrador');
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Quiz de prueba')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
 
-        $this->assertSame(
-            'Pregunta en curso',
-            $componente->get('preguntaActual')['enunciado']
-        );
         $this->assertSame('Quiz de prueba', $componente->get('titulo'));
         $this->assertDatabaseCount('evaluaciones_digitales', 0);
     }
@@ -1380,10 +1476,16 @@ class QuizParcialesBorradoresTest extends TestCase
     {
         $existente = $this->crearBorradorDirecto('Quiz de matemáticas');
 
-        $this->constructor()
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
             ->set('titulo', 'QUIZ DE MATEMÁTICAS')
-            ->call('guardarBorrador')
-            ->assertHasErrors('borrador');
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
 
         $this->assertSame('Quiz de matemáticas', $existente->fresh()->titulo);
         $this->assertDatabaseCount('evaluaciones_digitales', 1);
@@ -1393,10 +1495,16 @@ class QuizParcialesBorradoresTest extends TestCase
     {
         $existente = $this->crearBorradorDirecto('Quiz de matemáticas');
 
-        $this->constructor()
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
             ->set('titulo', 'Quiz  de   matemáticas')
-            ->call('guardarBorrador')
-            ->assertHasErrors('borrador');
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
 
         $this->assertSame('Quiz de matemáticas', $existente->fresh()->titulo);
         $this->assertDatabaseCount('evaluaciones_digitales', 1);
@@ -1406,10 +1514,16 @@ class QuizParcialesBorradoresTest extends TestCase
     {
         $existente = $this->crearBorradorDirecto('Quiz de matemáticas');
 
-        $this->constructor()
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
             ->set('titulo', '  Quiz de matemáticas  ')
-            ->call('guardarBorrador')
-            ->assertHasErrors('borrador');
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasErrors('borrador')
+            ->assertSet('pasoDos', false);
 
         $this->assertSame('Quiz de matemáticas', $existente->fresh()->titulo);
         $this->assertDatabaseCount('evaluaciones_digitales', 1);

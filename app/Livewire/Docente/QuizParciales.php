@@ -39,7 +39,13 @@ class QuizParciales extends Component
     public ?array $vistaPreviaPublicada = null;
 
     #[Locked]
+    public ?array $configuracionPersistida = null;
+
+    #[Locked]
     public ?int $borradorEliminarId = null;
+
+    #[Locked]
+    public ?int $preguntaEliminarIndice = null;
 
     public string $titulo = '';
 
@@ -64,6 +70,9 @@ class QuizParciales extends Component
     public int $cantidadOpciones = 2;
 
     public ?int $indiceCorrecto = null;
+
+    #[Locked]
+    public ?int $indiceEditandoPregunta = null;
 
     public bool $mostrarConfirmacionPregunta = false;
 
@@ -247,14 +256,14 @@ class QuizParciales extends Component
 
         $this->parcialConNotasConfirmado = false;
         $this->mostrarConfirmacionParcialConNotas = false;
+        $this->limpiarSolicitudPublicacion();
 
-        if ($this->borradorId !== null) {
-            $this->limpiarSolicitudPublicacion();
-
-            if (! $this->persistirBorrador()) {
-                return;
-            }
+        if (! $this->persistirBorrador() || $this->borradorId === null) {
+            return;
         }
+
+        $borradorPersistido = $this->buscarBorradorPropio($this->borradorId);
+        $this->configuracionPersistida = $this->configuracionPersistidaDesde($borradorPersistido);
 
         $this->pasoDos = true;
         $this->vistaPreviaPublicada = null;
@@ -1033,11 +1042,14 @@ class QuizParciales extends Component
             'horaInicio' => $this->horaInicio,
             'horaFin' => $this->horaFin,
             'modalidad' => $this->modalidad,
+            'configuracionPersistida' => $this->configuracionPersistida,
             'pasoDos' => $this->pasoDos,
             'preguntas' => $this->preguntas,
             'preguntaActual' => $this->preguntaActual,
             'cantidadOpciones' => $this->cantidadOpciones,
             'indiceCorrecto' => $this->indiceCorrecto,
+            'indiceEditandoPregunta' => $this->indiceEditandoPregunta,
+            'preguntaEliminarIndice' => $this->preguntaEliminarIndice,
             'mostrarConfirmacionPregunta' => $this->mostrarConfirmacionPregunta,
             'mostrarConfirmacionCancelarEvaluacion' => $this->mostrarConfirmacionCancelarEvaluacion,
             'ultimoGuardado' => $this->ultimoGuardado,
@@ -1217,6 +1229,29 @@ class QuizParciales extends Component
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function configuracionPersistidaDesde(EvaluacionDigital $digital): array
+    {
+        $digital->loadMissing('grupo.materia');
+
+        return [
+            'titulo' => $digital->titulo,
+            'materia' => $digital->grupo?->materia?->nombre ?? 'Sin materia',
+            'semestre' => $digital->grupo?->semestre,
+            'anio' => $digital->grupo?->anio,
+            'tipo' => $digital->tipo === EvaluacionDigital::TIPO_PARCIAL
+                ? 'Parcial'
+                : 'Quiz',
+            'parcial' => $digital->parcial,
+            'fecha' => $digital->fecha?->format('Y-m-d') ?? 'Sin fecha',
+            'horario' => substr((string) $digital->hora_inicio, 0, 5)
+                .' – '.substr((string) $digital->hora_fin, 0, 5),
+            'modalidad' => ucfirst((string) $digital->modalidad),
+        ];
+    }
+
     private function prepararSolicitudPublicacion(
         EvaluacionDigital $borrador
     ): bool {
@@ -1323,10 +1358,18 @@ class QuizParciales extends Component
             return false;
         }
 
-        return $this->persistirBorrador();
+        $guardado = $this->persistirBorrador();
+
+        if ($guardado && $this->borradorId !== null) {
+            $this->configuracionPersistida = $this->configuracionPersistidaDesde(
+                $this->buscarBorradorPropio($this->borradorId)
+            );
+        }
+
+        return $guardado;
     }
 
-    private function persistirBorrador(): bool
+    private function persistirBorrador(bool $incluirPreguntaActual = true): bool
     {
         $borrador = null;
 
@@ -1368,7 +1411,7 @@ class QuizParciales extends Component
             return false;
         }
 
-        if (! $this->validarPreguntaActualParaGuardado()) {
+        if ($incluirPreguntaActual && ! $this->validarPreguntaActualParaGuardado()) {
             return false;
         }
 
@@ -1376,7 +1419,7 @@ class QuizParciales extends Component
         $preparadas = null;
 
         try {
-            $preparadas = $this->prepararPreguntasParaBorrador();
+            $preparadas = $this->prepararPreguntasParaBorrador($incluirPreguntaActual);
 
             $datos = [
                 'tipo' => $this->tipo,
@@ -1444,7 +1487,7 @@ class QuizParciales extends Component
             $firmaValida = false;
         }
 
-        if ($firmaValida) {
+        if ($firmaValida && ($incluirPreguntaActual || ! $this->preguntaActualTieneDatos())) {
             $this->marcarEstadoGuardado();
         }
 
@@ -1470,6 +1513,8 @@ class QuizParciales extends Component
         }
 
         $this->borradorId = null;
+        $this->configuracionPersistida = null;
+        $this->preguntaEliminarIndice = null;
         $this->reiniciarFormularioEvaluacion();
         $this->archivoExistente = null;
         $this->ultimoGuardado = null;
@@ -1492,6 +1537,8 @@ class QuizParciales extends Component
     private function limpiarFormularioTrasPublicacion(): void
     {
         $this->borradorId = null;
+        $this->configuracionPersistida = null;
+        $this->preguntaEliminarIndice = null;
         $this->reiniciarFormularioEvaluacion();
         $this->archivoExistente = null;
         $this->ultimoGuardado = null;
@@ -1611,12 +1658,14 @@ class QuizParciales extends Component
         $this->mostrarConfirmacionParcialConNotas = false;
         $this->parcialConNotasConfirmado = false;
         $this->vistaPreviaPublicada = null;
+        $this->configuracionPersistida = $this->configuracionPersistidaDesde($borrador);
         $this->limpiarSolicitudPublicacion();
         $this->borradorPublicado = false;
         $this->evaluacionPublicadaId = null;
         $this->publicando = false;
 
         $this->reiniciarPregunta();
+        $this->preguntaEliminarIndice = null;
         $this->pasoDos = true;
         $this->ultimoGuardado = $borrador->updated_at?->format('d/m/Y H:i');
         $this->resetValidation();
@@ -1813,13 +1862,24 @@ class QuizParciales extends Component
      *     incluye_actual: bool
      * }
      */
-    private function prepararPreguntasParaBorrador(): array
-    {
+    private function prepararPreguntasParaBorrador(
+        bool $incluirPreguntaActual = true
+    ): array {
         $publicas = $this->preguntasAgregadasNormalizadas();
-        $incluyeActual = $this->preguntaActualTieneDatos();
+        $incluyeActual = $incluirPreguntaActual
+            && $this->preguntaActualTieneDatos();
 
         if ($incluyeActual) {
-            $publicas[] = $this->preguntaActualComoAgregada();
+            $actual = $this->preguntaActualComoAgregada();
+
+            if (
+                $this->indiceEditandoPregunta !== null
+                && array_key_exists($this->indiceEditandoPregunta, $publicas)
+            ) {
+                $publicas[$this->indiceEditandoPregunta] = $actual;
+            } else {
+                $publicas[] = $actual;
+            }
         }
 
         try {
@@ -2032,6 +2092,7 @@ class QuizParciales extends Component
 
     private function reiniciarFormularioEvaluacion(): void
     {
+        $this->configuracionPersistida = null;
         $this->grupoSeleccionadoId = null;
         $this->tipo = EvaluacionDigital::TIPO_QUIZ;
         $this->parcial = null;
@@ -2041,6 +2102,7 @@ class QuizParciales extends Component
         $this->horaFin = '09:00';
         $this->modalidad = EvaluacionDigital::MODALIDAD_PREGUNTAS;
         $this->preguntas = [];
+        $this->preguntaEliminarIndice = null;
         $this->mostrarConfirmacionPregunta = false;
         $this->mostrarConfirmacionCancelarEvaluacion = false;
         $this->reiniciarPregunta();
@@ -2068,6 +2130,7 @@ class QuizParciales extends Component
             'preguntaActual' => $this->preguntaActual,
             'cantidadOpciones' => $this->cantidadOpciones,
             'indiceCorrecto' => $this->indiceCorrecto,
+            'indiceEditandoPregunta' => $this->indiceEditandoPregunta,
         ];
     }
 
@@ -2246,13 +2309,23 @@ class QuizParciales extends Component
             ];
         }
 
-        $propuestas = $this->preguntas;
-        $propuestas[] = [
+        $nuevaPregunta = [
             'enunciado' => trim((string) $this->preguntaActual['enunciado']),
             'tipo' => $this->preguntaActual['tipo'],
             'opciones' => $opciones,
             'indice_correcto' => $indiceCorrecto,
         ];
+
+        $propuestas = $this->preguntas;
+
+        if (
+            $this->indiceEditandoPregunta !== null
+            && array_key_exists($this->indiceEditandoPregunta, $propuestas)
+        ) {
+            $propuestas[$this->indiceEditandoPregunta] = $nuevaPregunta;
+        } else {
+            $propuestas[] = $nuevaPregunta;
+        }
 
         try {
             $firma = $this->hashPreguntasAgregadas($propuestas);
@@ -2270,6 +2343,8 @@ class QuizParciales extends Component
         $this->firmaPreguntas = $firma;
         $this->mostrarConfirmacionPregunta = false;
         $this->reiniciarPregunta();
+        $this->limpiarSolicitudPublicacion();
+        $this->persistirBorrador(false);
     }
 
     public function seguirEditandoPregunta(): void
@@ -2310,6 +2385,116 @@ class QuizParciales extends Component
         $this->mostrarConfirmacionCancelarEvaluacion = false;
     }
 
+    public function editarPregunta(int $indice): void
+    {
+        if ($this->rechazarModificacionEnModoLectura()) {
+            return;
+        }
+
+        if (! $this->pasoDos || $this->borradorPublicado) {
+            return;
+        }
+
+        if (! array_key_exists($indice, $this->preguntas)) {
+            return;
+        }
+
+        if (! $this->preguntasAgregadasSonValidas()) {
+            $this->addError(
+                'preguntas',
+                'La integridad de las preguntas agregadas no se pudo verificar. Recarga la página o descarta la evaluación para continuar.'
+            );
+
+            return;
+        }
+
+        $pregunta = $this->preguntas[$indice];
+        $tipo = (string) ($pregunta['tipo'] ?? EvaluacionDigitalPregunta::TIPO_ORACION);
+
+        $opciones = [];
+
+        if ($tipo !== EvaluacionDigitalPregunta::TIPO_ORACION) {
+            $opcionesOriginales = is_array($pregunta['opciones'] ?? null)
+                ? $pregunta['opciones']
+                : [];
+
+            $opciones = array_values(array_map(
+                fn ($opcion) => [
+                    'texto' => is_array($opcion) ? (string) ($opcion['texto'] ?? '') : '',
+                    'es_correcta' => is_array($opcion) && (bool) ($opcion['es_correcta'] ?? false),
+                ],
+                $opcionesOriginales
+            ));
+        }
+
+        $this->indiceEditandoPregunta = $indice;
+        $this->preguntaActual = [
+            'enunciado' => (string) ($pregunta['enunciado'] ?? ''),
+            'tipo' => $tipo,
+            'opciones' => $opciones,
+        ];
+        $this->cantidadOpciones = $tipo === EvaluacionDigitalPregunta::TIPO_MULTIPLE
+            ? max(2, min(6, count($opciones)))
+            : 2;
+        $this->indiceCorrecto = $tipo === EvaluacionDigitalPregunta::TIPO_ORACION
+            ? null
+            : (isset($pregunta['indice_correcto']) && is_int($pregunta['indice_correcto'])
+                ? $pregunta['indice_correcto']
+                : null);
+
+        if ($tipo !== EvaluacionDigitalPregunta::TIPO_ORACION) {
+            $this->sincronizarOpcionCorrecta();
+        }
+
+        $this->mostrarConfirmacionPregunta = false;
+        $this->resetValidation('preguntaActual');
+    }
+
+    public function solicitarEliminarPregunta(int $indice): void
+    {
+        if ($this->rechazarModificacionEnModoLectura()) {
+            return;
+        }
+
+        if (! array_key_exists($indice, $this->preguntas)) {
+            return;
+        }
+
+        if (! $this->preguntasAgregadasSonValidas()) {
+            $this->addError(
+                'preguntas',
+                'La integridad de las preguntas agregadas no se pudo verificar. Recarga la página o descarta la evaluación para continuar.'
+            );
+
+            return;
+        }
+
+        $this->preguntaEliminarIndice = $indice;
+    }
+
+    public function cancelarEliminarPregunta(): void
+    {
+        $this->preguntaEliminarIndice = null;
+    }
+
+    public function confirmarEliminarPregunta(): void
+    {
+        if ($this->rechazarModificacionEnModoLectura()) {
+            $this->preguntaEliminarIndice = null;
+
+            return;
+        }
+
+        if ($this->preguntaEliminarIndice === null) {
+            return;
+        }
+
+        $indice = $this->preguntaEliminarIndice;
+        $this->preguntaEliminarIndice = null;
+
+        $this->eliminarPregunta($indice);
+    }
+
     public function eliminarPregunta(int $indice): void
     {
         if ($this->rechazarModificacionEnModoLectura()) {
@@ -2346,6 +2531,20 @@ class QuizParciales extends Component
 
         $this->preguntas = $propuestas;
         $this->firmaPreguntas = $firma;
+
+        if ($this->indiceEditandoPregunta === $indice) {
+            $this->reiniciarPregunta();
+        } elseif (
+            $this->indiceEditandoPregunta !== null
+            && $this->indiceEditandoPregunta > $indice
+        ) {
+            $this->indiceEditandoPregunta--;
+        }
+
+        if ($this->borradorId !== null) {
+            $this->limpiarSolicitudPublicacion();
+            $this->persistirBorrador(false);
+        }
     }
 
     private function reiniciarPregunta(): void
@@ -2357,6 +2556,7 @@ class QuizParciales extends Component
         ];
         $this->cantidadOpciones = 2;
         $this->indiceCorrecto = null;
+        $this->indiceEditandoPregunta = null;
         $this->resetValidation('preguntaActual');
     }
 

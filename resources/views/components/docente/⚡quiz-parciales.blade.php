@@ -204,7 +204,7 @@
                                 <input
                                     id="titulo-quiz"
                                     type="text"
-                                    wire:model.live="titulo"
+                                    wire:model="titulo"
                                     placeholder="Ej. Parcial de bases de datos"
                                     class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 >
@@ -223,7 +223,7 @@
                                 <input
                                     id="fecha-quiz"
                                     type="date"
-                                    wire:model.live="fecha"
+                                    wire:model="fecha"
                                     class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 >
 
@@ -241,7 +241,7 @@
                                     <input
                                         id="hora-inicio-quiz"
                                         type="time"
-                                        wire:model.live="horaInicio"
+                                        wire:model="horaInicio"
                                         class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     >
 
@@ -258,7 +258,7 @@
                                     <input
                                         id="hora-fin-quiz"
                                         type="time"
-                                        wire:model.live="horaFin"
+                                        wire:model="horaFin"
                                         class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     >
 
@@ -276,7 +276,7 @@
 
                                 <select
                                     id="modalidad-quiz"
-                                    wire:model.live="modalidad"
+                                    wire:model="modalidad"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                 >
                                     <option value="preguntas">Preguntas</option>
@@ -354,7 +354,7 @@
                         <div class="mt-3 text-xs">
                             <span
                                 wire:loading
-                                wire:target="guardarBorrador,guardarYContinuarCambio"
+                                wire:target="confirmarAgregarPregunta,confirmarEliminarPregunta,guardarYContinuarCambio"
                                 class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 font-semibold text-blue-700"
                             >
                                 Guardando...
@@ -362,7 +362,7 @@
 
                             <span
                                 wire:loading.remove
-                                wire:target="guardarBorrador,guardarYContinuarCambio"
+                                wire:target="confirmarAgregarPregunta,confirmarEliminarPregunta,guardarYContinuarCambio"
                             >
                                 @if ($cambiosSinGuardar)
                                     <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 font-semibold text-amber-700">
@@ -426,6 +426,12 @@
                                     <p class="mt-1 text-xs text-slate-500">
                                         Construye la pregunta y marca la respuesta correcta.
                                     </p>
+
+                                    @if ($indiceEditandoPregunta !== null)
+                                        <p class="mt-1 text-xs font-semibold text-blue-600">
+                                            Editando pregunta {{ $indiceEditandoPregunta + 1 }}
+                                        </p>
+                                    @endif
                                 </div>
 
                                 <span class="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
@@ -455,6 +461,7 @@
 
                                     <select
                                         id="pregunta-tipo"
+                                        wire:key="pregunta-tipo-{{ $preguntaActual['tipo'] }}-{{ $indiceEditandoPregunta ?? 'nueva' }}"
                                         wire:change="cambiarTipoPregunta($event.target.value)"
                                         class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     >
@@ -577,28 +584,11 @@
                                 </p>
                             </div>
                         @else
-                            <div class="mt-5 space-y-2">
-                                <button
-                                    type="button"
-                                    wire:click="guardarBorrador"
-                                    wire:loading.attr="disabled"
-                                    wire:target="guardarBorrador"
-                                    class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                    <span wire:loading.remove wire:target="guardarBorrador">
-                                        Guardar borrador
-                                    </span>
-                                    <span wire:loading wire:target="guardarBorrador">
-                                        Guardando...
-                                    </span>
-                                </button>
-
-                                @if ($ultimoGuardado)
-                                    <p class="text-center text-xs text-slate-400">
-                                        Último guardado: {{ $ultimoGuardado }}
-                                    </p>
-                                @endif
-                            </div>
+                            @if ($ultimoGuardado)
+                                <p class="mt-5 text-center text-xs text-slate-400">
+                                    Último guardado: {{ $ultimoGuardado }}
+                                </p>
+                            @endif
 
                             <button
                                 type="button"
@@ -808,7 +798,7 @@
                             </p>
                         </div>
 
-                    @elseif (!$grupoSeleccionado)
+                    @elseif (!$grupoSeleccionado && !($pasoDos && $configuracionPersistida !== null))
 
                         <div class="px-6 py-16 text-center">
                             <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl text-slate-400">
@@ -827,75 +817,153 @@
 
                     @else
 
-                        <div class="space-y-5 px-6 py-6">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                    Título
-                                </p>
-                                <h3 class="mt-1 text-xl font-bold text-slate-800">
-                                    {{ $titulo !== '' ? $titulo : 'Sin título' }}
-                                </h3>
-                            </div>
-
-                            <div class="grid gap-4 sm:grid-cols-2">
+                        {{-- x-data: ámbito Alpine para leer $wire en el navegador (paso 1 sin peticiones). --}}
+                        <div class="space-y-5 px-6 py-6" x-data>
+                            @if ($pasoDos && $configuracionPersistida !== null)
                                 <div>
                                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Materia y grupo
+                                        Título
                                     </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
-                                        {{ $grupoSeleccionado->materia->nombre }}
-                                    </p>
-                                    <p class="text-sm text-slate-500">
-                                        Semestre {{ $grupoSeleccionado->semestre }}
-                                        · {{ $grupoSeleccionado->anio }}
-                                    </p>
+                                    <h3 class="mt-1 text-xl font-bold text-slate-800">
+                                        {{ ($configuracionPersistida['titulo'] ?? '') !== '' ? $configuracionPersistida['titulo'] : 'Sin título' }}
+                                    </h3>
                                 </div>
 
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Materia y grupo
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ $configuracionPersistida['materia'] ?? 'Sin materia' }}
+                                        </p>
+                                        <p class="text-sm text-slate-500">
+                                            Semestre {{ $configuracionPersistida['semestre'] ?? '—' }}
+                                            · {{ $configuracionPersistida['anio'] ?? '—' }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Tipo
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ ($configuracionPersistida['tipo'] ?? '') === 'Parcial'
+                                                ? 'Parcial ' . ($configuracionPersistida['parcial'] ?? '—')
+                                                : 'Quiz' }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Fecha
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ $configuracionPersistida['fecha'] ?? 'Sin fecha' }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Horario
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ $configuracionPersistida['horario'] ?? '—' }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Modalidad
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ $configuracionPersistida['modalidad'] ?? '—' }}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Docente
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ auth()->user()->name ?? 'Docente' }}
+                                        </p>
+                                    </div>
+                                </div>
+                            @else
                                 <div>
                                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Tipo
+                                        Título
                                     </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
-                                        {{ $tipo === 'parcial' ? 'Parcial ' . ($parcial ?: '—') : 'Quiz' }}
-                                    </p>
+                                    <h3
+                                        class="mt-1 text-xl font-bold text-slate-800"
+                                        x-text="($wire.titulo ?? '') !== '' ? $wire.titulo : 'Sin título'"
+                                    >{{ $titulo !== '' ? $titulo : 'Sin título' }}</h3>
                                 </div>
 
-                                <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Fecha
-                                    </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
-                                        {{ $fecha ?: 'Sin fecha' }}
-                                    </p>
-                                </div>
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Materia y grupo
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ $grupoSeleccionado->materia->nombre }}
+                                        </p>
+                                        <p class="text-sm text-slate-500">
+                                            Semestre {{ $grupoSeleccionado->semestre }}
+                                            · {{ $grupoSeleccionado->anio }}
+                                        </p>
+                                    </div>
 
-                                <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Horario
-                                    </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
-                                        {{ $horaInicio }} – {{ $horaFin }}
-                                    </p>
-                                </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Tipo
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ $tipo === 'parcial' ? 'Parcial ' . ($parcial ?: '—') : 'Quiz' }}
+                                        </p>
+                                    </div>
 
-                                <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Modalidad
-                                    </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
-                                        {{ ucfirst($modalidad) }}
-                                    </p>
-                                </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Fecha
+                                        </p>
+                                        <p
+                                            class="mt-1 text-sm font-medium text-slate-700"
+                                            x-text="$wire.fecha || 'Sin fecha'"
+                                        >{{ $fecha ?: 'Sin fecha' }}</p>
+                                    </div>
 
-                                <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                        Docente
-                                    </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
-                                        {{ auth()->user()->name ?? 'Docente' }}
-                                    </p>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Horario
+                                        </p>
+                                        <p
+                                            class="mt-1 text-sm font-medium text-slate-700"
+                                            x-text="`${$wire.horaInicio ?? ''} – ${$wire.horaFin ?? ''}`"
+                                        >{{ $horaInicio }} – {{ $horaFin }}</p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Modalidad
+                                        </p>
+                                        <p
+                                            class="mt-1 text-sm font-medium text-slate-700"
+                                            x-text="$wire.modalidad ? $wire.modalidad.charAt(0).toUpperCase() + $wire.modalidad.slice(1) : ''"
+                                        >{{ ucfirst($modalidad) }}</p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                            Docente
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-slate-700">
+                                            {{ auth()->user()->name ?? 'Docente' }}
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
+                            @endif
 
                             @if (count($preguntas) === 0)
 
@@ -930,7 +998,7 @@
                                             };
                                         @endphp
 
-                                        <div class="rounded-xl border border-slate-200 bg-white p-4">
+                                        <div class="rounded-xl border p-4 {{ $indiceEditandoPregunta === $indice ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200 bg-white' }}">
                                             <div class="flex items-start justify-between gap-3">
                                                 <div>
                                                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -942,14 +1010,49 @@
                                                     </p>
                                                 </div>
 
-                                                <button
-                                                    type="button"
-                                                    wire:click="eliminarPregunta({{ $indice }})"
-                                                    wire:confirm="¿Eliminar esta pregunta?"
-                                                    class="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                                                >
-                                                    Eliminar
-                                                </button>
+                                                <div class="flex shrink-0 items-center gap-1">
+                                                    @if ($pasoDos && ! $borradorPublicado)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="editarPregunta({{ $indice }})"
+                                                            title="Editar pregunta"
+                                                            aria-label="Editar pregunta"
+                                                            class="rounded-lg p-1.5 text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
+                                                        >
+                                                            <svg
+                                                                class="h-4 w-4"
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                stroke-width="1.5"
+                                                                stroke="currentColor"
+                                                                aria-hidden="true"
+                                                            >
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                                            </svg>
+                                                        </button>
+                                                    @endif
+
+                                                    <button
+                                                        type="button"
+                                                        wire:click="solicitarEliminarPregunta({{ $indice }})"
+                                                        title="Eliminar pregunta"
+                                                        aria-label="Eliminar pregunta"
+                                                        class="rounded-lg p-1.5 text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                                                    >
+                                                        <svg
+                                                            class="h-4 w-4"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke-width="1.5"
+                                                            stroke="currentColor"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             @if ($pregunta['tipo'] === 'oracion')
@@ -1022,7 +1125,7 @@
                     <div class="text-xs">
                         <span
                             wire:loading
-                            wire:target="guardarBorrador,guardarYContinuarCambio"
+                            wire:target="confirmarAgregarPregunta,confirmarEliminarPregunta,guardarYContinuarCambio"
                             class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 font-semibold text-blue-700"
                         >
                             Guardando...
@@ -1030,7 +1133,7 @@
 
                         <span
                             wire:loading.remove
-                            wire:target="guardarBorrador,guardarYContinuarCambio"
+                            wire:target="confirmarAgregarPregunta,confirmarEliminarPregunta,guardarYContinuarCambio"
                         >
                             @if ($cambiosSinGuardar)
                                 <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 font-semibold text-amber-700">
@@ -1072,6 +1175,11 @@
                                     · {{ $borrador->grupo?->semestre ?? '—' }}
                                     · {{ $borrador->grupo?->anio ?? '—' }}
                                     · {{ $borrador->tipo === 'parcial' ? 'Parcial ' . $borrador->parcial : 'Quiz' }}
+                                </p>
+
+                                <p class="mt-1 text-xs text-slate-500">
+                                    {{ $borrador->fecha?->format('d/m/Y') ?? 'Sin fecha' }}
+                                    · {{ $borrador->hora_inicio ? substr((string) $borrador->hora_inicio, 0, 5) : '—' }} – {{ $borrador->hora_fin ? substr((string) $borrador->hora_fin, 0, 5) : '—' }}
                                 </p>
 
                                 <p class="mt-1 text-xs text-slate-400">
@@ -1370,6 +1478,39 @@
                         <span wire:loading wire:target="publicarConfirmado">
                             Publicando...
                         </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- CONFIRMAR ELIMINAR PREGUNTA --}}
+    @if ($preguntaEliminarIndice !== null)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-6">
+            <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+                <h3 class="text-lg font-bold text-slate-900">
+                    Eliminar pregunta
+                </h3>
+
+                <p class="mt-3 text-sm text-slate-600">
+                    ¿Estás seguro de eliminar esta pregunta? Esta acción quitará la pregunta de la evaluación.
+                </p>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        wire:click="cancelarEliminarPregunta"
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="button"
+                        wire:click="confirmarEliminarPregunta"
+                        class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                        Confirmar
                     </button>
                 </div>
             </div>

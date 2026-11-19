@@ -311,11 +311,12 @@ class QuizParcialesPublicacionTest extends TestCase
             ->call('generarConfiguracion')
             ->assertHasNoErrors()
             ->assertSet('pasoDos', true)
-            ->assertSet('borradorId', null)
             ->call('cambiarTipoPregunta', 'oracion')
             ->set('preguntaActual.enunciado', 'Pregunta directa');
 
-        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+        $this->assertNotNull($componente->get('borradorId'));
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
 
         $componente
             ->call('solicitarPublicacion')
