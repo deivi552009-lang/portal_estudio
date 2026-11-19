@@ -85,7 +85,7 @@ class QuizParcialesPublicacionTest extends TestCase
         $this->assertSame(1, $resumen['cantidad_preguntas']);
     }
 
-    public function test_el_resumen_usa_datos_persistidos_y_no_el_formulario(): void
+    public function test_el_resumen_refleja_los_cambios_del_formulario(): void
     {
         $componente = $this->guardarBorradorConPregunta();
         $borradorId = $componente->get('borradorId');
@@ -97,7 +97,7 @@ class QuizParcialesPublicacionTest extends TestCase
             ->assertSet('publicacionConCambios', true);
 
         $this->assertSame(
-            'Quiz de prueba',
+            'Título modificado sin guardar',
             $componente->get('resumenPublicacion')['titulo']
         );
 
@@ -116,8 +116,7 @@ class QuizParcialesPublicacionTest extends TestCase
             ->set('titulo', 'Título modificado')
             ->call('solicitarPublicacion')
             ->assertSet('publicacionConCambios', true)
-            ->assertSee('Tienes cambios sin guardar')
-            ->assertSee('Guardar y publicar')
+            ->assertSee('Se guardarán los cambios del formulario antes de publicar.')
             ->call('confirmarPublicacion')
             ->assertHasNoErrors()
             ->assertSet('mostrarConfirmacionPublicacion', false)
@@ -300,12 +299,58 @@ class QuizParcialesPublicacionTest extends TestCase
         $this->assertSame($borradorId, $componente->get('borradorId'));
     }
 
-    public function test_no_solicita_publicacion_sin_un_borrador_guardado(): void
+    public function test_publica_directamente_sin_guardar_borrador_antes(): void
     {
-        Livewire::test(QuizParciales::class)
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Quiz sin borrador')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasNoErrors()
+            ->assertSet('pasoDos', true)
+            ->assertSet('borradorId', null)
+            ->call('cambiarTipoPregunta', 'oracion')
+            ->set('preguntaActual.enunciado', 'Pregunta directa');
+
+        $this->assertDatabaseCount('evaluaciones_digitales', 0);
+
+        $componente
             ->call('solicitarPublicacion')
-            ->assertHasErrors('borrador')
-            ->assertSet('mostrarConfirmacionPublicacion', false);
+            ->assertHasNoErrors()
+            ->assertSet('mostrarConfirmacionPublicacion', true)
+            ->assertSet('publicacionConCambios', true)
+            ->call('publicarConfirmado')
+            ->assertHasNoErrors()
+            ->assertSet('borradorPublicado', true);
+
+        $this->assertNotNull($componente->get('evaluacionPublicadaId'));
+        $this->assertSame(1, Evaluacion::count());
+        $this->assertSame(
+            1,
+            EvaluacionDigital::where(
+                'estado',
+                EvaluacionDigital::ESTADO_PUBLICADA
+            )->count()
+        );
+    }
+
+    public function test_publicar_confirmado_publica_en_un_solo_paso(): void
+    {
+        $componente = $this->guardarBorradorConPregunta();
+
+        $componente
+            ->call('solicitarPublicacion')
+            ->assertSet('mostrarConfirmacionPublicacion', true)
+            ->call('publicarConfirmado')
+            ->assertHasNoErrors()
+            ->assertSet('borradorPublicado', true)
+            ->assertDontSee('Publicar ahora');
+
+        $this->assertSame(1, Evaluacion::count());
+        $this->assertNotNull($componente->get('evaluacionPublicadaId'));
     }
 
     public function test_el_paso_5_2_no_invoca_el_servicio_de_publicacion(): void
@@ -726,15 +771,14 @@ class QuizParcialesPublicacionTest extends TestCase
     public function test_publica_la_version_persistida_y_no_el_formulario(): void
     {
         $componente = $this->guardarBorradorConPregunta();
+        $borradorId = $componente->get('borradorId');
 
         $componente->set('titulo', 'Título guardado');
 
         $this->prepararPublicacion($componente);
         $this->publicar($componente);
 
-        $digital = EvaluacionDigital::findOrFail(
-            $componente->get('borradorId')
-        );
+        $digital = EvaluacionDigital::findOrFail($borradorId);
         $evaluacion = Evaluacion::findOrFail($digital->evaluacion_id);
 
         $this->assertSame('Título guardado', $evaluacion->nombre);
@@ -1044,6 +1088,40 @@ class QuizParcialesPublicacionTest extends TestCase
             'estado' => EvaluacionDigital::ESTADO_BORRADOR,
         ]);
         $this->assertDatabaseCount('evaluaciones', 0);
+    }
+
+    public function test_al_publicar_limpia_el_formulario_y_conserva_la_vista_previa(): void
+    {
+        $componente = $this->guardarBorradorConPregunta();
+
+        $this->prepararPublicacion($componente);
+        $this->publicar($componente);
+
+        $componente
+            ->assertSet('pasoDos', false)
+            ->assertSet('borradorId', null)
+            ->assertSet('titulo', '')
+            ->assertSee('Esta vista permanece hasta que generes una nueva evaluación.')
+            ->assertSee('Quiz de prueba');
+
+        $vistaPrevia = $componente->get('vistaPreviaPublicada');
+
+        $this->assertIsArray($vistaPrevia);
+        $this->assertSame('Quiz de prueba', $vistaPrevia['titulo']);
+        $this->assertCount(1, $vistaPrevia['preguntas']);
+
+        $componente
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Quiz nuevo')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertHasNoErrors()
+            ->assertSet('pasoDos', true)
+            ->assertSet('vistaPreviaPublicada', null)
+            ->assertSee('Quiz nuevo');
     }
 
     private function publicar(Testable $componente): Testable

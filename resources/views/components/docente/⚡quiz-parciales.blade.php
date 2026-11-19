@@ -307,6 +307,16 @@
                                 </span>
                             </button>
 
+                            @if ($configuracionAnterior !== null)
+                                <button
+                                    type="button"
+                                    wire:click="cancelarVolverAConfiguracion"
+                                    class="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    Cancelar
+                                </button>
+                            @endif
+
                         </form>
 
                     @else
@@ -590,53 +600,20 @@
                                 @endif
                             </div>
 
-                            @if ($solicitudPublicacionPreparada)
-                                <div class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                                    <p>
-                                        Solicitud de publicación preparada para la versión guardada.
-                                    </p>
-
-                                    <button
-                                        type="button"
-                                        wire:click="publicarSolicitudPreparada"
-                                        wire:loading.attr="disabled"
-                                        wire:target="publicarSolicitudPreparada"
-                                        class="mt-2 w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                                    >
-                                        <span wire:loading.remove wire:target="publicarSolicitudPreparada">
-                                            Publicar ahora
-                                        </span>
-                                        <span wire:loading wire:target="publicarSolicitudPreparada">
-                                            Publicando...
-                                        </span>
-                                    </button>
-                                </div>
-                            @elseif ($solicitudPublicacionInvalidada)
-                                <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                                    La solicitud preparada ya no es válida porque cambió el formulario o la versión guardada. Vuelve a confirmar la publicación.
-                                </div>
-                            @endif
-
-                            @if ($borradorId)
-                                <button
-                                    type="button"
-                                    wire:click="solicitarPublicacion"
-                                    wire:loading.attr="disabled"
-                                    wire:target="solicitarPublicacion"
-                                    class="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
-                                >
-                                    <span wire:loading.remove wire:target="solicitarPublicacion">
-                                        Publicar
-                                    </span>
-                                    <span wire:loading wire:target="solicitarPublicacion">
-                                        Preparando...
-                                    </span>
-                                </button>
-                            @else
-                                <p class="mt-2 text-center text-xs text-slate-400">
-                                    Guarda el borrador para poder publicar.
-                                </p>
-                            @endif
+                            <button
+                                type="button"
+                                wire:click="solicitarPublicacion"
+                                wire:loading.attr="disabled"
+                                wire:target="solicitarPublicacion"
+                                class="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                <span wire:loading.remove wire:target="solicitarPublicacion">
+                                    Publicar
+                                </span>
+                                <span wire:loading wire:target="solicitarPublicacion">
+                                    Preparando...
+                                </span>
+                            </button>
 
                             <button
                                 type="button"
@@ -667,14 +644,171 @@
                             </p>
                         </div>
 
-                        @if ($pasoDos)
+                        @if ($vistaPreviaPublicada !== null)
+                            <span class="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                                Publicada
+                            </span>
+                        @elseif ($pasoDos)
                             <span class="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                                 Configuración completa
                             </span>
                         @endif
                     </div>
 
-                    @if (!$grupoSeleccionado)
+                    @if ($vistaPreviaPublicada !== null)
+
+                        <div class="space-y-5 px-6 py-6">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    Título
+                                </p>
+                                <h3 class="mt-1 text-xl font-bold text-slate-800">
+                                    {{ $vistaPreviaPublicada['titulo'] }}
+                                </h3>
+                            </div>
+
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Materia y grupo
+                                    </p>
+                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                        {{ $vistaPreviaPublicada['materia'] }}
+                                    </p>
+                                    <p class="text-sm text-slate-500">
+                                        Semestre {{ $vistaPreviaPublicada['semestre'] ?? '—' }}
+                                        · {{ $vistaPreviaPublicada['anio'] ?? '—' }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Tipo
+                                    </p>
+                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                        {{ $vistaPreviaPublicada['tipo'] === 'Parcial'
+                                            ? 'Parcial ' . ($vistaPreviaPublicada['parcial'] ?? '—')
+                                            : 'Quiz' }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Fecha
+                                    </p>
+                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                        {{ $vistaPreviaPublicada['fecha'] }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Horario
+                                    </p>
+                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                        {{ $vistaPreviaPublicada['horario'] }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Modalidad
+                                    </p>
+                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                        {{ $vistaPreviaPublicada['modalidad'] }}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                        Docente
+                                    </p>
+                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                        {{ auth()->user()->name ?? 'Docente' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            @if (count($vistaPreviaPublicada['preguntas']) === 0)
+
+                                <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+                                    <p class="text-sm font-semibold text-slate-700">
+                                        Preguntas de la evaluación
+                                    </p>
+                                    <p class="mt-1 text-sm text-slate-400">
+                                        Todavía no se han agregado preguntas.
+                                    </p>
+                                </div>
+
+                            @else
+
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <p class="text-sm font-semibold text-slate-700">
+                                            Preguntas de la evaluación
+                                        </p>
+                                        <span class="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                            {{ count($vistaPreviaPublicada['preguntas']) }}
+                                        </span>
+                                    </div>
+
+                                    @foreach ($vistaPreviaPublicada['preguntas'] as $indice => $pregunta)
+                                        @php
+                                            $etiquetaTipo = match ($pregunta['tipo']) {
+                                                'oracion' => 'Oración',
+                                                'multiple' => 'Respuesta múltiple',
+                                                'verdadero_falso' => 'Verdadero o falso',
+                                                default => $pregunta['tipo'],
+                                            };
+                                        @endphp
+
+                                        <div class="rounded-xl border border-slate-200 bg-white p-4">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                                Pregunta {{ $indice + 1 }} · {{ $etiquetaTipo }}
+                                            </p>
+
+                                            <p class="mt-1 text-sm font-semibold text-slate-800">
+                                                {{ $pregunta['enunciado'] }}
+                                            </p>
+
+                                            @if ($pregunta['tipo'] === 'oracion')
+                                                <p class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                                    Respuesta abierta · revisión manual
+                                                </p>
+                                            @else
+                                                <div class="mt-3 space-y-1.5">
+                                                    @foreach ($pregunta['opciones'] as $indiceOpcion => $opcion)
+                                                        @php
+                                                            $esCorrecta = ($pregunta['indice_correcto'] ?? null) === $indiceOpcion;
+                                                        @endphp
+
+                                                        <div class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm
+                                                            {{ $esCorrecta
+                                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                                                : 'border-slate-200 text-slate-600' }}">
+                                                            <span>{{ $opcion['texto'] ?? '' }}</span>
+
+                                                            @if ($esCorrecta)
+                                                                <span class="text-xs font-semibold text-emerald-700">
+                                                                    Correcta
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                            @endif
+
+                            <p class="text-xs text-slate-400">
+                                Esta vista permanece hasta que generes una nueva evaluación.
+                            </p>
+                        </div>
+
+                    @elseif (!$grupoSeleccionado)
 
                         <div class="px-6 py-16 text-center">
                             <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl text-slate-400">
@@ -945,13 +1079,23 @@
                                 </p>
                             </div>
 
-                            <button
-                                type="button"
-                                wire:click="solicitarEditarBorrador({{ $borrador->id }})"
-                                class="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Continuar
-                            </button>
+                            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    wire:click="solicitarEditarBorrador({{ $borrador->id }})"
+                                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    Continuar
+                                </button>
+
+                                <button
+                                    type="button"
+                                    wire:click="solicitarEliminarBorrador({{ $borrador->id }})"
+                                    class="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -1148,7 +1292,7 @@
                 </h3>
 
                 <p class="mt-2 text-sm leading-6 text-slate-500">
-                    Revisa los datos guardados antes de continuar.
+                    Revisa los datos antes de publicar.
                 </p>
 
                 <div class="mt-5 space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
@@ -1200,8 +1344,7 @@
 
                 @if ($publicacionConCambios)
                     <p class="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                        Tienes cambios sin guardar. Para preparar la publicación de la versión actual,
-                        se guardarán primero.
+                        Se guardarán los cambios del formulario antes de publicar.
                     </p>
                 @endif
 
@@ -1216,16 +1359,16 @@
 
                     <button
                         type="button"
-                        wire:click="confirmarPublicacion"
+                        wire:click="publicarConfirmado"
                         wire:loading.attr="disabled"
-                        wire:target="confirmarPublicacion"
+                        wire:target="publicarConfirmado"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="confirmarPublicacion">
-                            {{ $publicacionConCambios ? 'Guardar y publicar' : 'Publicar' }}
+                        <span wire:loading.remove wire:target="publicarConfirmado">
+                            Publicar
                         </span>
-                        <span wire:loading wire:target="confirmarPublicacion">
-                            Preparando...
+                        <span wire:loading wire:target="publicarConfirmado">
+                            Publicando...
                         </span>
                     </button>
                 </div>
@@ -1233,6 +1376,70 @@
         </div>
     @endif
 
+    @endif
+
+    @if ($mostrarConfirmacionParcialConNotas)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-6">
+            <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+                <h3 class="text-lg font-bold text-slate-900">
+                    Parcial con notas registradas
+                </h3>
+
+                <p class="mt-3 text-sm text-slate-600">
+                    El parcial escogido ya contiene una nota, si continúa puede sobreescribirse.
+                </p>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        wire:click="cancelarParcialConNotas"
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="button"
+                        wire:click="confirmarParcialConNotas"
+                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                    >
+                        Aceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($borradorEliminarId !== null)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-6">
+            <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+                <h3 class="text-lg font-bold text-slate-900">
+                    Eliminar borrador
+                </h3>
+
+                <p class="mt-3 text-sm text-slate-600">
+                    Eliminar el borrador. Si elimina este borrador se perderá por completo.
+                </p>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        wire:click="cancelarEliminarBorrador"
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="button"
+                        wire:click="confirmarEliminarBorrador"
+                        class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                        Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
     @endif
 
     {{-- DETALLE DE PUBLICACIÓN (SOLO LECTURA) --}}

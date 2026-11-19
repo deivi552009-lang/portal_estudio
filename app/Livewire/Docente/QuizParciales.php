@@ -11,6 +11,7 @@ use App\Models\Grupo;
 use App\Services\EvaluacionesDigitalesService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use JsonException;
@@ -24,6 +25,21 @@ class QuizParciales extends Component
     public string $tipo = 'quiz';
 
     public ?string $parcial = null;
+
+    #[Locked]
+    public ?array $configuracionAnterior = null;
+
+    #[Locked]
+    public bool $mostrarConfirmacionParcialConNotas = false;
+
+    #[Locked]
+    public bool $parcialConNotasConfirmado = false;
+
+    #[Locked]
+    public ?array $vistaPreviaPublicada = null;
+
+    #[Locked]
+    public ?int $borradorEliminarId = null;
 
     public string $titulo = '';
 
@@ -128,6 +144,8 @@ class QuizParciales extends Component
         }
 
         $this->parcial = null;
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
 
         if (! $valor) {
             return;
@@ -148,10 +166,19 @@ class QuizParciales extends Component
             return;
         }
 
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
+
         if ($tipo !== EvaluacionDigital::TIPO_PARCIAL) {
             $this->parcial = null;
             $this->resetValidation('parcial');
         }
+    }
+
+    public function updatedParcial(): void
+    {
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
     }
 
     public function updating($propiedad, $valor): void
@@ -200,6 +227,57 @@ class QuizParciales extends Component
             return;
         }
 
+        if (! $this->validarConfiguracion()) {
+            $this->parcialConNotasConfirmado = false;
+
+            return;
+        }
+
+        $estadoParcial = $this->tipo === EvaluacionDigital::TIPO_PARCIAL
+            ? ($this->parcialesEstado()[$this->parcial] ?? null)
+            : null;
+
+        $tieneNotas = (bool) ($estadoParcial['tiene_notas'] ?? false);
+
+        if ($tieneNotas && ! $this->parcialConNotasConfirmado) {
+            $this->mostrarConfirmacionParcialConNotas = true;
+
+            return;
+        }
+
+        $this->parcialConNotasConfirmado = false;
+        $this->mostrarConfirmacionParcialConNotas = false;
+
+        if ($this->borradorId !== null) {
+            $this->limpiarSolicitudPublicacion();
+
+            if (! $this->persistirBorrador()) {
+                return;
+            }
+        }
+
+        $this->pasoDos = true;
+        $this->vistaPreviaPublicada = null;
+        $this->borradorPublicado = false;
+        $this->evaluacionPublicadaId = null;
+        $this->configuracionAnterior = null;
+    }
+
+    public function confirmarParcialConNotas(): void
+    {
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = true;
+        $this->generarConfiguracion();
+    }
+
+    public function cancelarParcialConNotas(): void
+    {
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
+    }
+
+    private function validarConfiguracion(): bool
+    {
         $this->resetValidation();
 
         $this->validate([
@@ -219,7 +297,7 @@ class QuizParciales extends Component
                 'El grupo seleccionado no pertenece a tu cuenta.'
             );
 
-            return;
+            return false;
         }
 
         if ($this->tipo === EvaluacionDigital::TIPO_QUIZ && $this->parcial !== null) {
@@ -228,7 +306,7 @@ class QuizParciales extends Component
                 'Un Quiz no puede tener un parcial asociado.'
             );
 
-            return;
+            return false;
         }
 
         if ($this->modalidad !== EvaluacionDigital::MODALIDAD_PREGUNTAS) {
@@ -237,7 +315,7 @@ class QuizParciales extends Component
                 'Por ahora solo está disponible la modalidad Preguntas. Archivo y Mixta se habilitarán cuando se implemente la carga de archivos.'
             );
 
-            return;
+            return false;
         }
 
         if ($this->horaFin <= $this->horaInicio) {
@@ -246,7 +324,7 @@ class QuizParciales extends Component
                 'La hora final debe ser posterior a la hora inicial.'
             );
 
-            return;
+            return false;
         }
 
         if ($this->tipo === EvaluacionDigital::TIPO_PARCIAL) {
@@ -259,11 +337,11 @@ class QuizParciales extends Component
                         ?? 'El parcial seleccionado no está disponible.'
                 );
 
-                return;
+                return false;
             }
         }
 
-        $this->pasoDos = true;
+        return true;
     }
 
     public function volverAConfiguracion(): void
@@ -272,7 +350,40 @@ class QuizParciales extends Component
             return;
         }
 
+        $this->configuracionAnterior = [
+            'grupoSeleccionadoId' => $this->grupoSeleccionadoId,
+            'tipo' => $this->tipo,
+            'parcial' => $this->parcial,
+            'titulo' => $this->titulo,
+            'fecha' => $this->fecha,
+            'horaInicio' => $this->horaInicio,
+            'horaFin' => $this->horaFin,
+            'modalidad' => $this->modalidad,
+        ];
+
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
         $this->pasoDos = false;
+    }
+
+    public function cancelarVolverAConfiguracion(): void
+    {
+        if ($this->rechazarModificacionEnModoLectura()) {
+            return;
+        }
+
+        if ($this->configuracionAnterior !== null) {
+            foreach ($this->configuracionAnterior as $propiedad => $valor) {
+                $this->{$propiedad} = $valor;
+            }
+        }
+
+        $this->configuracionAnterior = null;
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
+        $this->pasoDos = true;
+        $this->limpiarSolicitudPublicacion();
+        $this->resetValidation();
     }
 
     public function solicitarEditarBorrador(int $borradorId): void
@@ -303,6 +414,108 @@ class QuizParciales extends Component
         }
 
         $this->cargarBorradorEnFormulario($borrador);
+    }
+
+    public function solicitarEliminarBorrador(int $borradorId): void
+    {
+        if ($this->rechazarModificacionEnModoLectura()) {
+            return;
+        }
+
+        $this->resetValidation('borrador');
+
+        try {
+            $borrador = $this->buscarBorradorPropio($borradorId);
+        } catch (ModelNotFoundException) {
+            $this->addError(
+                'borrador',
+                'El borrador ya no existe o no pertenece a tu cuenta.'
+            );
+
+            return;
+        }
+
+        if ($borrador->estado !== EvaluacionDigital::ESTADO_BORRADOR) {
+            $this->addError(
+                'borrador',
+                'Solo se pueden eliminar borradores. Una evaluación publicada no se elimina.'
+            );
+
+            return;
+        }
+
+        $this->borradorEliminarId = $borrador->id;
+    }
+
+    public function confirmarEliminarBorrador(): void
+    {
+        if ($this->borradorEliminarId === null) {
+            $this->addError(
+                'borrador',
+                'No hay un borrador pendiente de eliminar.'
+            );
+
+            return;
+        }
+
+        $borradorId = $this->borradorEliminarId;
+        $this->borradorEliminarId = null;
+        $this->eliminarBorrador($borradorId);
+    }
+
+    public function cancelarEliminarBorrador(): void
+    {
+        $this->borradorEliminarId = null;
+        $this->resetValidation('borrador');
+    }
+
+    public function eliminarBorrador(int $borradorId): void
+    {
+        if ($this->rechazarModificacionEnModoLectura()) {
+            return;
+        }
+
+        $this->resetValidation('borrador');
+
+        try {
+            $borrador = $this->buscarBorradorPropio($borradorId);
+        } catch (ModelNotFoundException) {
+            $this->addError(
+                'borrador',
+                'El borrador ya no existe o no pertenece a tu cuenta.'
+            );
+
+            return;
+        }
+
+        if ($borrador->estado !== EvaluacionDigital::ESTADO_BORRADOR) {
+            $this->addError(
+                'borrador',
+                'Solo se pueden eliminar borradores. Una evaluación publicada no se elimina.'
+            );
+
+            return;
+        }
+
+        $eraElBorradorActivo = $this->borradorId === $borrador->id;
+
+        try {
+            $borrador->delete();
+        } catch (\Throwable $e) {
+            $this->addError(
+                'borrador',
+                'No se pudo eliminar el borrador. Inténtalo de nuevo.'
+            );
+
+            return;
+        }
+
+        if ($eraElBorradorActivo) {
+            $this->vistaPreviaPublicada = null;
+            $this->iniciarNuevoBorrador();
+        }
+
+        session()->flash('mensaje', 'El borrador se eliminó correctamente.');
     }
 
     public function abrirPublicacion(int $publicacionId): void
@@ -404,41 +617,69 @@ class QuizParciales extends Component
             return;
         }
 
-        if ($this->borradorId === null) {
+        if (! $this->pasoDos) {
             $this->addError(
                 'borrador',
-                'Guarda el borrador antes de solicitar la publicación.'
+                'Genera primero la configuración de la evaluación.'
             );
 
             return;
         }
 
-        try {
-            $borrador = $this->buscarBorradorPropio($this->borradorId);
-        } catch (ModelNotFoundException) {
+        $hayCambios = $this->borradorId === null
+            || $this->tieneCambiosSinGuardar();
+
+        $this->publicacionConCambios = $hayCambios;
+
+        if ($this->borradorId !== null) {
+            try {
+                $borrador = $this->buscarBorradorPropio($this->borradorId);
+            } catch (ModelNotFoundException) {
+                $this->addError(
+                    'borrador',
+                    'El borrador ya no existe o no pertenece a tu cuenta.'
+                );
+
+                return;
+            }
+
+            if (! $hayCambios) {
+                if (! $this->borradorEsPublicable($borrador)) {
+                    return;
+                }
+
+                if (! $this->versionGuardadaCoincide($borrador)) {
+                    $this->addError(
+                        'borrador',
+                        'El borrador cambió desde que lo cargaste. Vuelve a cargarlo antes de publicar.'
+                    );
+
+                    return;
+                }
+
+                $this->resumenPublicacion = $this->resumenPublicacionDesde(
+                    $borrador
+                );
+                $this->mostrarConfirmacionPublicacion = true;
+
+                return;
+            }
+        }
+
+        if (! $this->validarConfiguracion()) {
+            return;
+        }
+
+        if (! $this->preguntasAgregadasSonValidas()) {
             $this->addError(
                 'borrador',
-                'El borrador ya no existe o no pertenece a tu cuenta.'
+                'La integridad de las preguntas no se pudo verificar. Guarda el borrador antes de publicar.'
             );
 
             return;
         }
 
-        if (! $this->borradorEsPublicable($borrador)) {
-            return;
-        }
-
-        if (! $this->versionGuardadaCoincide($borrador)) {
-            $this->addError(
-                'borrador',
-                'El borrador cambió desde que lo cargaste. Vuelve a cargarlo antes de publicar.'
-            );
-
-            return;
-        }
-
-        $this->resumenPublicacion = $this->resumenPublicacionDesde($borrador);
-        $this->publicacionConCambios = $this->tieneCambiosSinGuardar();
+        $this->resumenPublicacion = $this->resumenPublicacionDesdeFormulario();
         $this->mostrarConfirmacionPublicacion = true;
     }
 
@@ -452,11 +693,71 @@ class QuizParciales extends Component
             return;
         }
 
+        $this->resetValidation('borrador');
+
+        $hayCambios = $this->borradorId === null
+            || $this->tieneCambiosSinGuardar();
+        $this->publicacionConCambios = $hayCambios;
+
+        if ($hayCambios && $this->borradorId !== null) {
+            try {
+                $persistido = $this->buscarBorradorPropio($this->borradorId);
+            } catch (ModelNotFoundException) {
+                $this->cerrarConfirmacionPublicacion();
+                $this->addError(
+                    'borrador',
+                    'El borrador ya no existe o no pertenece a tu cuenta.'
+                );
+
+                return;
+            }
+
+            if (! $this->versionGuardadaCoincide($persistido)) {
+                $this->cerrarConfirmacionPublicacion();
+                $this->addError(
+                    'borrador',
+                    'El borrador cambió desde que lo cargaste. Vuelve a cargarlo antes de publicar.'
+                );
+
+                return;
+            }
+        }
+
+        if ($hayCambios) {
+            if (! $this->preguntasAgregadasSonValidas()) {
+                $this->cerrarConfirmacionPublicacion();
+                $this->addError(
+                    'borrador',
+                    'La integridad de las preguntas no se pudo verificar. Guarda el borrador antes de publicar.'
+                );
+
+                return;
+            }
+
+            try {
+                $guardado = $this->guardarBorrador();
+            } catch (ModelNotFoundException) {
+                $this->cerrarConfirmacionPublicacion();
+                $this->addError(
+                    'borrador',
+                    'El borrador ya no existe o no pertenece a tu cuenta.'
+                );
+
+                return;
+            }
+
+            if (! $guardado) {
+                $this->cerrarConfirmacionPublicacion();
+
+                return;
+            }
+        }
+
         if ($this->borradorId === null) {
             $this->cerrarConfirmacionPublicacion();
             $this->addError(
                 'borrador',
-                'Guarda el borrador antes de solicitar la publicación.'
+                'No se pudo guardar el borrador antes de publicar.'
             );
 
             return;
@@ -484,69 +785,8 @@ class QuizParciales extends Component
             $this->cerrarConfirmacionPublicacion();
             $this->addError(
                 'borrador',
-                'El borrador cambió desde que lo cargaste. Vuelve a cargarlo antes de publicar.'
+                'El borrador cambió durante el guardado. Vuelve a cargarlo antes de publicar.'
             );
-
-            return;
-        }
-
-        $hayCambios = $this->tieneCambiosSinGuardar();
-        $this->publicacionConCambios = $hayCambios;
-
-        if ($hayCambios) {
-            if (! $this->preguntasAgregadasSonValidas()) {
-                $this->cerrarConfirmacionPublicacion();
-                $this->addError(
-                    'borrador',
-                    'La integridad de las preguntas no se pudo verificar. Recarga el borrador antes de publicar.'
-                );
-
-                return;
-            }
-
-            try {
-                $guardado = $this->guardarBorrador();
-            } catch (ModelNotFoundException) {
-                $this->cerrarConfirmacionPublicacion();
-                $this->addError(
-                    'borrador',
-                    'El borrador ya no existe o no pertenece a tu cuenta.'
-                );
-
-                return;
-            }
-
-            if (! $guardado) {
-                $this->cerrarConfirmacionPublicacion();
-
-                return;
-            }
-
-            try {
-                $borradorActual = $this->buscarBorradorPropio($this->borradorId);
-            } catch (ModelNotFoundException) {
-                $this->cerrarConfirmacionPublicacion();
-                $this->addError(
-                    'borrador',
-                    'El borrador ya no existe o no pertenece a tu cuenta.'
-                );
-
-                return;
-            }
-
-            if (! $this->versionGuardadaCoincide($borradorActual)) {
-                $this->cerrarConfirmacionPublicacion();
-                $this->addError(
-                    'borrador',
-                    'El borrador cambió durante el guardado. Vuelve a cargarlo antes de publicar.'
-                );
-
-                return;
-            }
-        }
-
-        if (! $this->borradorEsPublicable($borradorActual)) {
-            $this->cerrarConfirmacionPublicacion();
 
             return;
         }
@@ -558,11 +798,17 @@ class QuizParciales extends Component
         }
 
         $this->cerrarConfirmacionPublicacion(false);
+    }
 
-        session()->flash(
-            'mensaje',
-            'La solicitud de publicación quedó preparada para la versión guardada. La publicación real se habilitará en el siguiente paso.'
-        );
+    public function publicarConfirmado(): void
+    {
+        $this->confirmarPublicacion();
+
+        if (! $this->solicitudPublicacionPreparada) {
+            return;
+        }
+
+        $this->publicarSolicitudPreparada();
     }
 
     public function cancelarPublicacion(): void
@@ -693,6 +939,9 @@ class QuizParciales extends Component
                 'mensaje',
                 'La evaluación se publicó correctamente.'
             );
+
+            $this->vistaPreviaPublicada = $this->vistaPreviaDesde($publicada);
+            $this->limpiarFormularioTrasPublicacion();
         } catch (ValidationException $e) {
             foreach ($e->errors() as $campo => $mensajes) {
                 $this->addError($campo, $mensajes[0]);
@@ -875,17 +1124,96 @@ class QuizParciales extends Component
 
         return [
             'titulo' => $borrador->titulo,
-            'materia' => $borrador->grupo?->materia?->nombre ?? '—',
+            'materia' => $borrador->grupo?->materia?->nombre ?? '-',
             'semestre' => $borrador->grupo?->semestre,
             'anio' => $borrador->grupo?->anio,
             'tipo' => $borrador->tipo === EvaluacionDigital::TIPO_PARCIAL
                 ? 'Parcial'
                 : 'Quiz',
             'parcial' => $borrador->parcial,
-            'fecha' => $borrador->fecha?->format('d/m/Y') ?? '—',
+            'fecha' => $borrador->fecha?->format('d/m/Y') ?? '-',
             'horario' => substr((string) $borrador->hora_inicio, 0, 5)
                 .' – '.substr((string) $borrador->hora_fin, 0, 5),
             'cantidad_preguntas' => $borrador->preguntas->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resumenPublicacionDesdeFormulario(): array
+    {
+        $grupo = $this->grupoSeleccionadoId
+            ? $this->grupoPropio((int) $this->grupoSeleccionadoId)
+            : null;
+
+        $cantidad = count($this->preguntas);
+
+        if (trim((string) ($this->preguntaActual['enunciado'] ?? '')) !== '') {
+            $cantidad++;
+        }
+
+        return [
+            'titulo' => $this->titulo,
+            'materia' => $grupo?->materia?->nombre ?? '-',
+            'semestre' => $grupo?->semestre,
+            'anio' => $grupo?->anio,
+            'tipo' => $this->tipo === EvaluacionDigital::TIPO_PARCIAL
+                ? 'Parcial'
+                : 'Quiz',
+            'parcial' => $this->parcial,
+            'fecha' => Carbon::parse($this->fecha)
+                ->format('d/m/Y'),
+            'horario' => $this->horaInicio.' - '.$this->horaFin,
+            'cantidad_preguntas' => $cantidad,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function vistaPreviaDesde(EvaluacionDigital $digital): array
+    {
+        $digital->loadMissing(['grupo.materia', 'preguntas.opciones']);
+
+        $preguntas = $digital->preguntas
+            ->sortBy('orden')
+            ->values()
+            ->map(function (EvaluacionDigitalPregunta $pregunta) {
+                $opciones = $pregunta->opciones->sortBy('orden')->values();
+                $indiceCorrecto = $opciones->search(
+                    fn ($opcion) => (bool) $opcion->es_correcta
+                );
+
+                return [
+                    'enunciado' => $pregunta->enunciado,
+                    'tipo' => $pregunta->tipo,
+                    'opciones' => $opciones
+                        ->map(fn ($opcion) => [
+                            'texto' => $opcion->texto,
+                        ])
+                        ->all(),
+                    'indice_correcto' => $indiceCorrecto === false
+                        ? null
+                        : $indiceCorrecto,
+                ];
+            })
+            ->all();
+
+        return [
+            'titulo' => $digital->titulo,
+            'materia' => $digital->grupo?->materia?->nombre ?? 'Sin materia',
+            'semestre' => $digital->grupo?->semestre,
+            'anio' => $digital->grupo?->anio,
+            'tipo' => $digital->tipo === EvaluacionDigital::TIPO_PARCIAL
+                ? 'Parcial'
+                : 'Quiz',
+            'parcial' => $digital->parcial,
+            'fecha' => $digital->fecha?->format('d/m/Y') ?? 'Sin fecha',
+            'horario' => substr((string) $digital->hora_inicio, 0, 5)
+                .' - '.substr((string) $digital->hora_fin, 0, 5),
+            'modalidad' => ucfirst((string) $digital->modalidad),
+            'preguntas' => $preguntas,
         ];
     }
 
@@ -991,12 +1319,15 @@ class QuizParciales extends Component
             return false;
         }
 
-        $this->generarConfiguracion();
-
-        if (count($this->getErrorBag()->all()) > 0) {
+        if (! $this->validarConfiguracion()) {
             return false;
         }
 
+        return $this->persistirBorrador();
+    }
+
+    private function persistirBorrador(): bool
+    {
         $borrador = null;
 
         if ($this->borradorId !== null) {
@@ -1143,12 +1474,35 @@ class QuizParciales extends Component
         $this->archivoExistente = null;
         $this->ultimoGuardado = null;
         $this->pasoDos = false;
+        $this->configuracionAnterior = null;
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
         $this->mostrarConfirmacionCambio = false;
         $this->borradorPendienteId = null;
         $this->accionPendiente = '';
         $this->limpiarSolicitudPublicacion();
         $this->borradorPublicado = false;
         $this->evaluacionPublicadaId = null;
+        $this->publicando = false;
+        $this->huellaBorradorGuardado = '';
+        $this->firmaPreguntas = $this->hashPreguntasAgregadas($this->preguntas);
+        $this->marcarEstadoGuardado();
+    }
+
+    private function limpiarFormularioTrasPublicacion(): void
+    {
+        $this->borradorId = null;
+        $this->reiniciarFormularioEvaluacion();
+        $this->archivoExistente = null;
+        $this->ultimoGuardado = null;
+        $this->pasoDos = false;
+        $this->configuracionAnterior = null;
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
+        $this->mostrarConfirmacionCambio = false;
+        $this->borradorPendienteId = null;
+        $this->accionPendiente = '';
+        $this->limpiarSolicitudPublicacion();
         $this->publicando = false;
         $this->huellaBorradorGuardado = '';
         $this->firmaPreguntas = $this->hashPreguntasAgregadas($this->preguntas);
@@ -1253,6 +1607,10 @@ class QuizParciales extends Component
         $this->preguntas = $preguntas;
         $this->firmaPreguntas = $firma;
         $this->huellaBorradorGuardado = $huellaGuardada;
+        $this->configuracionAnterior = null;
+        $this->mostrarConfirmacionParcialConNotas = false;
+        $this->parcialConNotasConfirmado = false;
+        $this->vistaPreviaPublicada = null;
         $this->limpiarSolicitudPublicacion();
         $this->borradorPublicado = false;
         $this->evaluacionPublicadaId = null;
@@ -2245,7 +2603,7 @@ class QuizParciales extends Component
     }
 
     /**
-     * @return array<string, array{estado: string, etiqueta: string, clase: string, seleccionable: bool, mensaje: string}>
+     * @return array<string, array{estado: string, etiqueta: string, clase: string, seleccionable: bool, mensaje: string, tiene_notas: bool}>
      */
     private function parcialesEstado(): array
     {
@@ -2303,6 +2661,14 @@ class QuizParciales extends Component
             $evaluaciones = $oficiales->get($parcial, collect());
             $digitalesPeriodo = $digitales->get($parcial, collect());
 
+            $tieneNotas = $evaluaciones->contains(
+                fn (Evaluacion $evaluacion) => in_array(
+                    $evaluacion->id,
+                    $evaluacionesConNotas,
+                    true
+                )
+            );
+
             if ($evaluaciones->isEmpty()) {
                 $estados[$parcial] = [
                     'estado' => 'sin_oficial',
@@ -2310,6 +2676,7 @@ class QuizParciales extends Component
                     'clase' => 'bg-slate-100 text-slate-600',
                     'seleccionable' => false,
                     'mensaje' => "No existe la evaluación oficial {$parcial} en este grupo.",
+                    'tiene_notas' => false,
                 ];
 
                 continue;
@@ -2322,6 +2689,7 @@ class QuizParciales extends Component
                     'clase' => 'bg-red-50 text-red-700',
                     'seleccionable' => false,
                     'mensaje' => "Hay más de una evaluación oficial {$parcial} en este grupo.",
+                    'tiene_notas' => $tieneNotas,
                 ];
 
                 continue;
@@ -2339,6 +2707,7 @@ class QuizParciales extends Component
                     'clase' => 'bg-red-50 text-red-700',
                     'seleccionable' => false,
                     'mensaje' => "El parcial {$parcial} ya tiene una evaluación digital publicada.",
+                    'tiene_notas' => $tieneNotas,
                 ];
 
                 continue;
@@ -2356,18 +2725,11 @@ class QuizParciales extends Component
                     'clase' => 'bg-amber-50 text-amber-700',
                     'seleccionable' => true,
                     'mensaje' => '',
+                    'tiene_notas' => $tieneNotas,
                 ];
 
                 continue;
             }
-
-            $tieneNotas = $evaluaciones->contains(
-                fn (Evaluacion $evaluacion) => in_array(
-                    $evaluacion->id,
-                    $evaluacionesConNotas,
-                    true
-                )
-            );
 
             if ($tieneNotas) {
                 $estados[$parcial] = [
@@ -2376,6 +2738,7 @@ class QuizParciales extends Component
                     'clase' => 'bg-amber-50 text-amber-700',
                     'seleccionable' => true,
                     'mensaje' => "El parcial {$parcial} ya tiene calificaciones registradas.",
+                    'tiene_notas' => true,
                 ];
 
                 continue;
@@ -2387,6 +2750,7 @@ class QuizParciales extends Component
                 'clase' => 'bg-emerald-50 text-emerald-700',
                 'seleccionable' => true,
                 'mensaje' => '',
+                'tiene_notas' => false,
             ];
         }
 

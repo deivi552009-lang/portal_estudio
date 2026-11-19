@@ -1,5 +1,5 @@
 # Agentes de documentación — evaluación y prioridad
-Última actualización: 2026-11-17
+Última actualización: 2026-11-19
 
 ## Objetivo
 Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
@@ -11,7 +11,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 4. No tocar código, datos ni credenciales; no hacer commits.
 5. Necesitar cero correcciones del orquestador.
 
-## Evidencia disponible (al 2026-11-17)
+## Evidencia disponible (al 2026-11-19)
 | Modelo | Tarea | Resultado | Correcciones del orquestador |
 |---|---|---|---|
 | `opencode/deepseek-v4.1-flash-free` (titular) | Selector de grupos en la planilla de notas | Completado | 3: modelo «Free» en relevo, sección obsoleta de revisión, índice con P1 ya cerrado |
@@ -57,8 +57,13 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `opencode/beam-free` | Pendientes y estado (`pendientes.md`, `estado-actual.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 0 en contenido; el orquestador ajustó cifras 15/56→22/90. |
 | `opencode/beam-free` | Relevo, índice y bitácora (`relevo.md`, `00-INDICE.md`, `bitacora/2026-11-17.md`) | Parcial: máximo de pasos; necesitó 3 ejecuciones; no creó la bitácora | 1: el orquestador corrigió frases de «árbol de trabajo», «no escribe calificaciones oficiales» y «pendiente de commit»; el índice se completó en una ejecución aparte. |
 | `opencode/big-pickle` | Bitácora 2026-11-17 (`bitacora/2026-11-17.md`) | Completado en 1 ejecución | 0. |
+| `opencode/beam-free` | Quiz/Parciales UX 2026-11-19 (`modulos/quiz-parciales.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 2: faltaba la sección «Ajustes de UI del 2026-11-19» y actualizar pruebas/riesgos/próximos pasos. |
+| `opencode/beam-free` | Panel docente UX 2026-11-19 (`modulos/panel-docente.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 0 tras completar flujo, estado, puntos delicados y hallazgos. |
+| `opencode/beam-free` | Decisiones y pendientes UX 2026-11-19 (`decisiones.md`, `pendientes.md`) | Parcial: máximo de pasos; necesitó 2 ejecuciones | 0; el segundo encargo completó «Por confirmar» y la nota histórica del 2026-11-17. |
+| `opencode/beam-free` | Estado y relevo UX 2026-11-19 (`estado-actual.md`, `relevo.md`) | Completado | 1: el orquestador precisó que se retiró la solicitud de la interfaz, no los métodos internos. |
+| `opencode/beam-free` | Índice y bitácora 2026-11-19 (`00-INDICE.md`, `bitacora/2026-11-19.md`) | Completado | 2: se eliminó una duda innecesaria sobre Quiz y se precisó que la solicitud preparada solo se retiró de la interfaz; se añadieron los archivos de prueba. |
 
-**Conclusión:** Los cuatro primeros modelos no pudieron documentar por límite de uso gratuito el 2026-11-16; `opencode/beam-free` fue el único operativo y completó panel, Quiz/Parciales, relevo/índice/arquitectura/bitácora, estado/pendientes y decisiones, con límite de pasos y correcciones del orquestador. La documentación de cierre de Quiz/Parciales se completó con Beam, hubo límite de pasos y correcciones del orquestador; Beam sigue como primera opción operativa mientras tenga cuota y no se marca «recomendado» por cero errores. El 2026-11-17 Beam completó módulos, decisiones, pendientes, estado, relevo e índice con límite de pasos y correcciones del orquestador; la bitácora la completó Big Pickle. La revisión del orquestador sigue siendo obligatoria.
+**Conclusión:** Los cuatro primeros modelos no pudieron documentar por límite de uso gratuito el 2026-11-16; `opencode/beam-free` fue el único operativo y completó panel, Quiz/Parciales, relevo/índice/arquitectura/bitácora, estado/pendientes y decisiones, con límite de pasos y correcciones del orquestador. La documentación de cierre de Quiz/Parciales se completó con Beam, hubo límite de pasos y correcciones del orquestador; Beam sigue como primera opción operativa mientras tenga cuota y no se marca «recomendado» por cero errores. El 2026-11-17 Beam completó módulos, decisiones, pendientes, estado, relevo e índice con límite de pasos y correcciones del orquestador; la bitácora la completó Big Pickle. El 2026-11-19 Beam completó los ajustes de UX en módulos, decisiones, pendientes, estado, relevo, índice y bitácora con límite de pasos y correcciones del orquestador. La revisión del orquestador sigue siendo obligatoria.
 
 ## Lista de prioridad (provisional)
 Orden operativo 2026-11-16: empezar por `opencode/beam-free` si sigue disponible; Big Pickle, DeepSeek, MiMo y GLM agotaron la cuota gratuita en esta ejecución.

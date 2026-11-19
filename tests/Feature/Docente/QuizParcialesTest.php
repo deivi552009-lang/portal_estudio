@@ -610,6 +610,397 @@ class QuizParcialesTest extends TestCase
             );
     }
 
+    public function test_pide_confirmacion_si_el_parcial_tiene_notas_al_generar(): void
+    {
+        $oficial = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 4.00,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->set('parcial', 'P1')
+            ->set('titulo', 'Parcial con notas')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertSet('mostrarConfirmacionParcialConNotas', true)
+            ->assertSet('pasoDos', false)
+            ->assertSee('El parcial escogido ya contiene una nota, si continúa puede sobreescribirse.');
+
+        $componente
+            ->call('cancelarParcialConNotas')
+            ->assertSet('mostrarConfirmacionParcialConNotas', false)
+            ->assertSet('pasoDos', false);
+
+        $componente
+            ->call('generarConfiguracion')
+            ->assertSet('mostrarConfirmacionParcialConNotas', true)
+            ->call('confirmarParcialConNotas')
+            ->assertSet('mostrarConfirmacionParcialConNotas', false)
+            ->assertSet('pasoDos', true);
+    }
+
+    public function test_pide_confirmacion_aunque_exista_borrador_del_parcial_con_notas(): void
+    {
+        $oficial = $this->crearOficial('P1');
+        $estudiante = $this->crearEstudiante();
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $estudiante->id,
+            'nota' => 3.00,
+        ]);
+
+        EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => $oficial->id,
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => 'P1',
+            'titulo' => 'Borrador P1 con notas',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('tipo', 'parcial')
+            ->set('parcial', 'P1')
+            ->assertViewHas(
+                'parcialesEstado',
+                fn ($estados) => $estados['P1']['estado'] === 'borrador'
+                    && $estados['P1']['tiene_notas'] === true
+            )
+            ->set('titulo', 'Parcial con borrador y notas')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertSet('mostrarConfirmacionParcialConNotas', true)
+            ->assertSet('pasoDos', false);
+    }
+
+    public function test_generar_de_nuevo_guarda_los_cambios_en_el_borrador(): void
+    {
+        $this->actingAs($this->usuarioDocente);
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Quiz original')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertSet('pasoDos', true)
+            ->call('guardarBorrador')
+            ->assertHasNoErrors();
+
+        $borradorId = $componente->get('borradorId');
+
+        $componente
+            ->call('volverAConfiguracion')
+            ->assertSet('pasoDos', false)
+            ->set('titulo', 'Quiz actualizado')
+            ->call('generarConfiguracion')
+            ->assertHasNoErrors()
+            ->assertSet('pasoDos', true)
+            ->assertSet('configuracionAnterior', null);
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $borradorId,
+            'titulo' => 'Quiz actualizado',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+        ]);
+        $this->assertDatabaseCount('evaluaciones_digitales', 1);
+    }
+
+    public function test_cancelar_volver_a_configuracion_restaura_los_valores(): void
+    {
+        $this->actingAs($this->usuarioDocente);
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Quiz original')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertSet('pasoDos', true)
+            ->call('guardarBorrador')
+            ->assertHasNoErrors();
+
+        $borradorId = $componente->get('borradorId');
+
+        $componente
+            ->call('volverAConfiguracion')
+            ->assertSet('pasoDos', false)
+            ->assertSee('Cancelar')
+            ->set('titulo', 'Quiz cancelado')
+            ->call('cancelarVolverAConfiguracion')
+            ->assertSet('pasoDos', true)
+            ->assertSet('titulo', 'Quiz original')
+            ->assertSet('configuracionAnterior', null);
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $borradorId,
+            'titulo' => 'Quiz original',
+        ]);
+    }
+
+    public function test_elimina_un_borrador_propio_y_sus_preguntas(): void
+    {
+        $this->actingAs($this->usuarioDocente);
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->set('titulo', 'Borrador a eliminar')
+            ->set('fecha', '2026-12-01')
+            ->set('horaInicio', '08:00')
+            ->set('horaFin', '09:00')
+            ->set('modalidad', 'preguntas')
+            ->call('generarConfiguracion')
+            ->assertSet('pasoDos', true)
+            ->call('cambiarTipoPregunta', 'multiple')
+            ->set('preguntaActual.enunciado', 'Pregunta eliminable')
+            ->set('preguntaActual.opciones.0.texto', 'A')
+            ->set('preguntaActual.opciones.1.texto', 'B')
+            ->set('indiceCorrecto', 0)
+            ->call('guardarBorrador')
+            ->assertHasNoErrors();
+
+        $borradorId = $componente->get('borradorId');
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $borradorId,
+        ]);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 1);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 2);
+
+        $componente
+            ->call('eliminarBorrador', $borradorId)
+            ->assertHasNoErrors()
+            ->assertSet('borradorId', null)
+            ->assertSet('pasoDos', false);
+
+        $this->assertDatabaseMissing('evaluaciones_digitales', [
+            'id' => $borradorId,
+        ]);
+        $this->assertDatabaseCount('evaluacion_digital_preguntas', 0);
+        $this->assertDatabaseCount('evaluacion_digital_opciones', 0);
+    }
+
+    public function test_no_elimina_un_borrador_ajeno(): void
+    {
+        $ajeno = EvaluacionDigital::create([
+            'grupo_id' => $this->grupoAjeno->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Borrador ajeno',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->call('eliminarBorrador', $ajeno->id)
+            ->assertHasErrors('borrador');
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $ajeno->id,
+        ]);
+    }
+
+    public function test_no_elimina_una_evaluacion_publicada(): void
+    {
+        $publicada = EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Quiz publicado',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
+            'publicada_at' => now(),
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->call('eliminarBorrador', $publicada->id)
+            ->assertHasErrors('borrador');
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $publicada->id,
+            'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
+        ]);
+    }
+
+    public function test_eliminar_un_borrador_de_parcial_conserva_la_evaluacion_oficial(): void
+    {
+        $oficial = $this->crearOficial('P1');
+
+        $borrador = EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => $oficial->id,
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => 'P1',
+            'titulo' => 'Borrador de parcial',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->call('eliminarBorrador', $borrador->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseMissing('evaluaciones_digitales', [
+            'id' => $borrador->id,
+        ]);
+        $this->assertDatabaseHas('evaluaciones', [
+            'id' => $oficial->id,
+            'nombre' => 'P1',
+        ]);
+        $this->assertDatabaseCount('evaluaciones', 1);
+    }
+
+    public function test_pide_confirmacion_antes_de_eliminar_un_borrador(): void
+    {
+        $borrador = EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Borrador con confirmación',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        $componente = Livewire::test(QuizParciales::class)
+            ->call('solicitarEliminarBorrador', $borrador->id)
+            ->assertSet('borradorEliminarId', $borrador->id)
+            ->assertSee('Eliminar el borrador. Si elimina este borrador se perderá por completo')
+            ->assertSee('Confirmar')
+            ->assertSee('Cancelar');
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $borrador->id,
+        ]);
+
+        $componente
+            ->call('cancelarEliminarBorrador')
+            ->assertSet('borradorEliminarId', null);
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $borrador->id,
+        ]);
+
+        $componente
+            ->call('solicitarEliminarBorrador', $borrador->id)
+            ->call('confirmarEliminarBorrador')
+            ->assertHasNoErrors()
+            ->assertSet('borradorEliminarId', null);
+
+        $this->assertDatabaseMissing('evaluaciones_digitales', [
+            'id' => $borrador->id,
+        ]);
+    }
+
+    public function test_no_abre_confirmacion_para_un_borrador_ajeno(): void
+    {
+        $ajeno = EvaluacionDigital::create([
+            'grupo_id' => $this->grupoAjeno->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Borrador ajeno',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_BORRADOR,
+            'publicada_at' => null,
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->call('solicitarEliminarBorrador', $ajeno->id)
+            ->assertHasErrors('borrador')
+            ->assertSet('borradorEliminarId', null);
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $ajeno->id,
+        ]);
+    }
+
+    public function test_no_abre_confirmacion_para_una_evaluacion_publicada(): void
+    {
+        $publicada = EvaluacionDigital::create([
+            'grupo_id' => $this->grupo->id,
+            'evaluacion_id' => null,
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'titulo' => 'Quiz publicado',
+            'modalidad' => EvaluacionDigital::MODALIDAD_PREGUNTAS,
+            'fecha' => '2026-12-01',
+            'hora_inicio' => '08:00:00',
+            'hora_fin' => '09:00:00',
+            'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
+            'publicada_at' => now(),
+        ]);
+
+        $this->actingAs($this->usuarioDocente);
+
+        Livewire::test(QuizParciales::class)
+            ->call('solicitarEliminarBorrador', $publicada->id)
+            ->assertHasErrors('borrador')
+            ->assertSet('borradorEliminarId', null);
+
+        $this->assertDatabaseHas('evaluaciones_digitales', [
+            'id' => $publicada->id,
+            'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
+        ]);
+    }
+
     private function crearEstudiante(): Estudiante
     {
         $rolEstudiante = Role::firstOrCreate(['nombre' => 'Estudiante']);
