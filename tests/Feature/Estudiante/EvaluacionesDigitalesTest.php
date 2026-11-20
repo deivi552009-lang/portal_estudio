@@ -603,9 +603,19 @@ class EvaluacionesDigitalesTest extends TestCase
             $segundoGrupo->id,
             session('estudiante_evaluaciones_ultimo_grupo')
         );
+
+        $componente
+            ->set('grupoSeleccionadoId', '')
+            ->assertHasNoErrors()
+            ->assertSet('grupoSeleccionadoId', null)
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$primera->id, $segunda->id]
+            );
     }
 
-    public function test_filtro_pendientes_incluye_disponibles_y_en_curso(): void
+    public function test_filtro_disponibles_incluye_disponibles_y_en_curso(): void
     {
         $disponible = $this->crearDigital(
             $this->grupo,
@@ -653,7 +663,7 @@ class EvaluacionesDigitalesTest extends TestCase
         ]);
 
         Livewire::test(EvaluacionesDigitales::class)
-            ->assertSet('filtroEstado', 'pendientes')
+            ->assertSet('filtroEstado', 'disponibles')
             ->assertViewHas(
                 'evaluaciones',
                 fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
@@ -815,6 +825,370 @@ class EvaluacionesDigitalesTest extends TestCase
             ->assertViewHas('detalle', null);
     }
 
+    public function test_al_montar_selecciona_todos_por_defecto_y_muestra_controles_esperados(): void
+    {
+        $segundoGrupo = $this->crearGrupo(Docente::first(), 'Ciencias');
+        $segundoGrupo->estudiantes()->attach($this->estudiante->id);
+
+        session(['estudiante_evaluaciones_ultimo_grupo' => $this->grupo->id]);
+
+        $matematicas = $this->crearDigital(
+            $this->grupo,
+            'Evaluación de Matemáticas',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $ciencias = $this->crearDigital(
+            $segundoGrupo,
+            'Evaluación de Ciencias',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $this->crearDigital(
+            $this->grupoAjeno,
+            'Evaluación ajena',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->assertSet('grupoSeleccionadoId', null)
+            ->assertSet('filtroEstado', 'disponibles')
+            ->assertSee('Todos')
+            ->assertSee('Actualizar')
+            ->assertSee('Historial')
+            ->assertSee('Evaluaciones disponibles o en curso')
+            ->assertDontSee('Pendientes')
+            ->assertSee('Evaluación de Matemáticas')
+            ->assertSee('Evaluación de Ciencias')
+            ->assertDontSee('Evaluación ajena')
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$matematicas->id, $ciencias->id]
+            );
+    }
+
+    public function test_actualizar_evaluaciones_refresca_lista_cacheada_sin_polling(): void
+    {
+        $inicial = $this->crearDigital(
+            $this->grupo,
+            'Evaluación inicial',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $componente = Livewire::test(EvaluacionesDigitales::class)
+            ->assertDontSee('wire:poll')
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$inicial->id]
+            );
+
+        $nueva = $this->crearDigital(
+            $this->grupo,
+            'Nueva evaluación publicada',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        // Al interactuar con la evaluación actual no debe reconsultar la lista cacheada
+        $componente
+            ->call('seleccionarEvaluacion', $inicial->id)
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$inicial->id]
+            )
+            ->assertDontSee('Nueva evaluación publicada');
+
+        // Al pulsar «Actualizar» sí refresca la lista desde BD
+        $componente
+            ->call('actualizarEvaluaciones')
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$inicial->id, $nueva->id]
+            )
+            ->assertSee('Nueva evaluación publicada');
+
+        // toggleHistorial alterna entre historial y disponibles
+        $componente
+            ->call('toggleHistorial')
+            ->assertSet('filtroEstado', 'historial')
+            ->assertSee('Intentos enviados o calificados')
+            ->call('toggleHistorial')
+            ->assertSet('filtroEstado', 'disponibles')
+            ->assertSee('Evaluaciones disponibles o en curso');
+    }
+
+    public function test_ordena_evaluaciones_disponibles_por_fecha_y_hora_ascendente(): void
+    {
+        $segundoGrupo = $this->crearGrupo(Docente::first(), 'Ciencias');
+        $segundoGrupo->estudiantes()->attach($this->estudiante->id);
+
+        $manana = $this->crearDigital(
+            $this->grupo,
+            'Mañana temprano',
+            EvaluacionDigital::ESTADO_PUBLICADA,
+            [
+                'fecha' => '2026-12-02',
+                'hora_inicio' => '07:00:00',
+                'hora_fin' => '08:00:00',
+            ]
+        );
+
+        $hoyTarde = $this->crearDigital(
+            $segundoGrupo,
+            'Hoy tarde',
+            EvaluacionDigital::ESTADO_PUBLICADA,
+            [
+                'fecha' => '2026-12-01',
+                'hora_inicio' => '10:00:00',
+                'hora_fin' => '11:00:00',
+            ]
+        );
+
+        $hoyPronto = $this->crearDigital(
+            $this->grupo,
+            'Hoy pronto',
+            EvaluacionDigital::ESTADO_PUBLICADA,
+            [
+                'fecha' => '2026-12-01',
+                'hora_inicio' => '08:00:00',
+                'hora_fin' => '09:00:00',
+            ]
+        );
+
+        $hoyPrimero = $this->crearDigital(
+            $segundoGrupo,
+            'Hoy primero',
+            EvaluacionDigital::ESTADO_PUBLICADA,
+            [
+                'fecha' => '2026-12-01',
+                'hora_inicio' => '07:30:00',
+                'hora_fin' => '09:00:00',
+            ]
+        );
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$hoyPrimero->id, $hoyPronto->id, $hoyTarde->id, $manana->id]
+            )
+            ->set('grupoSeleccionadoId', $this->grupo->id)
+            ->assertViewHas(
+                'evaluaciones',
+                fn ($evaluaciones) => $evaluaciones->pluck('id')->all()
+                    === [$hoyPronto->id, $manana->id]
+            );
+    }
+
+    public function test_historial_muestra_calificaciones_con_codigo_de_colores_sin_exponer_es_correcta(): void
+    {
+        $evalRoja = $this->crearDigital(
+            $this->grupo,
+            'Evaluación roja',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+        $pregunta = EvaluacionDigitalPregunta::create([
+            'evaluacion_digital_id' => $evalRoja->id,
+            'orden' => 1,
+            'enunciado' => 'Pregunta de prueba',
+            'tipo' => EvaluacionDigitalPregunta::TIPO_MULTIPLE,
+        ]);
+        EvaluacionDigitalOpcion::create([
+            'pregunta_id' => $pregunta->id,
+            'texto' => 'Opción correcta',
+            'es_correcta' => true,
+            'orden' => 1,
+        ]);
+
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $evalRoja->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            'enviada_at' => now()->subMinutes(15),
+            'nota' => 2.90,
+            'calificada_at' => now(),
+        ]);
+
+        $evalAmarilla = $this->crearDigital(
+            $this->grupo,
+            'Evaluación amarilla',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $evalAmarilla->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            'enviada_at' => now()->subMinutes(10),
+            'nota' => 3.00,
+            'calificada_at' => now(),
+        ]);
+
+        $evalVerde = $this->crearDigital(
+            $this->grupo,
+            'Evaluación verde',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $evalVerde->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            'enviada_at' => now()->subMinutes(5),
+            'nota' => 4.80,
+            'calificada_at' => now(),
+        ]);
+
+        $componente = Livewire::test(EvaluacionesDigitales::class)
+            ->call('toggleHistorial')
+            ->assertSet('filtroEstado', 'historial')
+            ->assertSee('Nota: 2.90')
+            ->assertSee('Nota: 3.00')
+            ->assertSee('Nota: 4.80')
+            ->assertSee('bg-red-50 text-red-700 border-red-200')
+            ->assertSee('bg-amber-50 text-amber-700 border-amber-200')
+            ->assertSee('bg-emerald-50 text-emerald-700 border-emerald-200')
+            ->assertViewHas('evaluaciones', function ($evaluaciones) use ($evalRoja, $evalAmarilla, $evalVerde) {
+                $porId = $evaluaciones->keyBy('id');
+
+                return $porId[$evalRoja->id]['nota'] === '2.90'
+                    && $porId[$evalRoja->id]['nota_clase'] === 'bg-red-50 text-red-700 border-red-200'
+                    && $porId[$evalAmarilla->id]['nota'] === '3.00'
+                    && $porId[$evalAmarilla->id]['nota_clase'] === 'bg-amber-50 text-amber-700 border-amber-200'
+                    && $porId[$evalVerde->id]['nota'] === '4.80'
+                    && $porId[$evalVerde->id]['nota_clase'] === 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            });
+
+        $componente
+            ->call('seleccionarEvaluacion', $evalRoja->id)
+            ->assertSee('Calificación')
+            ->assertSee('2.90')
+            ->assertDontSee('es_correcta')
+            ->assertViewHas(
+                'intentoActual',
+                fn ($intento) => $intento['nota'] === '2.90'
+                    && $intento['nota_clase'] === 'bg-red-50 text-red-700 border-red-200'
+            );
+
+        $componente
+            ->call('seleccionarEvaluacion', $evalAmarilla->id)
+            ->assertSee('3.00')
+            ->assertViewHas(
+                'intentoActual',
+                fn ($intento) => $intento['nota'] === '3.00'
+                    && $intento['nota_clase'] === 'bg-amber-50 text-amber-700 border-amber-200'
+            );
+
+        $componente
+            ->call('seleccionarEvaluacion', $evalVerde->id)
+            ->assertSee('4.80')
+            ->assertViewHas(
+                'intentoActual',
+                fn ($intento) => $intento['nota'] === '4.80'
+                    && $intento['nota_clase'] === 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            );
+    }
+
+    public function test_notificacion_emergente_de_tiempo_se_renderiza_solo_en_intento_editable(): void
+    {
+        $evaluacion = $this->crearDigital(
+            $this->grupo,
+            'Evaluación con temporizador',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $componente = Livewire::test(EvaluacionesDigitales::class)
+            ->call('iniciarIntento', $evaluacion->id)
+            ->assertHasNoErrors()
+            ->assertSee('position: fixed; bottom: 1.25rem; right: 1.25rem')
+            ->assertSee('2026-12-01T09:00:00-05:00')
+            ->assertSee('Te queda media hora para terminar el examen.')
+            ->assertSee('Te quedan 15 minutos para terminar el examen.')
+            ->assertSee('Te quedan 5 minutos para terminar el examen.')
+            ->assertViewHas(
+                'intentoActual',
+                fn ($intento) => $intento['editable'] === true
+                    && $intento['cierre_iso'] === '2026-12-01T09:00:00-05:00'
+                    && ! empty($intento['servidor_ahora_iso'])
+            );
+
+        // Al enviar el intento (pasa a solo lectura), no debe renderizar el aviso emergente
+        $componente
+            ->call('solicitarEnvio')
+            ->call('enviarIntento')
+            ->assertHasNoErrors()
+            ->assertDontSee('position: fixed; bottom: 1.25rem; right: 1.25rem')
+            ->assertDontSee('Te queda media hora para terminar el examen.')
+            ->assertDontSee('Te quedan 15 minutos para terminar el examen.')
+            ->assertDontSee('Te quedan 5 minutos para terminar el examen.');
+
+        // Un intento en curso cuya ventana ya cerró: se bloquean las respuestas, se avisa que
+        // se acabó el tiempo y solo queda habilitado el envío.
+        $otra = $this->crearDigital(
+            $this->grupo,
+            'Evaluación con tiempo agotado',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+        $preguntaVencida = EvaluacionDigitalPregunta::create([
+            'evaluacion_digital_id' => $otra->id,
+            'orden' => 1,
+            'enunciado' => 'Pregunta con tiempo agotado',
+            'tipo' => EvaluacionDigitalPregunta::TIPO_ORACION,
+        ]);
+        EvaluacionDigitalIntento::create([
+            'evaluacion_digital_id' => $otra->id,
+            'estudiante_id' => $this->estudiante->id,
+            'estado' => EvaluacionDigitalIntento::ESTADO_EN_CURSO,
+        ]);
+
+        $this->fijarHoraUtc('14:00:00');
+
+        Livewire::test(EvaluacionesDigitales::class)
+            ->call('seleccionarEvaluacion', $otra->id)
+            ->assertHasNoErrors()
+            ->assertViewHas(
+                'intentoActual',
+                fn ($intento) => $intento['editable'] === false
+                    && $intento['vencido'] === true
+            )
+            ->assertSee('Se acabó el tiempo')
+            ->assertSee('Enviar evaluación')
+            ->assertSee('position: fixed; bottom: 1.25rem; right: 1.25rem')
+            ->assertDontSee('Solo lectura')
+            ->assertDontSee('Guardar respuesta')
+            ->assertDontSee('wire:model="respuestasTexto.'.$preguntaVencida->id.'"', false)
+            ->call('tiempoAgotado')
+            ->assertHasNoErrors();
+    }
+
+    public function test_muestra_boton_flecha_para_regresar_desde_historial(): void
+    {
+        $evaluacion = $this->crearDigital(
+            $this->grupo,
+            'Evaluación disponible para volver',
+            EvaluacionDigital::ESTADO_PUBLICADA
+        );
+
+        $componente = Livewire::test(EvaluacionesDigitales::class)
+            ->assertSet('filtroEstado', 'disponibles')
+            ->assertSee($evaluacion->titulo)
+            ->assertDontSeeHtml('aria-label="Volver a evaluaciones disponibles"');
+
+        $componente
+            ->call('toggleHistorial')
+            ->assertSet('filtroEstado', 'historial')
+            ->assertDontSee($evaluacion->titulo)
+            ->assertSeeHtml('aria-label="Volver a evaluaciones disponibles"')
+            ->assertSeeHtml('wire:click="cambiarFiltro(\'disponibles\')"');
+
+        $componente
+            ->call('cambiarFiltro', 'disponibles')
+            ->assertSet('filtroEstado', 'disponibles')
+            ->assertDontSeeHtml('aria-label="Volver a evaluaciones disponibles"')
+            ->assertSee($evaluacion->titulo);
+    }
+
     private function fijarHoraUtc(string $hora): void
     {
         Carbon::setTestNow(Carbon::parse(
@@ -850,9 +1224,10 @@ class EvaluacionesDigitalesTest extends TestCase
     private function crearDigital(
         Grupo $grupo,
         string $titulo,
-        string $estado
+        string $estado,
+        array $atributos = []
     ): EvaluacionDigital {
-        return EvaluacionDigital::create([
+        return EvaluacionDigital::create(array_merge([
             'grupo_id' => $grupo->id,
             'evaluacion_id' => null,
             'tipo' => EvaluacionDigital::TIPO_QUIZ,
@@ -866,6 +1241,6 @@ class EvaluacionesDigitalesTest extends TestCase
             'publicada_at' => $estado === EvaluacionDigital::ESTADO_PUBLICADA
                 ? now()
                 : null,
-        ]);
+        ], $atributos));
     }
 }

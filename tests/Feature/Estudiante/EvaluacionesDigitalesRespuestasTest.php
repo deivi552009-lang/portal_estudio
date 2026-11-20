@@ -683,7 +683,7 @@ class EvaluacionesDigitalesRespuestasTest extends TestCase
         ]);
     }
 
-    public function test_rechaza_envio_al_llegar_al_cierre(): void
+    public function test_permite_enviar_al_llegar_al_cierre_un_intento_en_curso(): void
     {
         $digital = $this->crearDigital();
 
@@ -691,20 +691,38 @@ class EvaluacionesDigitalesRespuestasTest extends TestCase
 
         $componente
             ->call('solicitarEnvio')
+            ->assertHasNoErrors()
             ->assertSet('mostrarConfirmacionEnvio', true);
 
         $this->fijarHoraUtc('14:00:00');
 
         $componente
             ->call('enviarIntento')
-            ->assertHasErrors('envio')
+            ->assertHasNoErrors()
             ->assertSet('mostrarConfirmacionEnvio', false);
 
-        $this->assertDatabaseHas('evaluacion_digital_intentos', [
-            'id' => $componente->get('intentoActualId'),
-            'estado' => EvaluacionDigitalIntento::ESTADO_EN_CURSO,
-            'enviada_at' => null,
-        ]);
+        $intento = EvaluacionDigitalIntento::query()
+            ->whereKey($componente->get('intentoActualId'))
+            ->firstOrFail();
+
+        $this->assertNotSame(
+            EvaluacionDigitalIntento::ESTADO_EN_CURSO,
+            $intento->estado
+        );
+        $this->assertNotNull($intento->enviada_at);
+    }
+
+    public function test_no_permite_enviar_antes_del_inicio_aunque_el_intento_exista(): void
+    {
+        $digital = $this->crearDigital();
+
+        $componente = $this->iniciar($digital);
+
+        $this->fijarHoraUtc('12:00:00');
+
+        $componente
+            ->call('solicitarEnvio')
+            ->assertHasErrors('envio');
     }
 
     public function test_rechaza_envio_de_intento_ajeno(): void
@@ -970,8 +988,9 @@ class EvaluacionesDigitalesRespuestasTest extends TestCase
 
         $this->fijarHoraUtc('14:00:00');
 
-        $componente->call('solicitarEnvio')->assertHasErrors('envio');
+        $componente->call('solicitarEnvio')->assertHasNoErrors();
 
+        // Pedir el envío no envía por sí solo: el intento sigue en curso hasta confirmar.
         $this->assertDatabaseHas('evaluacion_digital_intentos', [
             'id' => $componente->get('intentoActualId'),
             'estado' => EvaluacionDigitalIntento::ESTADO_EN_CURSO,

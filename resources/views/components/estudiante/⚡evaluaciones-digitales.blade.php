@@ -63,13 +63,31 @@
                 {{-- PANEL IZQUIERDO --}}
                 <div class="space-y-4 lg:col-span-1">
                     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                            Filtros
-                        </p>
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                                    Filtros
+                                </p>
 
-                        <h2 class="mt-1 text-lg font-bold text-slate-800">
-                            Materias
-                        </h2>
+                                <h2 class="mt-1 text-lg font-bold text-slate-800">
+                                    Materias
+                                </h2>
+                            </div>
+
+                            @if ($filtroEstado === 'historial')
+                                <button
+                                    type="button"
+                                    wire:click="cambiarFiltro('disponibles')"
+                                    title="Volver a evaluaciones disponibles"
+                                    aria-label="Volver a evaluaciones disponibles"
+                                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-800"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+                                    </svg>
+                                </button>
+                            @endif
+                        </div>
 
                         <label class="mt-4 block text-sm font-medium text-slate-700">
                             Materia / grupo
@@ -77,6 +95,8 @@
                                 wire:model.live="grupoSeleccionadoId"
                                 class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
                             >
+                                <option value="">Todos</option>
+
                                 @foreach ($grupos as $grupo)
                                     <option value="{{ $grupo->id }}">
                                         {{ $grupo->materia->nombre }} · Semestre {{ $grupo->semestre }} · {{ $grupo->anio }}
@@ -87,21 +107,28 @@
 
                         <div class="mt-5">
                             <p class="mb-2 text-sm font-medium text-slate-700">
-                                Estado
+                                Acciones
                             </p>
 
                             <div class="flex gap-2">
                                 <button
                                     type="button"
-                                    wire:click="cambiarFiltro('pendientes')"
-                                    class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition {{ $filtroEstado === 'pendientes' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50' }}"
+                                    wire:click="actualizarEvaluaciones"
+                                    wire:loading.attr="disabled"
+                                    wire:target="actualizarEvaluaciones"
+                                    class="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    Pendientes
+                                    <span wire:loading.remove wire:target="actualizarEvaluaciones">
+                                        Actualizar
+                                    </span>
+                                    <span wire:loading wire:target="actualizarEvaluaciones">
+                                        Actualizando...
+                                    </span>
                                 </button>
 
                                 <button
                                     type="button"
-                                    wire:click="cambiarFiltro('historial')"
+                                    wire:click="toggleHistorial"
                                     class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition {{ $filtroEstado === 'historial' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50' }}"
                                 >
                                     Historial
@@ -118,9 +145,9 @@
                                 </h2>
 
                                 <p class="mt-1 text-sm text-slate-500">
-                                    {{ $filtroEstado === 'pendientes'
-                                        ? 'Disponibles o con intento en curso'
-                                        : 'Intentos enviados o calificados' }}
+                                    {{ $filtroEstado === 'historial'
+                                        ? 'Intentos enviados o calificados'
+                                        : 'Evaluaciones disponibles o en curso' }}
                                 </p>
                             </div>
 
@@ -165,11 +192,23 @@
                                                     {{ $estadoIntento }}
                                                 </span>
                                             @endif
+
+                                            @if ($filtroEstado === 'historial' && $evaluacion['nota'] !== null)
+                                                <span class="rounded-md border px-2 py-0.5 text-xs font-semibold {{ $evaluacion['nota_clase'] }}">
+                                                    Nota: {{ $evaluacion['nota'] }}
+                                                </span>
+                                            @endif
                                         </div>
 
                                         <p class="mt-2 truncate text-sm font-semibold text-slate-800">
                                             {{ $evaluacion['titulo'] }}
                                         </p>
+
+                                        @if ($grupoSeleccionadoId === null)
+                                            <p class="mt-1 truncate text-xs font-medium text-blue-700">
+                                                {{ $evaluacion['materia'] }}
+                                            </p>
+                                        @endif
 
                                         <p class="mt-1 text-xs text-slate-500">
                                             {{ $evaluacion['fecha'] }} · {{ $evaluacion['horario'] }}
@@ -259,14 +298,29 @@
                                     </p>
                                 </div>
 
-                                @if ($intentoActual && $intentoActual['enviada_at'])
-                                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                            Enviado
-                                        </p>
-                                        <p class="mt-1 font-medium text-slate-700">
-                                            {{ $intentoActual['enviada_at'] }}
-                                        </p>
+                                @if ($intentoActual && ($intentoActual['enviada_at'] || $intentoActual['nota'] !== null))
+                                    <div class="flex flex-wrap items-stretch gap-3">
+                                        @if ($intentoActual['nota'] !== null)
+                                            <div class="rounded-xl border px-4 py-3 text-sm {{ $intentoActual['nota_clase'] }}">
+                                                <p class="text-xs font-semibold uppercase tracking-wide opacity-80">
+                                                    Calificación
+                                                </p>
+                                                <p class="mt-1 text-base font-bold">
+                                                    {{ $intentoActual['nota'] }}
+                                                </p>
+                                            </div>
+                                        @endif
+
+                                        @if ($intentoActual['enviada_at'])
+                                            <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                                    Enviado
+                                                </p>
+                                                <p class="mt-1 font-medium text-slate-700">
+                                                    {{ $intentoActual['enviada_at'] }}
+                                                </p>
+                                            </div>
+                                        @endif
                                     </div>
                                 @endif
                             </div>
@@ -295,7 +349,7 @@
                                         {{ $detalle['fecha'] }} entre {{ $detalle['horario'] }}.
                                     </div>
                                 @else
-                                    <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                                    <div id="estado-tiempo-agotado" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                                         El período de acceso terminó y no registraste un intento.
                                     </div>
                                 @endif
@@ -304,6 +358,13 @@
                                     <p class="mt-4 text-sm text-slate-600">
                                         Tu intento está en curso. Guarda cada respuesta antes de enviar la evaluación.
                                     </p>
+                                @elseif ($intentoActual['vencido'])
+                                    <div id="estado-tiempo-agotado" class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                                        <p class="font-semibold">Se acabó el tiempo</p>
+                                        <p class="mt-1">
+                                            Ya no puedes responder más preguntas. Pulsa «Enviar evaluación» para entregar las respuestas que alcanzaste a guardar.
+                                        </p>
+                                    </div>
                                 @else
                                     <div class="mt-4 flex flex-wrap items-center gap-3">
                                         <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
@@ -443,7 +504,7 @@
                                     </button>
                                 @endif
 
-                                @if ($intentoActual !== null && $intentoActual['editable'])
+                                @if ($intentoActual !== null && ($intentoActual['editable'] || $intentoActual['vencido']))
                                     <button
                                         type="button"
                                         wire:click="solicitarEnvio"
@@ -488,6 +549,174 @@
                                             class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
                                         >
                                             Sí, enviar evaluación
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- NOTIFICACIÓN EMERGENTE DE TIEMPO RESTANTE --}}
+                        @if (
+                            ! empty($detalle['cierre_iso'])
+                            && (
+                                ($intentoActual === null && ($detalle['disponibilidad']['disponible'] || $tiempoAgotadoNotificado))
+                                || ($intentoActual !== null && ($intentoActual['editable'] || $intentoActual['vencido']))
+                            )
+                        )
+                            <div
+                                wire:ignore
+                                wire:key="alerta-tiempo-{{ $detalle['id'] }}-{{ $detalle['cierre_iso'] }}"
+                                data-cierre-iso="{{ $detalle['cierre_iso'] }}"
+                                data-servidor-ahora-iso="{{ $detalle['servidor_ahora_iso'] }}"
+                                x-data="{
+                                    cierreMs: 0,
+                                    servidorAhoraMs: 0,
+                                    clockOffsetMs: 0,
+                                    visible: false,
+                                    mensaje: '',
+                                    tono: 'azul',
+                                    mostradas: {},
+                                    intentosCierre: 0,
+                                    intervaloId: null,
+                                    timeoutId: null,
+                                    init() {
+                                        this.cierreMs = Date.parse(this.$el.dataset.cierreIso || '');
+                                        this.servidorAhoraMs = Date.parse(this.$el.dataset.servidorAhoraIso || '');
+
+                                        if (Number.isNaN(this.cierreMs) || Number.isNaN(this.servidorAhoraMs)) {
+                                            return;
+                                        }
+
+                                        this.clockOffsetMs = this.servidorAhoraMs - Date.now();
+                                        this.$nextTick(() => this.verificar());
+                                        this.intervaloId = setInterval(() => this.verificar(), 1000);
+                                    },
+                                    destroy() {
+                                        if (this.intervaloId !== null) {
+                                            clearInterval(this.intervaloId);
+                                            this.intervaloId = null;
+                                        }
+                                        if (this.timeoutId !== null) {
+                                            clearTimeout(this.timeoutId);
+                                            this.timeoutId = null;
+                                        }
+                                    },
+                                    verificar() {
+                                        const restanteMs = this.cierreMs - (Date.now() + this.clockOffsetMs);
+
+                                        if (restanteMs <= 0) {
+                                            const yaBloqueado = document.getElementById('estado-tiempo-agotado') !== null;
+
+                                            if (! this.mostradas[0]) {
+                                                this.mostradas[0] = true;
+
+                                                if (! yaBloqueado) {
+                                                    this.mostrar('Se acabó el tiempo. Ya no puedes responder; solo puedes enviar la evaluación.', 'rojo');
+                                                }
+                                            }
+
+                                            if (yaBloqueado || this.intentosCierre >= 5) {
+                                                if (this.intervaloId !== null) {
+                                                    clearInterval(this.intervaloId);
+                                                    this.intervaloId = null;
+                                                }
+
+                                                return;
+                                            }
+
+                                            this.intentosCierre++;
+                                            this.$wire.tiempoAgotado();
+
+                                            return;
+                                        }
+
+                                        const min30 = 30 * 60 * 1000;
+                                        const min15 = 15 * 60 * 1000;
+                                        const min5 = 5 * 60 * 1000;
+
+                                        let umbral = null;
+                                        let texto = '';
+                                        let tono = 'azul';
+
+                                        if (restanteMs <= min5) {
+                                            umbral = 5;
+                                            texto = 'Te quedan 5 minutos para terminar el examen.';
+                                            tono = 'rojo';
+                                        } else if (restanteMs <= min15) {
+                                            umbral = 15;
+                                            texto = 'Te quedan 15 minutos para terminar el examen.';
+                                            tono = 'ambar';
+                                        } else if (restanteMs <= min30) {
+                                            umbral = 30;
+                                            texto = 'Te queda media hora para terminar el examen.';
+                                            tono = 'azul';
+                                        }
+
+                                        if (umbral === null || this.mostradas[umbral]) {
+                                            return;
+                                        }
+
+                                        this.mostradas[umbral] = true;
+                                        this.mostrar(texto, tono);
+                                    },
+                                    mostrar(texto, tono) {
+                                        this.mensaje = texto;
+                                        this.tono = tono;
+                                        this.visible = true;
+
+                                        if (this.timeoutId !== null) {
+                                            clearTimeout(this.timeoutId);
+                                        }
+
+                                        this.timeoutId = setTimeout(() => {
+                                            this.cerrar();
+                                        }, 10000);
+                                    },
+                                    cerrar() {
+                                        this.visible = false;
+                                        if (this.timeoutId !== null) {
+                                            clearTimeout(this.timeoutId);
+                                            this.timeoutId = null;
+                                        }
+                                    }
+                                }"
+                            >
+                                <div
+                                    x-show="visible"
+                                    x-transition
+                                    x-cloak
+                                    style="position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 60; max-width: 20rem;"
+                                >
+                                    <div
+                                        class="flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs shadow-lg"
+                                        :class="{
+                                            'border-blue-200 bg-white text-slate-800 ring-1 ring-blue-100': tono === 'azul',
+                                            'border-amber-300 bg-amber-50 text-amber-900 ring-1 ring-amber-200': tono === 'ambar',
+                                            'border-red-300 bg-red-50 text-red-900 ring-1 ring-red-200': tono === 'rojo'
+                                        }"
+                                    >
+                                        <span
+                                            class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
+                                            :class="{
+                                                'bg-blue-100 text-blue-700': tono === 'azul',
+                                                'bg-amber-100 text-amber-700': tono === 'ambar',
+                                                'bg-red-100 text-red-700': tono === 'rojo'
+                                            }"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                                                <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                                            </svg>
+                                        </span>
+
+                                        <p x-text="mensaje" class="flex-1 font-medium leading-snug"></p>
+
+                                        <button
+                                            type="button"
+                                            @click="cerrar()"
+                                            aria-label="Cerrar aviso"
+                                            class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-sm font-semibold opacity-60 transition hover:opacity-100"
+                                        >
+                                            &times;
                                         </button>
                                     </div>
                                 </div>

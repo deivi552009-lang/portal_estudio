@@ -696,7 +696,7 @@ class CorreccionDigitalServiceTest extends TestCase
             ->assertDontSee('es_correcta')
             ->assertViewHas(
                 'intentoActual',
-                fn ($intento) => ! array_key_exists('nota', $intento)
+                fn ($intento) => ($intento['nota'] ?? null) === '5.00'
                     && ! array_key_exists('puntaje_total', $intento)
             );
     }
