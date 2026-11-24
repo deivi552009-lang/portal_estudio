@@ -2014,6 +2014,10 @@ class QuizParciales extends Component
             }
         }
 
+        if ($tipo !== EvaluacionDigitalPregunta::TIPO_ORACION) {
+            $this->sincronizarOpcionCorrecta();
+        }
+
         return true;
     }
 
@@ -2272,6 +2276,13 @@ class QuizParciales extends Component
             return;
         }
 
+        if (
+            ($this->preguntaActual['tipo'] ?? null) !== EvaluacionDigitalPregunta::TIPO_ORACION
+            && is_array($this->preguntaActual['opciones'] ?? null)
+        ) {
+            $this->sincronizarOpcionCorrecta();
+        }
+
         $this->mostrarConfirmacionPregunta = true;
     }
 
@@ -2287,6 +2298,13 @@ class QuizParciales extends Component
             $this->mostrarConfirmacionPregunta = false;
 
             return;
+        }
+
+        if (
+            ($this->preguntaActual['tipo'] ?? null) !== EvaluacionDigitalPregunta::TIPO_ORACION
+            && is_array($this->preguntaActual['opciones'] ?? null)
+        ) {
+            $this->sincronizarOpcionCorrecta();
         }
 
         if (! $this->preguntasAgregadasSonValidas()) {
@@ -2763,7 +2781,9 @@ class QuizParciales extends Component
             ->orderByDesc('updated_at')
             ->get();
 
-        $publicaciones = EvaluacionDigital::query()
+        $ahora = Carbon::now('America/Bogota');
+
+        [$enCurso, $otras] = EvaluacionDigital::query()
             ->with('grupo.materia')
             ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
             ->whereHas('grupo.docente', function ($query) {
@@ -2771,7 +2791,15 @@ class QuizParciales extends Component
             })
             ->orderByDesc('publicada_at')
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->each(function (EvaluacionDigital $publicacion) use ($ahora): void {
+                $publicacion->setAttribute('en_curso', $publicacion->estaEnCurso($ahora));
+            })
+            ->partition(
+                fn (EvaluacionDigital $publicacion): bool => (bool) $publicacion->getAttribute('en_curso')
+            );
+
+        $publicaciones = $enCurso->concat($otras)->values();
 
         $publicacionSeleccionada = null;
 

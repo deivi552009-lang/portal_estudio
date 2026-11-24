@@ -534,21 +534,28 @@
                         <!-- NOTAS -->
 
                         @foreach ($grupo->evaluaciones as $eval)
+                            @php
+                                $comentarioCelda = $comentariosNotas[$estudiante->id][$eval->id] ?? '';
+                            @endphp
 
-                            <td style="
-                                width: 58px;
-                                min-width: 58px;
-                                max-width: 58px;
-                                padding: 4px;
-                                text-align: center;
-                                background-color: white;
-                            ">
+                            <td
+                                title="{{ $comentarioCelda }}"
+                                style="
+                                    width: 58px;
+                                    min-width: 58px;
+                                    max-width: 58px;
+                                    padding: 4px;
+                                    text-align: center;
+                                    background-color: white;
+                                "
+                            >
 
                                 <input
                                     type="number"
                                     step="0.1"
                                     min="0"
                                     max="5"
+                                    title="{{ $comentarioCelda }}"
                                     x-model.number="
                                         notas[
                                             {{ $estudiante->id }}

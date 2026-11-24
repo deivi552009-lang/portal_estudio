@@ -700,6 +700,53 @@ class QuizParcialesPreguntasTest extends TestCase
         $this->assertDatabaseCount('evaluacion_digital_preguntas', 2);
     }
 
+    public function test_paso_dos_usa_wire_model_diferido_y_wire_key_en_enunciado_y_opciones_multiples(): void
+    {
+        $componente = $this->constructor()
+            ->call('cambiarTipoPregunta', 'multiple')
+            ->assertSee('wire:model="preguntaActual.enunciado"', false)
+            ->assertSee('wire:model="preguntaActual.opciones.0.texto"', false)
+            ->assertSee('wire:model="preguntaActual.opciones.1.texto"', false)
+            ->assertSee('wire:model="indiceCorrecto"', false)
+            ->assertDontSee('wire:model.live.debounce.500ms="preguntaActual.enunciado"', false)
+            ->assertDontSee('wire:model.live.debounce.500ms="preguntaActual.opciones.0.texto"', false)
+            ->assertDontSee('wire:model.live="indiceCorrecto"', false)
+            ->assertSee('wire:key="pregunta-opcion-multiple-nueva-0"', false)
+            ->assertSee('wire:key="pregunta-opcion-multiple-nueva-1"', false);
+
+        // Llena opciones 1 y 2, amplía a 4 opciones, llena opciones 3 y 4 y agrega la pregunta
+        $componente
+            ->set('preguntaActual.enunciado', '¿Cuál es el resultado de 3 × 4?')
+            ->set('preguntaActual.opciones.0.texto', '8')
+            ->set('preguntaActual.opciones.1.texto', '10')
+            ->set('cantidadOpciones', 4)
+            ->assertSee('wire:key="pregunta-opcion-multiple-nueva-2"', false)
+            ->assertSee('wire:key="pregunta-opcion-multiple-nueva-3"', false)
+            ->set('preguntaActual.opciones.2.texto', '12')
+            ->set('preguntaActual.opciones.3.texto', '14')
+            ->set('indiceCorrecto', 2)
+            ->call('solicitarAgregarPregunta')
+            ->assertHasNoErrors()
+            ->assertSet('mostrarConfirmacionPregunta', true)
+            ->call('confirmarAgregarPregunta')
+            ->assertHasNoErrors();
+
+        $componente->assertViewHas(
+            'preguntas',
+            fn ($preguntas) => count($preguntas) === 1
+                && $preguntas[0]['enunciado'] === '¿Cuál es el resultado de 3 × 4?'
+                && count($preguntas[0]['opciones']) === 4
+                && $preguntas[0]['opciones'][0]['texto'] === '8'
+                && $preguntas[0]['opciones'][1]['texto'] === '10'
+                && $preguntas[0]['opciones'][2]['texto'] === '12'
+                && $preguntas[0]['opciones'][3]['texto'] === '14'
+                && $preguntas[0]['opciones'][2]['es_correcta'] === true
+                && $preguntas[0]['opciones'][0]['es_correcta'] === false
+                && $preguntas[0]['opciones'][1]['es_correcta'] === false
+                && $preguntas[0]['opciones'][3]['es_correcta'] === false
+        );
+    }
+
     private function constructor(string $titulo = 'Quiz de preguntas'): Testable
     {
         return Livewire::test(QuizParciales::class)

@@ -8,6 +8,7 @@ use App\Livewire\Docente\GrupoAsistencia;
 use App\Livewire\Docente\GrupoEstudiantes;
 use App\Livewire\Docente\GrupoNotas;
 use App\Livewire\Docente\HistorialAsistencia;
+use App\Livewire\Docente\MonitoreoQuizParciales;
 use App\Livewire\Docente\QuizParciales;
 use App\Livewire\Docente\RevisionQuizParciales;
 use App\Livewire\Estudiante\Asistencia;
@@ -99,6 +100,9 @@ Route::middleware(['auth', 'role:docente'])->group(function () {
 
     Route::get('/docente/quizzes/revision', RevisionQuizParciales::class)
         ->name('docente.quizzes.revision');
+
+    Route::get('/docente/quizzes/monitoreo', MonitoreoQuizParciales::class)
+        ->name('docente.quizzes.monitoreo');
 
 });
 

@@ -112,6 +112,23 @@
                                 Historial
                             </button>
                         </div>
+
+                        <button
+                            type="button"
+                            wire:click="guardarTodo"
+                            wire:loading.attr="disabled"
+                            wire:target="guardarTodo"
+                            @disabled($sugeridasListasCount === 0)
+                            class="mt-3 w-full rounded-lg px-3 py-2 text-sm font-semibold text-white transition {{ $sugeridasListasCount > 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'cursor-not-allowed bg-slate-300 text-slate-500' }} disabled:opacity-60"
+                            @if ($sugeridasListasCount === 0) style="background-color: #cbd5e1; color: #64748b;" @endif
+                        >
+                            <span wire:loading.remove wire:target="guardarTodo">
+                                Guardar todo
+                            </span>
+                            <span wire:loading wire:target="guardarTodo">
+                                Guardando...
+                            </span>
+                        </button>
                     </div>
                 </div>
 
@@ -150,10 +167,15 @@
                                     </p>
 
                                     <p class="mt-1 text-xs text-slate-500">
-                                        @if ($intento->estado === \App\Models\EvaluacionDigitalIntento::ESTADO_CALIFICADA)
+                                        @if ($intento->estado === \App\Models\EvaluacionDigitalIntento::ESTADO_CALIFICADA && $intento->calificada_por !== null)
                                             Calificada
                                             @if ($intento->nota !== null)
                                                 · Nota {{ number_format((float) $intento->nota, 2) }}
+                                            @endif
+                                        @elseif ($intento->estado === \App\Models\EvaluacionDigitalIntento::ESTADO_CALIFICADA && $intento->calificada_por === null)
+                                            Pendiente
+                                            @if ($intento->nota !== null)
+                                                · Nota sugerida {{ number_format((float) $intento->nota, 2) }}
                                             @endif
                                         @else
                                             Pendiente
@@ -393,5 +415,64 @@
                 </div>
             </div>
         @endif
+
+        {{-- TOAST DE GUARDADO MASIVO --}}
+        <div
+            wire:ignore
+            x-data="{
+                visible: false,
+                mensaje: 'Todas las calificaciones se guardaron correctamente',
+                timeoutId: null,
+                mostrar(texto) {
+                    this.mensaje = texto || 'Todas las calificaciones se guardaron correctamente';
+                    this.visible = true;
+
+                    if (this.timeoutId !== null) {
+                        clearTimeout(this.timeoutId);
+                    }
+
+                    this.timeoutId = setTimeout(() => {
+                        this.cerrar();
+                    }, 5000);
+                },
+                cerrar() {
+                    this.visible = false;
+
+                    if (this.timeoutId !== null) {
+                        clearTimeout(this.timeoutId);
+                        this.timeoutId = null;
+                    }
+                }
+            }"
+            x-on:calificaciones-guardadas-masivo.window="mostrar($event.detail?.mensaje ?? $event.detail?.[0]?.mensaje ?? '')"
+        >
+            <div
+                x-show="visible"
+                x-transition
+                x-cloak
+                role="status"
+                aria-live="polite"
+                style="position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 60; max-width: 22rem;"
+            >
+                <div class="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 shadow-lg ring-1 ring-emerald-100">
+                    <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+
+                    <p x-text="mensaje" class="flex-1 font-medium leading-snug"></p>
+
+                    <button
+                        type="button"
+                        @click="cerrar()"
+                        aria-label="Cerrar aviso"
+                        class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-sm font-semibold opacity-60 transition hover:opacity-100"
+                    >
+                        &times;
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class EvaluacionDigital extends Model
 {
@@ -65,5 +66,66 @@ class EvaluacionDigital extends Model
     public function intentos(): HasMany
     {
         return $this->hasMany(EvaluacionDigitalIntento::class);
+    }
+
+    public function monitoreoLogs(): HasMany
+    {
+        return $this->hasMany(
+            EvaluacionDigitalMonitoreoLog::class,
+            'evaluacion_digital_id'
+        );
+    }
+
+    /**
+     * Indica si la evaluación publicada se encuentra actualmente en curso (America/Bogota).
+     */
+    public function estaEnCurso(?Carbon $ahora = null): bool
+    {
+        if (
+            $this->estado !== self::ESTADO_PUBLICADA
+            || $this->fecha === null
+            || $this->hora_inicio === null
+            || $this->hora_inicio === ''
+            || $this->hora_fin === null
+            || $this->hora_fin === ''
+        ) {
+            return false;
+        }
+
+        $horaInicio = strlen((string) $this->hora_inicio) === 5
+            ? $this->hora_inicio.':00'
+            : (string) $this->hora_inicio;
+
+        $horaFin = strlen((string) $this->hora_fin) === 5
+            ? $this->hora_fin.':00'
+            : (string) $this->hora_fin;
+
+        $fecha = $this->fecha->format('Y-m-d');
+
+        try {
+            $inicio = Carbon::createFromFormat(
+                'Y-m-d H:i:s',
+                $fecha.' '.$horaInicio,
+                'America/Bogota'
+            );
+            $cierre = Carbon::createFromFormat(
+                'Y-m-d H:i:s',
+                $fecha.' '.$horaFin,
+                'America/Bogota'
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        if (! $inicio instanceof Carbon || ! $cierre instanceof Carbon) {
+            return false;
+        }
+
+        $referencia = ($ahora ? $ahora->copy() : Carbon::now('America/Bogota'))
+            ->setTimezone('America/Bogota');
+
+        return $cierre->gt($inicio)
+            && $referencia->gte($inicio)
+            && $referencia->lt($cierre);
     }
 }

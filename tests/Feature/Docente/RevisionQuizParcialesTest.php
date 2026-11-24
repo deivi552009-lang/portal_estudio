@@ -16,6 +16,7 @@ use App\Models\Grupo;
 use App\Models\Materia;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\CorreccionDigitalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -144,6 +145,7 @@ class RevisionQuizParcialesTest extends TestCase
             'estado' => EvaluacionDigitalIntento::ESTADO_CALIFICADA,
             'nota' => 4,
             'calificada_at' => now(),
+            'calificada_por' => $this->docente->id,
         ]);
 
         $componente = Livewire::test(RevisionQuizParciales::class)
@@ -680,6 +682,231 @@ class RevisionQuizParcialesTest extends TestCase
         ]);
     }
 
+    public function test_intento_calificado_automaticamente_permanece_en_pendientes_hasta_guardar_calificacion(): void
+    {
+        [$digital, $objetiva, $correcta] = $this->crearExamenObjetivo(
+            $this->grupoA,
+            'Quiz automático'
+        );
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+
+        app(CorreccionDigitalService::class)->corregir($intento);
+        $intento->refresh();
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            $intento->estado
+        );
+        $this->assertNull($intento->calificada_por);
+
+        $componente = Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->assertViewHas(
+                'intentos',
+                fn ($intentos) => $intentos->pluck('id')->contains($intento->id)
+            )
+            ->assertViewHas('sugeridasListasCount', 1)
+            ->assertSee('Pendiente')
+            ->assertSee('Nota sugerida 5.00');
+
+        $componente
+            ->call('cambiarFiltro', 'historial')
+            ->assertViewHas(
+                'intentos',
+                fn ($intentos) => ! $intentos->pluck('id')->contains($intento->id)
+            );
+
+        $componente
+            ->call('cambiarFiltro', 'pendientes')
+            ->call('seleccionarIntento', $intento->id)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors()
+            ->assertSet('filtroEstado', 'historial')
+            ->assertViewHas(
+                'intentos',
+                fn ($intentos) => $intentos->pluck('id')->contains($intento->id)
+            )
+            ->assertSee('Calificada')
+            ->assertSee('Nota 5.00');
+
+        $intento->refresh();
+
+        $this->assertSame($this->docente->id, $intento->calificada_por);
+    }
+
+    public function test_guardar_todo_guarda_solo_las_sugeridas_de_la_materia_seleccionada(): void
+    {
+        $grupoCiencias = $this->crearGrupo($this->docente, 'Ciencias');
+        $grupoCiencias->estudiantes()->attach($this->estudiante->id);
+
+        [$quizMat, $pregQuizMat, $corrQuizMat] = $this->crearExamenObjetivo(
+            $this->grupoA,
+            'Quiz de matemáticas'
+        );
+        $intentoQuizMat = $this->crearIntentoEnviado($quizMat);
+        $this->crearRespuestaOpcion($intentoQuizMat, $pregQuizMat, $corrQuizMat);
+        app(CorreccionDigitalService::class)->corregir($intentoQuizMat);
+
+        [$parcialMat, $pregParcialMat, $corrParcialMat, $oficialP1] =
+            $this->crearParcialObjetivo($this->grupoA, 'P1');
+        $intentoParcialMat = $this->crearIntentoEnviado($parcialMat);
+        $this->crearRespuestaOpcion(
+            $intentoParcialMat,
+            $pregParcialMat,
+            $corrParcialMat
+        );
+        app(CorreccionDigitalService::class)->corregir($intentoParcialMat);
+
+        [$mixtoMat, $pregObjMixto, $pregAbiMixto, $corrMixto] =
+            $this->crearExamenMixto($this->grupoA);
+        $intentoMixtoMat = $this->crearIntentoEnviado($mixtoMat);
+        $this->crearRespuestaOpcion($intentoMixtoMat, $pregObjMixto, $corrMixto);
+        $this->crearRespuestaTexto(
+            $intentoMixtoMat,
+            $pregAbiMixto,
+            'Respuesta abierta pendiente'
+        );
+
+        [$quizCiencias, $pregQuizCie, $corrQuizCie] = $this->crearExamenObjetivo(
+            $grupoCiencias,
+            'Quiz de ciencias'
+        );
+        $intentoCiencias = $this->crearIntentoEnviado($quizCiencias);
+        $this->crearRespuestaOpcion($intentoCiencias, $pregQuizCie, $corrQuizCie);
+        app(CorreccionDigitalService::class)->corregir($intentoCiencias);
+
+        $componente = Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->assertViewHas('sugeridasListasCount', 2)
+            ->call('guardarTodo')
+            ->assertHasNoErrors()
+            ->assertDispatched(
+                'calificaciones-guardadas-masivo',
+                mensaje: 'Todas las calificaciones se guardaron correctamente'
+            )
+            ->assertViewHas('sugeridasListasCount', 0)
+            ->assertViewHas(
+                'intentos',
+                fn ($intentos) => $intentos->pluck('id')->all() === [$intentoMixtoMat->id]
+            );
+
+        $intentoQuizMat->refresh();
+        $intentoParcialMat->refresh();
+        $intentoMixtoMat->refresh();
+        $intentoCiencias->refresh();
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            $intentoQuizMat->estado
+        );
+        $this->assertSame($this->docente->id, $intentoQuizMat->calificada_por);
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            $intentoParcialMat->estado
+        );
+        $this->assertSame($this->docente->id, $intentoParcialMat->calificada_por);
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficialP1->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 5.00,
+        ]);
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_ENVIADA,
+            $intentoMixtoMat->estado
+        );
+        $this->assertNull($intentoMixtoMat->calificada_por);
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            $intentoCiencias->estado
+        );
+        $this->assertNull($intentoCiencias->calificada_por);
+
+        $componente
+            ->call('cambiarFiltro', 'historial')
+            ->assertViewHas(
+                'intentos',
+                fn ($intentos) => $intentos->pluck('id')->contains($intentoQuizMat->id)
+                    && $intentos->pluck('id')->contains($intentoParcialMat->id)
+                    && ! $intentos->pluck('id')->contains($intentoMixtoMat->id)
+            );
+    }
+
+    public function test_guardar_todo_no_sobrescribe_nota_oficial_distinta_preexistente(): void
+    {
+        [$parcial, $objetiva, $correcta, $oficial] = $this->crearParcialObjetivo(
+            $this->grupoA,
+            'P1'
+        );
+        $intento = $this->crearIntentoEnviado($parcial);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        app(CorreccionDigitalService::class)->corregir($intento);
+
+        Calificacion::create([
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 2.25,
+        ]);
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('guardarTodo')
+            ->assertHasNoErrors()
+            ->assertSet('trasladoPendiente', null)
+            ->assertDispatched(
+                'calificaciones-guardadas-masivo',
+                mensaje: 'Todas las calificaciones se guardaron correctamente'
+            );
+
+        $intento->refresh();
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+            $intento->estado
+        );
+        $this->assertSame($this->docente->id, $intento->calificada_por);
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $oficial->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 2.25,
+        ]);
+        $this->assertDatabaseCount('calificaciones', 1);
+    }
+
+    public function test_guardar_todo_sin_sugeridas_muestra_aviso_y_vista_incluye_boton_y_toast(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta] = $this->crearExamenMixto(
+            $this->grupoA
+        );
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $this->crearRespuestaTexto($intento, $abierta, 'Respuesta pendiente');
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->assertViewHas('sugeridasListasCount', 0)
+            ->assertSee('Guardar todo')
+            ->assertSeeHtml('wire:click="guardarTodo"')
+            ->assertSeeHtml('calificaciones-guardadas-masivo')
+            ->assertSeeHtml('M16.704 4.153')
+            ->assertSeeHtml('bg-emerald-100 text-emerald-700')
+            ->call('guardarTodo')
+            ->assertHasErrors('revision')
+            ->assertSee('No hay calificaciones sugeridas listas para guardar en esta materia.')
+            ->assertNotDispatched('calificaciones-guardadas-masivo');
+
+        $intento->refresh();
+
+        $this->assertSame(
+            EvaluacionDigitalIntento::ESTADO_ENVIADA,
+            $intento->estado
+        );
+        $this->assertNull($intento->calificada_por);
+    }
+
     private function crearGrupo(Docente $docente, string $materia): Grupo
     {
         return Grupo::create([
@@ -741,7 +968,29 @@ class RevisionQuizParcialesTest extends TestCase
      */
     private function crearExamenMixto(Grupo $grupo): array
     {
-        $digital = $this->crearDigital($grupo, 'Examen de revisión');
+        [$digital, $objetiva, $correcta] = $this->crearExamenObjetivo(
+            $grupo,
+            'Examen de revisión'
+        );
+
+        $abierta = EvaluacionDigitalPregunta::create([
+            'evaluacion_digital_id' => $digital->id,
+            'orden' => 2,
+            'enunciado' => 'Pregunta abierta',
+            'tipo' => EvaluacionDigitalPregunta::TIPO_ORACION,
+        ]);
+
+        return [$digital, $objetiva, $abierta, $correcta];
+    }
+
+    /**
+     * @return array{0: EvaluacionDigital, 1: EvaluacionDigitalPregunta, 2: EvaluacionDigitalOpcion}
+     */
+    private function crearExamenObjetivo(
+        Grupo $grupo,
+        string $titulo = 'Quiz objetivo'
+    ): array {
+        $digital = $this->crearDigital($grupo, $titulo);
 
         $objetiva = EvaluacionDigitalPregunta::create([
             'evaluacion_digital_id' => $digital->id,
@@ -762,14 +1011,35 @@ class RevisionQuizParcialesTest extends TestCase
             'orden' => 2,
         ]);
 
-        $abierta = EvaluacionDigitalPregunta::create([
-            'evaluacion_digital_id' => $digital->id,
-            'orden' => 2,
-            'enunciado' => 'Pregunta abierta',
-            'tipo' => EvaluacionDigitalPregunta::TIPO_ORACION,
+        return [$digital, $objetiva, $correcta];
+    }
+
+    /**
+     * @return array{0: EvaluacionDigital, 1: EvaluacionDigitalPregunta, 2: EvaluacionDigitalOpcion, 3: Evaluacion}
+     */
+    private function crearParcialObjetivo(
+        Grupo $grupo,
+        string $parcial = 'P1'
+    ): array {
+        [$digital, $objetiva, $correcta] = $this->crearExamenObjetivo(
+            $grupo,
+            'Parcial '.$parcial
+        );
+
+        $oficial = Evaluacion::create([
+            'grupo_id' => $grupo->id,
+            'nombre' => $parcial,
+            'tipo' => 'parcial',
+            'porcentaje' => 20,
         ]);
 
-        return [$digital, $objetiva, $abierta, $correcta];
+        $digital->update([
+            'tipo' => EvaluacionDigital::TIPO_PARCIAL,
+            'parcial' => $parcial,
+            'evaluacion_id' => $oficial->id,
+        ]);
+
+        return [$digital, $objetiva, $correcta, $oficial];
     }
 
     private function crearIntentoEnviado(

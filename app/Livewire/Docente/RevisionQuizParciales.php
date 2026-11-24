@@ -9,6 +9,8 @@ use App\Models\EvaluacionDigitalPregunta;
 use App\Models\Grupo;
 use App\Services\CorreccionDigitalService;
 use App\Services\TrasladoNotaParcialService;
+use Closure;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -242,15 +244,103 @@ class RevisionQuizParciales extends Component
         );
     }
 
+    public function guardarTodo(): void
+    {
+        $this->resetValidation('revision');
+        $this->resetValidation('grupo');
+        $this->trasladoPendiente = null;
+        session()->forget('mensaje');
+
+        $docente = $this->docente();
+
+        if (
+            $this->grupoSeleccionadoId === null
+            || ! $this->gruposPropios($docente)->contains('id', $this->grupoSeleccionadoId)
+        ) {
+            $this->addError(
+                'grupo',
+                'El grupo seleccionado no pertenece al docente autenticado.'
+            );
+
+            return;
+        }
+
+        $intentos = $this->intentosPendientesQuery($docente)
+            ->with([
+                'evaluacionDigital.grupo.materia',
+                'respuestas.pregunta',
+            ])
+            ->orderBy('id')
+            ->get();
+
+        $correccionService = app(CorreccionDigitalService::class);
+        $trasladoService = app(TrasladoNotaParcialService::class);
+        $guardadosIds = [];
+
+        foreach ($intentos as $intento) {
+            $valoraciones = $this->valoracionesExistentes($intento);
+            $calculo = $correccionService->calcularNotaSugerida(
+                $intento,
+                $valoraciones
+            );
+
+            if (! $calculo['completa']) {
+                continue;
+            }
+
+            $correccionService->guardarValoraciones(
+                $intento,
+                $valoraciones,
+                $docente
+            );
+
+            $intento->refresh();
+            $destino = $trasladoService->destino($intento);
+
+            if ($destino !== null && $destino['nota_anterior'] === null) {
+                $trasladoService->guardar($intento);
+            }
+
+            $guardadosIds[] = $intento->id;
+        }
+
+        if ($guardadosIds === []) {
+            $this->addError(
+                'revision',
+                'No hay calificaciones sugeridas listas para guardar en esta materia.'
+            );
+
+            return;
+        }
+
+        if (
+            $this->intentoSeleccionadoId !== null
+            && in_array($this->intentoSeleccionadoId, $guardadosIds, true)
+            && $this->filtroEstado === 'pendientes'
+        ) {
+            $this->intentoSeleccionadoId = null;
+            $this->valoraciones = [];
+        }
+
+        $this->dispatch(
+            'calificaciones-guardadas-masivo',
+            mensaje: 'Todas las calificaciones se guardaron correctamente'
+        );
+    }
+
     public function render()
     {
         $docente = $this->docente();
-        $grupos = $this->gruposPropios();
+        $grupos = $this->gruposPropios($docente);
         $grupoSeleccionado = $grupos->firstWhere(
             'id',
             $this->grupoSeleccionadoId
         );
         $intentos = $this->intentosDelGrupo($docente);
+        $sugeridasListasCount = $this->contarSugeridasListas(
+            $docente,
+            $intentos
+        );
 
         $intentoSeleccionado = null;
         $examen = null;
@@ -278,6 +368,7 @@ class RevisionQuizParciales extends Component
             'grupos' => $grupos,
             'grupoSeleccionado' => $grupoSeleccionado,
             'intentos' => $intentos,
+            'sugeridasListasCount' => $sugeridasListasCount,
             'intentoSeleccionadoId' => $this->intentoSeleccionadoId,
             'examen' => $examen,
             'sugerida' => $sugerida,
@@ -297,9 +388,11 @@ class RevisionQuizParciales extends Component
         return $docente;
     }
 
-    private function gruposPropios()
+    private function gruposPropios(?Docente $docente = null)
     {
-        return $this->docente()
+        $docente ??= $this->docente();
+
+        return $docente
             ->grupos()
             ->with('materia')
             ->get()
@@ -316,24 +409,56 @@ class RevisionQuizParciales extends Component
             return collect();
         }
 
-        $estado = $this->filtroEstado === 'historial'
-            ? EvaluacionDigitalIntento::ESTADO_CALIFICADA
-            : EvaluacionDigitalIntento::ESTADO_ENVIADA;
+        $consulta = $this->filtroEstado === 'historial'
+            ? $this->baseIntentosQuery($docente)
+                ->where('estado', EvaluacionDigitalIntento::ESTADO_CALIFICADA)
+                ->whereNotNull('calificada_por')
+                ->orderByDesc('calificada_at')
+            : $this->intentosPendientesQuery($docente)
+                ->orderByDesc('enviada_at');
 
-        return EvaluacionDigitalIntento::query()
+        return $consulta
             ->with([
-                'evaluacionDigital.grupo.materia',
+                'evaluacionDigital' => fn ($query) => $query
+                    ->withCount('preguntas')
+                    ->with('grupo.materia'),
                 'estudiante.user',
             ])
             ->withCount([
-                'respuestas as pendientes_count' => fn ($query) => $query
-                    ->whereNull('valoracion_docente')
-                    ->whereHas('pregunta', fn ($pregunta) => $pregunta->where(
-                        'tipo',
-                        EvaluacionDigitalPregunta::TIPO_ORACION
-                    )),
+                'respuestas as pendientes_count' => $this->filtroAbiertasPendientes(),
             ])
-            ->where('estado', $estado)
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    private function contarSugeridasListas(
+        Docente $docente,
+        Collection $intentosActuales
+    ): int {
+        if ($this->grupoSeleccionadoId === null) {
+            return 0;
+        }
+
+        $pendientes = $this->filtroEstado === 'pendientes'
+            ? $intentosActuales
+            : $this->intentosPendientesQuery($docente)
+                ->with([
+                    'evaluacionDigital' => fn ($query) => $query->withCount('preguntas'),
+                ])
+                ->withCount([
+                    'respuestas as pendientes_count' => $this->filtroAbiertasPendientes(),
+                ])
+                ->get();
+
+        return $pendientes
+            ->filter(fn (EvaluacionDigitalIntento $intento) => (int) $intento->pendientes_count === 0
+                && (int) ($intento->evaluacionDigital?->preguntas_count ?? 0) > 0)
+            ->count();
+    }
+
+    private function baseIntentosQuery(Docente $docente)
+    {
+        return EvaluacionDigitalIntento::query()
             ->whereHas('evaluacionDigital', function ($query) {
                 $query->where('grupo_id', $this->grupoSeleccionadoId)
                     ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA);
@@ -341,14 +466,52 @@ class RevisionQuizParciales extends Component
             ->whereHas(
                 'evaluacionDigital.grupo',
                 fn ($query) => $query->where('docente_id', $docente->id)
-            )
-            ->orderByDesc(
-                $estado === EvaluacionDigitalIntento::ESTADO_CALIFICADA
-                    ? 'calificada_at'
-                    : 'enviada_at'
-            )
-            ->orderByDesc('id')
-            ->get();
+            );
+    }
+
+    private function intentosPendientesQuery(Docente $docente)
+    {
+        return $this->baseIntentosQuery($docente)
+            ->where(function ($query) {
+                $query->where('estado', EvaluacionDigitalIntento::ESTADO_ENVIADA)
+                    ->orWhere(function ($sub) {
+                        $sub->where('estado', EvaluacionDigitalIntento::ESTADO_CALIFICADA)
+                            ->whereNull('calificada_por');
+                    });
+            });
+    }
+
+    private function filtroAbiertasPendientes(): Closure
+    {
+        return fn ($query) => $query
+            ->whereNull('valoracion_docente')
+            ->whereNotNull('respuesta_texto')
+            ->whereRaw("TRIM(respuesta_texto) != ''")
+            ->whereHas('pregunta', fn ($pregunta) => $pregunta->where(
+                'tipo',
+                EvaluacionDigitalPregunta::TIPO_ORACION
+            ));
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function valoracionesExistentes(
+        EvaluacionDigitalIntento $intento
+    ): array {
+        $valoraciones = [];
+
+        foreach ($intento->respuestas as $respuesta) {
+            if (
+                $respuesta->pregunta?->tipo === EvaluacionDigitalPregunta::TIPO_ORACION
+                && trim((string) $respuesta->respuesta_texto) !== ''
+                && $respuesta->valoracion_docente !== null
+            ) {
+                $valoraciones[$respuesta->id] = $respuesta->valoracion_docente;
+            }
+        }
+
+        return $valoraciones;
     }
 
     private function buscarIntentoPropio(

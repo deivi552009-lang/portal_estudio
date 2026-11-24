@@ -151,7 +151,7 @@
                 {{-- Quiz / Parciales --}}
                 <a href="{{ route('docente.quizzes') }}"
                    class="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition
-                   {{ request()->routeIs('docente.quizzes*')
+                   {{ request()->routeIs('docente.quizzes') || request()->routeIs('docente.quizzes.revision')
                         ? 'bg-blue-600 text-white'
                         : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
 
@@ -171,6 +171,18 @@
 
                     Quiz / Parciales
                 </a>
+
+                {{-- Sub-enlace Monitoreo --}}
+                <div class="mb-1 ml-5 border-l border-slate-700 pl-3">
+                    <a href="{{ route('docente.quizzes.monitoreo') }}"
+                       class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition
+                       {{ request()->routeIs('docente.quizzes.monitoreo*')
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white' }}">
+                        <span class="h-1.5 w-1.5 rounded-full {{ request()->routeIs('docente.quizzes.monitoreo*') ? 'bg-white' : 'bg-emerald-400' }}"></span>
+                        <span>Monitoreo</span>
+                    </a>
+                </div>
 
 
                 {{-- Historial --}}
@@ -365,6 +377,10 @@
         </div>
 
     </div>
+
+    @if (auth()->user()?->docente)
+        <livewire:docente.notificaciones-monitoreo />
+    @endif
 
 </body>
 

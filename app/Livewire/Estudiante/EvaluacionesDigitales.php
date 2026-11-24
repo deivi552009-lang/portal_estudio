@@ -4,13 +4,16 @@ namespace App\Livewire\Estudiante;
 
 use App\Models\EvaluacionDigital;
 use App\Models\EvaluacionDigitalIntento;
+use App\Models\EvaluacionDigitalMonitoreoLog;
 use App\Models\Grupo;
+use App\Services\MonitoreoDigitalService;
 use App\Services\RespuestasDigitalesService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -276,6 +279,15 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
+        try {
+            app(MonitoreoDigitalService::class)->registrarInicio(
+                $intento,
+                request()->ip()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $this->tiempoAgotadoNotificado = false;
         $this->evaluacionSeleccionadaId = $intento->evaluacion_digital_id;
         $this->intentoActualId = $intento->id;
@@ -360,6 +372,15 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
+        if ($intento->estado === EvaluacionDigitalIntento::ESTADO_ANULADA) {
+            $this->addError(
+                'respuesta',
+                'Este examen ha sido anulado y no admite modificaciones.'
+            );
+
+            return;
+        }
+
         if ($this->tiempoAgotadoNotificado) {
             $this->addError(
                 'respuesta',
@@ -381,7 +402,7 @@ class EvaluacionesDigitales extends Component
         $texto = $this->respuestasTexto[$preguntaId] ?? null;
 
         try {
-            app(RespuestasDigitalesService::class)->guardar(
+            $respuesta = app(RespuestasDigitalesService::class)->guardar(
                 $intento,
                 $preguntaId,
                 is_numeric($opcionId) ? (int) $opcionId : null,
@@ -400,6 +421,17 @@ class EvaluacionesDigitales extends Component
             );
 
             return;
+        }
+
+        try {
+            app(MonitoreoDigitalService::class)->registrarRespuesta(
+                $intento,
+                $respuesta,
+                request()->ip(),
+                true
+            );
+        } catch (\Throwable $e) {
+            report($e);
         }
 
         $this->respuestaGuardadaId = $preguntaId;
@@ -481,10 +513,95 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
+        try {
+            app(MonitoreoDigitalService::class)->registrarEntrega(
+                $enviado,
+                request()->ip()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $this->intentoActualId = $enviado->id;
         $this->cargarRespuestasDelIntento($enviado);
         $this->mensajeEnvio = 'Evaluación enviada correctamente.';
         $this->cargarEvaluacionesEnMemoria();
+    }
+
+    /**
+     * Registra señales del navegador del estudiante mientras el intento esté en curso y vigente.
+     *
+     * @param  array<string, mixed>|null  $metadata
+     */
+    public function registrarSenalMonitoreo(
+        string $tipoEvento,
+        ?array $metadata = null
+    ): void {
+        $estudiante = Auth::user()?->estudiante;
+
+        abort_unless(
+            $estudiante,
+            403,
+            'El usuario no tiene un registro de estudiante.'
+        );
+
+        if ($this->intentoActualId === null) {
+            return;
+        }
+
+        $intento = $this->buscarIntentoPropio($this->intentoActualId);
+
+        if (
+            $intento === null
+            || $intento->estado !== EvaluacionDigitalIntento::ESTADO_EN_CURSO
+            || $this->tiempoAgotadoNotificado
+            || $this->errorDisponibilidad($intento->evaluacionDigital) !== null
+        ) {
+            return;
+        }
+
+        if (! in_array($tipoEvento, EvaluacionDigitalMonitoreoLog::TIPOS_SENAL_NAVEGADOR, true)) {
+            return;
+        }
+
+        try {
+            app(MonitoreoDigitalService::class)->registrarSenalNavegador(
+                $intento,
+                $tipoEvento,
+                request()->ip(),
+                $metadata
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    public function verificarEstadoIntento(): void
+    {
+        if ($this->evaluacionSeleccionadaId === null) {
+            return;
+        }
+
+        $intento = $this->buscarIntentoDeEvaluacion($this->evaluacionSeleccionadaId);
+        $estadoActual = $intento?->estado;
+
+        $evaluacionCacheada = collect($this->evaluacionesCargadas)
+            ->firstWhere('id', $this->evaluacionSeleccionadaId);
+        $estadoCacheado = is_array($evaluacionCacheada)
+            ? ($evaluacionCacheada['intento_estado'] ?? null)
+            : null;
+
+        if ($intento !== null) {
+            $this->intentoActualId = $intento->id;
+        }
+
+        if ($estadoActual === EvaluacionDigitalIntento::ESTADO_ANULADA) {
+            $this->mostrarConfirmacionEnvio = false;
+        }
+
+        if ($estadoActual !== $estadoCacheado) {
+            $this->cargarEvaluacionesEnMemoria();
+        }
     }
 
     public function render()
@@ -550,14 +667,52 @@ class EvaluacionesDigitales extends Component
                 } else {
                     $this->intentoActualId = $intento->id;
                     $enCurso = $intento->estado === EvaluacionDigitalIntento::ESTADO_EN_CURSO;
+                    $anulada = $intento->estado === EvaluacionDigitalIntento::ESTADO_ANULADA;
                     $editable = $enCurso
                         && ! $tiempoVencido
                         && $this->errorDisponibilidad($intento->evaluacionDigital) === null;
                     $vencido = $enCurso && ! $editable && $tiempoVencido;
-                    $notaIntento = $intento->estado === EvaluacionDigitalIntento::ESTADO_CALIFICADA
+                    $notaIntento = in_array($intento->estado, [
+                        EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+                        EvaluacionDigitalIntento::ESTADO_ANULADA,
+                    ], true)
                         && $intento->nota !== null
                         ? $this->formatoNotaEstudiante((float) $intento->nota)
                         : null;
+
+                    $motivoAnulacion = null;
+                    $anulacionCancelada = false;
+                    $mensajeAnulacionCancelada = null;
+
+                    if (Schema::hasTable('evaluacion_digital_monitoreo_logs')) {
+                        if ($anulada) {
+                            $logAnulacion = EvaluacionDigitalMonitoreoLog::query()
+                                ->where('intento_id', $intento->id)
+                                ->where('tipo_evento', EvaluacionDigitalMonitoreoLog::TIPO_EXAMEN_ANULADO)
+                                ->orderByDesc('created_at')
+                                ->orderByDesc('id')
+                                ->first();
+
+                            $motivoAnulacion = is_array($logAnulacion?->metadata)
+                                ? ($logAnulacion->metadata['mensaje_docente'] ?? null)
+                                : null;
+                        } elseif ($enCurso) {
+                            $ultimoEventoAnulacion = EvaluacionDigitalMonitoreoLog::query()
+                                ->where('intento_id', $intento->id)
+                                ->whereIn('tipo_evento', [
+                                    EvaluacionDigitalMonitoreoLog::TIPO_EXAMEN_ANULADO,
+                                    EvaluacionDigitalMonitoreoLog::TIPO_ANULACION_CANCELADA,
+                                ])
+                                ->orderByDesc('created_at')
+                                ->orderByDesc('id')
+                                ->first();
+
+                            if ($ultimoEventoAnulacion?->tipo_evento === EvaluacionDigitalMonitoreoLog::TIPO_ANULACION_CANCELADA) {
+                                $anulacionCancelada = true;
+                                $mensajeAnulacionCancelada = 'Se canceló la anulacion de su parcial';
+                            }
+                        }
+                    }
 
                     $intentoActual = [
                         'id' => $intento->id,
@@ -574,6 +729,10 @@ class EvaluacionesDigitales extends Component
                         'servidor_ahora_iso' => Carbon::now(self::ZONA_HORARIA)->toIso8601String(),
                         'editable' => $editable,
                         'vencido' => $vencido,
+                        'anulada' => $anulada,
+                        'motivo_anulacion' => $motivoAnulacion,
+                        'anulacion_cancelada' => $anulacionCancelada,
+                        'mensaje_anulacion_cancelada' => $mensajeAnulacionCancelada,
                         'preguntas' => $this->preguntasDelIntento($intento),
                     ];
                 }
@@ -675,7 +834,10 @@ class EvaluacionesDigitales extends Component
                     $evaluacion,
                     $ahora
                 );
-                $notaFormateada = $intento?->estado === EvaluacionDigitalIntento::ESTADO_CALIFICADA
+                $notaFormateada = in_array($intento?->estado, [
+                    EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+                    EvaluacionDigitalIntento::ESTADO_ANULADA,
+                ], true)
                     && $intento?->nota !== null
                     ? $this->formatoNotaEstudiante((float) $intento->nota)
                     : null;
@@ -709,6 +871,7 @@ class EvaluacionesDigitales extends Component
                     return in_array($evaluacion['intento_estado'], [
                         EvaluacionDigitalIntento::ESTADO_ENVIADA,
                         EvaluacionDigitalIntento::ESTADO_CALIFICADA,
+                        EvaluacionDigitalIntento::ESTADO_ANULADA,
                     ], true);
                 }
 
@@ -717,6 +880,13 @@ class EvaluacionesDigitales extends Component
                     === EvaluacionDigitalIntento::ESTADO_EN_CURSO
                 ) {
                     return true;
+                }
+
+                if (
+                    $evaluacion['intento_estado']
+                    === EvaluacionDigitalIntento::ESTADO_ANULADA
+                ) {
+                    return $evaluacion['disponibilidad']['etiqueta'] !== 'Cerrada';
                 }
 
                 if ($evaluacion['intento_estado'] !== null) {
@@ -850,6 +1020,10 @@ class EvaluacionesDigitales extends Component
 
     private function errorEnvio(EvaluacionDigitalIntento $intento): ?string
     {
+        if ($intento->estado === EvaluacionDigitalIntento::ESTADO_ANULADA) {
+            return 'Este examen ha sido anulado y no puede enviarse.';
+        }
+
         if ($intento->estado !== EvaluacionDigitalIntento::ESTADO_EN_CURSO) {
             return 'Este intento ya fue enviado o calificado.';
         }

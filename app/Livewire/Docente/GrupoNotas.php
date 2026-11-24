@@ -240,8 +240,27 @@ class GrupoNotas extends Component
                 .'|'.$grupo->id)
             ->values();
 
+        $comentariosNotas = [];
+        $evaluacionIds = $this->grupo->evaluaciones->pluck('id')->all();
+
+        if ($evaluacionIds !== []) {
+            $calificacionesConComentario = Calificacion::query()
+                ->whereIn('evaluacion_id', $evaluacionIds)
+                ->whereNotNull('comentario')
+                ->get(['estudiante_id', 'evaluacion_id', 'comentario']);
+
+            foreach ($calificacionesConComentario as $calificacion) {
+                $comentarioLimpio = trim((string) $calificacion->comentario);
+
+                if ($comentarioLimpio !== '') {
+                    $comentariosNotas[$calificacion->estudiante_id][$calificacion->evaluacion_id] = $comentarioLimpio;
+                }
+            }
+        }
+
         return view('components.docente.⚡grupo-notas', [
             'grupos' => $grupos,
+            'comentariosNotas' => $comentariosNotas,
         ])->layout('layouts.docente');
 
     }

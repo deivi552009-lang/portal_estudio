@@ -12,7 +12,7 @@ class Notas extends Component
     {
         $estudiante = Auth::user()->estudiante;
 
-        if (!$estudiante) {
+        if (! $estudiante) {
             abort(403, 'El usuario no tiene un registro de estudiante.');
         }
 
@@ -36,6 +36,7 @@ class Notas extends Component
                 return [
                     'nombre' => $evaluacion->nombre,
                     'nota' => $calificacion?->nota,
+                    'comentario' => $calificacion?->comentario,
                     'porcentaje' => $evaluacion->porcentaje,
                 ];
             });

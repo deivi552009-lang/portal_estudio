@@ -62,6 +62,7 @@
                                                 @php
                                                     $nombreEvaluacion = $evaluacion['nombre'] ?: 'Nota ' . ($index + 1);
                                                     $nota = $evaluacion['nota'] !== null ? (float) $evaluacion['nota'] : null;
+                                                    $comentarioNota = trim((string) ($evaluacion['comentario'] ?? ''));
                                                     $claseNota = $nota === null
                                                         ? 'border-slate-200 bg-slate-50 text-slate-400'
                                                         : ($nota >= 4
@@ -72,7 +73,7 @@
                                                 @endphp
                                                 <div
                                                     class="flex h-14 w-16 shrink-0 flex-col items-center justify-center rounded-lg border px-1 text-center {{ $claseNota }}"
-                                                    title="{{ $nombreEvaluacion }}{{ $nota !== null ? ': ' . number_format($nota, 1) : '' }}"
+                                                    title="{{ $comentarioNota !== '' ? $comentarioNota : ($nombreEvaluacion . ($nota !== null ? ': ' . number_format($nota, 1) : '')) }}"
                                                     aria-label="{{ $nombreEvaluacion }}"
                                                 >
                                                     <div class="w-full truncate text-[10px] font-semibold uppercase leading-tight">

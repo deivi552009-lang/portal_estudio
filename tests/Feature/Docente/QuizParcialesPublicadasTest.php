@@ -10,6 +10,7 @@ use App\Models\Materia;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -544,6 +545,124 @@ class QuizParcialesPublicadasTest extends TestCase
             $componente->get('borradorId')
         );
         $this->assertDatabaseCount('evaluaciones_digitales', 2);
+    }
+
+    public function test_el_layout_docente_muestra_el_subenlace_monitoreo_debajo_de_quiz_parciales(): void
+    {
+        $urlMonitoreo = route('docente.quizzes.monitoreo');
+
+        $this->get(route('docente.quizzes'))
+            ->assertOk()
+            ->assertSeeInOrder(['Quiz / Parciales', 'Monitoreo'])
+            ->assertSee('href="'.$urlMonitoreo.'"', false);
+
+        $this->get($urlMonitoreo)
+            ->assertOk()
+            ->assertSee('Monitoreo de Evaluaciones');
+    }
+
+    public function test_publicadas_ordena_de_primeras_las_evaluaciones_en_curso(): void
+    {
+        // 14:00 America/Bogota (19:00 UTC)
+        Carbon::setTestNow(Carbon::parse('2026-11-20 19:00:00', 'UTC'));
+
+        try {
+            $cerrada = $this->crearRegistro(
+                'Parcial Cerrado Reciente',
+                estado: EvaluacionDigital::ESTADO_PUBLICADA,
+                publicadaAt: '2026-11-20 18:55:00',
+                fecha: '2026-11-20',
+                horaInicio: '08:00:00',
+                horaFin: '10:00:00'
+            );
+
+            $futura = $this->crearRegistro(
+                'Parcial Futuro Más Reciente',
+                estado: EvaluacionDigital::ESTADO_PUBLICADA,
+                publicadaAt: '2026-11-20 18:59:00',
+                fecha: '2026-11-20',
+                horaInicio: '16:00:00',
+                horaFin: '18:00:00'
+            );
+
+            $enCurso = $this->crearRegistro(
+                'Parcial En Curso Anterior',
+                estado: EvaluacionDigital::ESTADO_PUBLICADA,
+                publicadaAt: '2026-11-20 18:00:00',
+                fecha: '2026-11-20',
+                horaInicio: '13:00:00',
+                horaFin: '15:00:00'
+            );
+
+            Livewire::test(QuizParciales::class)
+                ->assertViewHas(
+                    'publicaciones',
+                    fn ($publicaciones) => $publicaciones->pluck('id')->all() === [
+                        $enCurso->id,
+                        $futura->id,
+                        $cerrada->id,
+                    ]
+                )
+                ->assertSeeInOrder([
+                    'Parcial En Curso Anterior',
+                    'Parcial Futuro Más Reciente',
+                    'Parcial Cerrado Reciente',
+                ]);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_boton_monitoreo_aparece_solo_en_evaluaciones_publicadas_en_curso(): void
+    {
+        // 14:00 America/Bogota (19:00 UTC)
+        Carbon::setTestNow(Carbon::parse('2026-11-20 19:00:00', 'UTC'));
+
+        try {
+            $enCurso = $this->crearRegistro(
+                'Evaluación En Curso',
+                estado: EvaluacionDigital::ESTADO_PUBLICADA,
+                publicadaAt: '2026-11-20 17:00:00',
+                fecha: '2026-11-20',
+                horaInicio: '13:00:00',
+                horaFin: '15:00:00'
+            );
+
+            $pendiente = $this->crearRegistro(
+                'Evaluación Pendiente',
+                estado: EvaluacionDigital::ESTADO_PUBLICADA,
+                publicadaAt: '2026-11-20 17:10:00',
+                fecha: '2026-11-20',
+                horaInicio: '15:00:00',
+                horaFin: '17:00:00'
+            );
+
+            $cerrada = $this->crearRegistro(
+                'Evaluación Cerrada',
+                estado: EvaluacionDigital::ESTADO_PUBLICADA,
+                publicadaAt: '2026-11-20 17:20:00',
+                fecha: '2026-11-20',
+                horaInicio: '10:00:00',
+                horaFin: '14:00:00'
+            );
+
+            $urlEnCurso = route('docente.quizzes.monitoreo', ['evaluacion' => $enCurso->id]);
+            $urlPendiente = route('docente.quizzes.monitoreo', ['evaluacion' => $pendiente->id]);
+            $urlCerrada = route('docente.quizzes.monitoreo', ['evaluacion' => $cerrada->id]);
+
+            Livewire::test(QuizParciales::class)
+                ->assertSee('href="'.$urlEnCurso.'"', false)
+                ->assertSee('Monitoreo')
+                ->assertDontSee('href="'.$urlPendiente.'"', false)
+                ->assertDontSee('href="'.$urlCerrada.'"', false);
+
+            // Verificación de bordes exactos: inicio inclusivo (13:00) y cierre exclusivo (15:00)
+            $this->assertTrue($enCurso->estaEnCurso(Carbon::parse('2026-11-20 13:00:00', 'America/Bogota')));
+            $this->assertFalse($enCurso->estaEnCurso(Carbon::parse('2026-11-20 15:00:00', 'America/Bogota')));
+            $this->assertFalse($cerrada->estaEnCurso(Carbon::parse('2026-11-20 14:00:00', 'America/Bogota')));
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     private function crearBorradorCargado(): array

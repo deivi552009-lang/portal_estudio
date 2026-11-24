@@ -14,6 +14,8 @@ class EvaluacionDigitalIntento extends Model
 
     public const ESTADO_CALIFICADA = 'calificada';
 
+    public const ESTADO_ANULADA = 'anulada';
+
     protected $table = 'evaluacion_digital_intentos';
 
     protected $fillable = [
@@ -56,5 +58,13 @@ class EvaluacionDigitalIntento extends Model
     public function respuestas(): HasMany
     {
         return $this->hasMany(EvaluacionDigitalRespuesta::class, 'intento_id');
+    }
+
+    public function monitoreoLogs(): HasMany
+    {
+        return $this->hasMany(
+            EvaluacionDigitalMonitoreoLog::class,
+            'intento_id'
+        );
     }
 }

@@ -1,5 +1,5 @@
 # Quiz / Parciales
-Última actualización: 2026-11-20
+Última actualización: 2026-11-23
 
 ## Qué hace
 Módulo de evaluaciones digitales para docente y estudiante. El docente crea Quiz (evaluación personalizada) y Parciales (P1–P4 oficiales del grupo), construye preguntas, guarda borradores, publica desde la interfaz y consulta las publicadas en solo lectura. El estudiante ve sus evaluaciones publicadas (por defecto con el filtro «Todos», en orden ascendente por fecha y hora, cargadas en caché sin polling y con botón «Actualizar»), consulta la disponibilidad, inicia o recupera su intento, recibe avisos de tiempo restante (30, 15, 5 min y tiempo agotado con `wire:ignore`), responde pregunta por pregunta, guarda cada respuesta y envía el intento de forma definitiva con confirmación (permitiendo enviar un intento `en_curso` tras el cierre mientras las respuestas quedan bloqueadas). El sistema corrige automáticamente las preguntas objetivas y deja las abiertas pendientes de valoración docente; cuando no quedan pendientes calcula la nota sobre 5 y marca el intento como calificado. En Historial y en el detalle, el estudiante ve su calificación final con código de colores (rojo/amarillo/verde) sin exponer `es_correcta`, `puntaje_total` ni respuestas correctas. El docente revisa y califica las respuestas abiertas desde la UI de revisión. La publicación funciona para modalidad Preguntas; Archivo y Mixta siguen bloqueadas (deshabilitadas con «(próximamente)»). El traslado de la nota digital a la nota oficial P1–P4 del mismo grupo y estudiante queda autorizado y se ejecuta al guardar una calificación en `/docente/quizzes/revision` (solo Parciales vinculados a P1–P4; no aplica a Quiz personalizados ni a A). La vista del estudiante se rediseñó en dos paneles (filtros/lista a la izquierda, evaluación seleccionada a la derecha); el detalle está en `modulos/panel-estudiante.md`. Las siete migraciones del módulo están aplicadas en Supabase/PostgreSQL.
@@ -26,7 +26,7 @@ Módulo de evaluaciones digitales para docente y estudiante. El docente crea Qui
 - Ajustes de UI del 2026-11-19: **sin archivos nuevos**; se modificaron el componente y la vista docente anteriores y las pruebas `tests/Feature/Docente/QuizParcialesTest.php`, `tests/Feature/Docente/QuizParcialesPreguntasTest.php`, `tests/Feature/Docente/QuizParcialesBorradoresTest.php` y `tests/Feature/Docente/QuizParcialesPublicacionTest.php`. Sin migraciones ni cambios de esquema ni cambios en Supabase, servicios, modelos, rutas, layouts u otros módulos.
 - Ruta: `/docente/quizzes` (`docente.quizzes`), protegida por `auth` + `role:docente`; enlace en el sidebar docente.
 - Servicio de traslado: `app/Services/TrasladoNotaParcialService.php` (`destino()` y `guardar()`), con modal de confirmación en la vista de revisión.
-- Componente docente de revisión: `app/Livewire/Docente/RevisionQuizParciales.php` y `resources/views/components/docente/⚡revision-quiz-parciales.blade.php` (añadidos `trasladoPendiente`, `confirmarTrasladoNota`, `cancelarTrasladoNota` y banner `session()->flash('mensaje', 'Calificación guardada correctamente.')`).
+- Componente docente de revisión: `app/Livewire/Docente/RevisionQuizParciales.php` y `resources/views/components/docente/⚡revision-quiz-parciales.blade.php` (añadidos `trasladoPendiente`, `confirmarTrasladoNota`, `cancelarTrasladoNota` y banner `session()->flash('mensaje', 'Calificación guardada correctamente.')`; actualizados el 2026-11-23 con separación Pendientes/Historial por `calificada_por`, botón «Guardar todo» limitado a la materia seleccionada y toast flotante con chulo).
 - Ruta de revisión: `GET /docente/quizzes/revision` (`docente.quizzes.revision`), protegida por `auth` + `role:docente`; enlace «Revisión de calificaciones» desde la página de creación (`/docente/quizzes`).
 - Componente estudiante: `app/Livewire/Estudiante/EvaluacionesDigitales.php` y `resources/views/components/estudiante/⚡evaluaciones-digitales.blade.php` (actualizados el 2026-11-20 con filtro «Todos», caché `$evaluacionesCargadas`, botón «Actualizar», flecha `←` en Historial, orden por fecha/hora, nota con colores, alertas de tiempo y bloqueo de respuestas al cierre).
 - Ruta estudiante: `GET /estudiante/evaluaciones-digitales` (`estudiante.evaluaciones-digitales`), protegida por `auth` + `role:estudiante`; enlace «Evaluaciones» en `resources/views/layouts/estudiante.blade.php` (sidebar y navegación móvil).
@@ -60,7 +60,7 @@ Columnas de resultados (migraciones del 2026-11-16, aplicadas en Supabase/Postgr
 11. **Estudiante — respuestas (7.5).** Captura y guardado de respuestas por pregunta, sin autoguardado: `RespuestasDigitalesService::guardar()` valida intento `en_curso`, pregunta de la evaluación del intento, opción de la pregunta, tipo, `trim`, vacío y máximo 5.000 caracteres; transacción, `lockForUpdate()` y `updateOrCreate` por `(intento_id, pregunta_id)`; `es_correcta` queda `null`; recuperación al abrir el intento. El estudiante no recibe `es_correcta`.
 12. **Estudiante — envío definitivo (7.6 y ajuste 2026-11-20).** `RespuestasDigitalesService::enviar()` cambia a `enviada`, registra `enviada_at`, bloquea y no permite segundo envío; `abrirIntento`/`iniciarIntento` respetan la ventana. Tras el cierre, `tiempoAgotado()` bloquea las respuestas pero `errorEnvio()` permite enviar un intento `en_curso` dejando habilitado solo «Enviar evaluación». Después del envío la vista queda en solo lectura. No hay envío automático al cierre.
 13. **Corrección y calificación (7.7 y visualización 2026-11-20).** `CorreccionDigitalService::corregir()` procesa solo intentos `enviada`, no reprocesa `calificada`, rechaza `en_curso`, bloquea con `lockForUpdate()` y usa transacción. Objetivas: correcta 1 punto, incorrecta 0, sin responder 0 sin crear fila. Abiertas respondidas sin valorar: `puntos_obtenidos = null` y pendientes; estado `enviada`, nota `null`. Abiertas sin responder: 0 puntos, sin fila ni pendiente. `calificarAbierta()` guarda valoración entera 0–10, `puntos_obtenidos = valoracion / 10`, `revisada_por`, `revisada_at`; valoración 0 queda revisada. Solo el docente responsable del grupo; solo intentos `enviada`; solo respuestas abiertas de esa evaluación. `respuestasAbiertas()` devuelve las abiertas al docente responsable. Fórmula: `nota = (suma de puntos / total de preguntas) * 5`, redondeo final a 2 decimales; suma en décimas enteras. Si hay pendientes, `nota = null`; si no hay pendientes y hay preguntas, estado `calificada`. Sin abiertas, calificación automática (`calificada_por` null); si la última revisión la hace el docente, `calificada_por` es ese docente. La corrección se ejecuta después del envío, en transacción independiente; si falla, el intento queda `enviada` y se puede reintentar. En Historial y detalle, los intentos `calificada` con `nota !== null` muestran la nota final formateada a 2 decimales (`formatoNotaEstudiante()`) con colores (rojo `< 3.0`, amarillo `3.0–3.99`, verde `>= 4.0`), sin exponer `es_correcta` ni `puntaje_total`.
-14. **Revisión docente (UI).** Ruta `GET /docente/quizzes/revision` (`docente.quizzes.revision`), componente `RevisionQuizParciales` y vista `⚡revision-quiz-parciales.blade.php`; enlace «Revisión de calificaciones» desde `/docente/quizzes`. Panel izquierdo: grupos/materias del docente, filtro Pendientes (por defecto) e Historial, lista de estudiantes, última materia en sesión `docente_revision_ultimo_grupo`. Panel derecho: examen del estudiante, preguntas objetivas en consulta, abiertas con selector 0–10, nota sugerida en vivo (`calcularNotaSugerida()`), bloqueo de guardado si hay pendientes y botón Guardar calificación (`guardarValoraciones()`). `guardarValoraciones()` permite `enviada` y `calificada` solo al docente responsable; en intentos `calificada` se pueden modificar valoraciones, actualizando `calificada_por`/`calificada_at` y `revisada_por`/`revisada_at`, sin crear otro intento. `corregir()` sigue sin reprocesar automáticamente `calificada`. Al guardar una calificación se muestra un banner verde superior con «Calificación guardada correctamente.» mediante `session()->flash('mensaje', ...)`. No se escriben notas en P1–P4/A ni en `calificaciones` por la revisión en sí; el traslado a la nota oficial se ejecuta por `TrasladoNotaParcialService` (ver sección «Traslado de nota a P1–P4»).
+14. **Revisión docente (UI).** Ruta `GET /docente/quizzes/revision` (`docente.quizzes.revision`), componente `RevisionQuizParciales` y vista `⚡revision-quiz-parciales.blade.php`; enlace «Revisión de calificaciones» desde `/docente/quizzes`. Panel izquierdo: grupos/materias del docente, filtro Pendientes (por defecto) e Historial, botón «Guardar todo» debajo de los filtros, lista de estudiantes y última materia en sesión `docente_revision_ultimo_grupo`. Desde el 2026-11-23 (`intentosDelGrupo()` delega en `baseIntentosQuery()` e `intentosPendientesQuery()`): **Pendientes** incluye intentos `ESTADO_ENVIADA` **y** intentos `ESTADO_CALIFICADA` con `calificada_por IS NULL` (calificados automáticamente por el sistema y aún sin guardar por el docente; muestra `Pendiente · Nota sugerida X.XX` en la tarjeta), ordenados por `enviada_at` desc, `id` desc; **Historial** incluye únicamente `ESTADO_CALIFICADA` con `calificada_por IS NOT NULL` (guardados explícitamente por el docente con «Guardar calificación» o «Guardar todo»), ordenados por `calificada_at` desc, `id` desc; `filtroAbiertasPendientes()` cuenta solo abiertas con `valoracion_docente IS NULL`, `respuesta_texto IS NOT NULL` y `TRIM(respuesta_texto) != ''`. El botón «Guardar todo» (`wire:click="guardarTodo"`, deshabilitado cuando `$sugeridasListasCount === 0`, con `wire:loading` «Guardando...») valida que `grupoSeleccionadoId` pertenezca al docente autenticado y procesa solo los intentos pendientes de ese grupo/materia (`grupo_id`, `ESTADO_PUBLICADA`, `docente_id`; nunca otras materias ni otros docentes) cuya nota sugerida esté completa (`calcularNotaSugerida()['completa'] === true`), guardando con `CorreccionDigitalService::guardarValoraciones()` (`calificada_por = $docente->id`) y trasladando a P1–P4 con `TrasladoNotaParcialService::guardar()` únicamente cuando `nota_anterior === null` (sin sobrescribir notas oficiales distintas preexistentes; los intentos con abiertas pendientes permanecen en Pendientes). Si no hay intentos listos, agrega error en `'revision'`: `'No hay calificaciones sugeridas listas para guardar en esta materia.'`. Al guardar masivamente se despacha `calificaciones-guardadas-masivo` («Todas las calificaciones se guardaron correctamente») hacia un toast flotante en la esquina inferior derecha (`wire:ignore`, `style="position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 60; max-width: 22rem;"`, `x-cloak`, `x-show="visible"`, `x-transition`) con ícono SVG checkmark verde esmeralda, botón de cierre `×` y autocierre a los 5 segundos. Panel derecho: examen del estudiante, preguntas objetivas en consulta, abiertas con selector 0–10, nota sugerida en vivo (`calcularNotaSugerida()`), bloqueo de guardado si hay pendientes y botón Guardar calificación (`guardarValoraciones()`). `guardarValoraciones()` permite `enviada` y `calificada` solo al docente responsable; en intentos `calificada` se pueden modificar valoraciones, actualizando `calificada_por`/`calificada_at` y `revisada_por`/`revisada_at`, sin crear otro intento. `corregir()` sigue sin reprocesar automáticamente `calificada`. Al guardar una calificación individual se muestra un banner verde superior con «Calificación guardada correctamente.» mediante `session()->flash('mensaje', ...)`. No se escriben notas en P1–P4/A ni en `calificaciones` por la revisión en sí; el traslado a la nota oficial se ejecuta por `TrasladoNotaParcialService` (ver sección «Traslado de nota a P1–P4»).
 
 ## Paso 4 — guardado, integridad y recuperación de borradores (2026-11-13)
 Cerrado y confirmado por el usuario el 2026-11-13. Archivos: `app/Livewire/Docente/QuizParciales.php`, `resources/views/components/docente/⚡quiz-parciales.blade.php` y `tests/Feature/Docente/QuizParcialesBorradoresTest.php`. No se modificaron servicios, modelos, migraciones, rutas, layouts, `GrupoNotas`, `CalificacionesService`, `GrupoEstudiantes` ni otros módulos.
@@ -214,10 +214,10 @@ La ponderación de las personalizadas (`porcentaje = null`, sin sumar a la nota 
 - Etapa 6 (6.4): `tests/Feature/Docente/GrupoEliminacionArchivosTest.php` (12 / 56) y `GrupoNotasEliminacionEvaluacionTest.php` (3 / 15), PASS.
 - Etapa 7 y mejoras 2026-11-20 (`EvaluacionesDigitalesTest.php` y `EvaluacionesDigitalesRespuestasTest.php`): filtro `EvaluacionesDigitales` en SQLite en memoria **66 passed (425 assertions)** el 2026-11-20 (cifras históricas previas: 27 casos el 2026-11-17; respuestas 32 / 207 el 2026-11-16).
 - Corrección (7.7): `tests/Feature/Services/CorreccionDigitalServiceTest.php` — el 2026-11-20 se actualizó únicamente la aserción de `$intentoActual` para verificar `nota === '5.00'` y ausencia de `puntaje_total` y `es_correcta` (cifra histórica previa: 22 / 88, PASS).
-- Revisión docente: `tests/Feature/Docente/RevisionQuizParcialesTest.php` — 22 / 90, PASS (2026-11-17), con 7 pruebas nuevas del traslado: sin nota previa, Quiz sin traslado, confirmación con nota existente, cancelación, nota `0.00`, nota coincidente y exclusión de A.
-- Suite completa el 2026-11-20: **490 passed (2757 assertions)** (2026-11-19 segundo bloque: 483 / 2682; primer bloque: 468 / 2449; 2026-11-17: 455 / 2344).
-- `php -l`: sin errores en `app/Livewire/Estudiante/EvaluacionesDigitales.php` (2026-11-20) ni en los archivos PHP del módulo. Pint (`--test`) en verde (2026-11-20); `npm run build` compilado (`public/build`, ignorado por git); `view:cache` correcto (2026-11-17). Verificación en PostgreSQL real: `/docente/quizzes` y `/docente/quizzes/revision` devolvieron HTTP 200; sin errores nuevos en logs.
-- Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo. Sin migraciones nuevas ni cambios de esquema en estos ajustes (2026-11-17, 2026-11-19 y 2026-11-20).
+- Revisión docente: `tests/Feature/Docente/RevisionQuizParcialesTest.php` — **26 passed (138 assertions)** el 2026-11-23 (4 pruebas nuevas para separación Pendientes/Historial por `calificada_por`, botón «Guardar todo» por materia seleccionada y toast flotante con chulo + 1 ajustada: `test_cambia_entre_pendientes_e_historial_sin_perder_el_filtro` ahora asigna `calificada_por`; cifra anterior del 2026-11-17: 22/90, incluidas 7 pruebas del traslado: sin nota previa, Quiz sin traslado, confirmación con nota existente, cancelación, nota `0.00`, nota coincidente y exclusión de A).
+- Suite completa el 2026-11-23: **533 passed (3228 assertions)** (2026-11-20: 490 / 2757; 2026-11-19 segundo bloque: 483 / 2682; primer bloque: 468 / 2449; 2026-11-17: 455 / 2344).
+- `php -l`: sin errores en `app/Livewire/Docente/RevisionQuizParciales.php` (2026-11-23), `app/Livewire/Estudiante/EvaluacionesDigitales.php` (2026-11-20) ni en los archivos PHP del módulo. `vendor\bin\pint` sobre los 2 archivos PHP modificados en revisión (`RevisionQuizParciales.php` y `RevisionQuizParcialesTest.php`): `passed` (2026-11-23); Pint (`--test`) en verde (2026-11-20); `npm run build` compilado (`public/build`, ignorado por git); `view:cache` correcto (2026-11-17). Verificación en PostgreSQL real: `/docente/quizzes` y `/docente/quizzes/revision` devolvieron HTTP 200; sin errores nuevos en logs.
+- Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo. Sin migraciones nuevas ni cambios de esquema en estos ajustes (2026-11-17, 2026-11-19, 2026-11-20 y 2026-11-23).
 
 ## Riesgos y dependencias
 - Protección de borrado de grupos y evaluaciones con contenido digital: **resuelta en Etapa 6 (2026-11-16)**. Bloquea con mensaje amigable, no borra ni archiva digitales y no existe UI de archivado. **[Implementado]**
@@ -242,24 +242,160 @@ La ponderación de las personalizadas (`porcentaje = null`, sin sumar a la nota 
 - Si falla la corrección tras el envío, el intento queda `enviada` y no hay botón/comando de reintento. **[Limitación]**
 - El módulo cubre la UI docente hasta el Paso 5.5 (publicación para modalidad Preguntas y consulta en solo lectura) y la del estudiante hasta 7.7 más las mejoras de 2026-11-20 (nota final visible en Historial/detalle, alertas de tiempo y envío tras cierre con respuestas bloqueadas). Archivo/Mixta y detalle por pregunta para el estudiante siguen pendientes.
 
+## Planeación del nuevo apartado «Monitoreo» (definida por el usuario el 2026-11-20 — pendiente de implementación)
+
+El usuario definió el diseño visual y funcional de una nueva fase del módulo Quiz / Parciales: el apartado **«Monitoreo»**, destinado a supervisar en tiempo real y consultar posteriormente el historial de actividad de cada estudiante durante la realización de una evaluación digital (Parcial o Quiz).
+
+### 1. Vías de acceso a «Monitoreo»
+Se podrá entrar al apartado de dos maneras:
+1. **Desde el Layout del docente (`resources/views/layouts/docente.blade.php`):**
+   - Añadir un sub-enlace anidado debajo de `Quiz / Parciales`:
+     ```text
+     Quiz / Parciales
+       |_ Monitoreo
+     ```
+   - Ruta: `GET /docente/quizzes/monitoreo` (`docente.quizzes.monitoreo`), protegida con `auth` + `role:docente`.
+   - Mantener la distinción visual de ruta activa entre `docente.quizzes` y `docente.quizzes.monitoreo`.
+2. **Desde `Quiz / Parciales`, sección «Publicadas» (`app/Livewire/Docente/QuizParciales.php` y `resources/views/components/docente/⚡quiz-parciales.blade.php`):**
+   - Colocar un botón **«Monitoreo»** al lado del botón **«Ver»** en cada evaluación publicada.
+   - **Visibilidad condicionada:** El botón «Monitoreo» **solo aparece cuando la evaluación publicada se encuentra en curso** (ventana activa en `America/Bogota`: `ahora >= inicio` y `ahora < cierre`).
+   - **Ordenamiento de «Publicadas»:** Las evaluaciones publicadas que están **en curso** deben colocarse **de primeras** en la lista de la sección «Publicadas», seguidas por las demás evaluaciones publicadas (`publicada_at DESC, id DESC`).
+   - Al pulsar «Monitoreo» desde una publicación en curso, redirige a `route('docente.quizzes.monitoreo', ['evaluacion' => $publicacion->id])` preseleccionando la materia/grupo y esa evaluación.
+
+### 2. Diseño y estructura visual del apartado «Monitoreo»
+Conserva la línea visual de `Quiz / Parciales` y `Revisión` (`Tailwind`, tarjetas `rounded-2xl border border-slate-200 bg-white shadow-sm`), distribuida en dos paneles (`grid gap-6 lg:grid-cols-3`):
+
+#### A. Panel izquierdo (`lg:col-span-1`) — «Panel de Control»
+- **Título:** `Panel de Control`.
+- **Filtro principal:** `Seleccionar Materia` (`<select wire:model.live="grupoSeleccionadoId">`) con las materias/grupos propios del docente autenticado (y selector/contexto de la evaluación digital publicada del grupo cuando aplique consultar una evaluación en curso o su historial guardado).
+- **Lista de estudiantes de la materia seleccionada:**
+  - Al seleccionar la materia, se listan todos los estudiantes inscritos en ese grupo (`grupo_estudiante`).
+  - Cada tarjeta de estudiante muestra su avatar/inicial, nombre completo y su estado de actividad:
+    - **`● Activo` (en color verde / `emerald`):** El estudiante ya le dio clic al botón «Iniciar evaluación» / «Iniciar examen» en su vista (existe su intento iniciado para la evaluación monitoreada).
+    - **`● Inactivo` (en color rojo / `red`):** El estudiante **no** ha iniciado el examen todavía.
+  - Al hacer clic sobre un estudiante, queda resaltado (borde y fondo azul claro) y se carga su detalle en el panel derecho.
+
+#### B. Panel derecho (`lg:col-span-2`) — «Detalle del Estudiante: [Nombre]»
+Cuando se selecciona un estudiante, muestra el encabezado `Detalle del Estudiante: [Nombre]` seguido de **4 tarjetas superiores** (cuadrícula 2x2: `grid gap-4 sm:grid-cols-2`) y **1 panel inferior de registro de actividad**:
+
+1. **Tarjeta 1 — `Información General`:**
+   - Avatar o inicial del estudiante.
+   - Nombre completo del estudiante (`users.name`).
+   - Identificador del estudiante (`ID Número`: código/ID del estudiante).
+   - Información del curso/materia (`Materia · Semestre · Año` / carrera).
+2. **Tarjeta 2 — `Estado de Conexión`:**
+   - Estado con icono:
+     - **`En Línea` (verde):** Aparece en línea una vez que el estudiante inicia el examen (al darle clic a «Iniciar examen» / «Iniciar evaluación» en su vista).
+     - Si el estudiante aún no ha iniciado el examen, se muestra como `Fuera de línea / Sin iniciar` (rojo/gris); si ya envió el examen, se indica `Examen entregado / Finalizado`.
+   - Hora de conexión / inicio del examen (y última señal recibida).
+   - Dirección IP (`IP Address`) registrada desde la conexión del estudiante.
+3. **Tarjeta 3 — `Progreso del Examen`:**
+   - Indicador circular de porcentaje (`0%` a `100%`) junto con el texto `Preguntas Respondidas: X de Y`.
+   - Se calcula consultando cuántas preguntas de la evaluación ha respondido y guardado el estudiante en `evaluacion_digital_respuestas` frente al total de preguntas de la evaluación (`evaluacion_digital_preguntas`).
+4. **Tarjeta 4 — `Alertas Activas` («Alerta de actividades»):**
+   - Muestra las alertas acumuladas cuando el estudiante:
+     - Cambia de pestaña o pierde el foco de la pestaña del examen (`⚠️ Navegó fuera de la pestaña (N veces)`).
+     - Realiza un intento de copiar (`Ctrl + C` / evento `copy`) o pegar (`Ctrl + V` / evento `paste`) (`⚠️ Intento de copia detectado - Portapapeles` / `⚠️ Intento de pegado detectado - Portapapeles`).
+   - Si no registra alertas, muestra un estado limpio sin advertencias.
+5. **Panel inferior de ancho completo — `Actividad Reciente (Log de Acciones)`:**
+   - Muestra en orden cronológico (con la hora de cada evento, ej. `1:50 PM`) el detalle de todas las señales y acciones recibidas del estudiante:
+     - **Inicio del examen:** Cuando el estudiante da clic a «Iniciar examen» (`Inició el Parcial` / `Inició el Quiz`).
+     - **Cambio de pestaña / pérdida de foco:** Cuando navega fuera de la pestaña o la pestaña del examen pierde el foco (`⚠️ Navegó fuera de la pestaña`).
+     - **Uso de portapapeles (`Ctrl + C` / `Ctrl + V`):** Cuando copia o pega durante el examen (`⚠️ Intento de copia detectado - Portapapeles` / `⚠️ Intento de pegado detectado - Portapapeles`).
+     - **Respuesta y guardado por pregunta:** Cuando responde y guarda una pregunta, detallando **qué pregunta respondió** (por su número de orden, ej. `Pregunta 17`), **cuál respuesta escogió** (ej. `(Opción B)` con su letra A/B/C/D según el orden de las opciones en selección múltiple / verdadero-falso, o indicador de respuesta abierta) y el evento de guardado (`Respondió Pregunta 17 (Opción B)` / `Guardó Progreso`).
+     - **Entrega del examen:** Cuando el estudiante confirma el envío definitivo (`Entregó Examen`).
+   - **Límite visual y botón «Ver más» (ajuste del 2026-11-23):** Por defecto solo se muestran las **5 actividades más recientes** en el panel `Actividad Reciente (Log de Acciones)`; cuando existen más de 5 registros, aparece debajo un botón **«Ver más»** (`toggleVerTodasActividades()`) para desplegar todo el historial (y **«Ver menos»** para contraerlo a 5), conservando el estado durante `wire:poll.5s` y reiniciándolo al cambiar de estudiante, evaluación o materia.
+   - **Estado «Finalizado» al enviar evaluación (ajuste 2 del 2026-11-23):** Cuando el estudiante envía su evaluación (`enviada` o `calificada`), su estado en el Panel de Control y en `Estado de Conexión` cambia de `Activo` a **`Finalizado`**.
+   - **Anulación de examen y cancelación de nulidad (ajuste 3 del 2026-11-23):**
+     - En la esquina superior derecha de `Detalle del Estudiante: [Nombre]` aparece el botón **«Anular»** (mientras el examen no esté anulado). Al pulsarlo, abre un modal flotante para escribir un mensaje al estudiante con los botones **«Anular»** y **«Cancelar»**.
+     - Al confirmar la anulación: el intento pasa a estado `anulada` con `nota = 1.00`; se asigna automáticamente un **`1` (`1.00`)** en `calificaciones` para esa evaluación con el mensaje del docente en `calificaciones.comentario` (visible al pasar el mouse por encima de la nota en el apartado Notas); y en la pantalla del estudiante aparece **`Examen anulado`** con el mensaje escrito por el docente, bloqueando respuestas y envío.
+     - Una vez anulado, en la esquina superior derecha de `Detalle del Estudiante` ya no aparece «Anular», sino el botón **«Cancelar»** (cancela la nulidad del examen).
+     - Si el docente pulsa **«Cancelar»** para levantar la nulidad: se elimina el `1` colocado en la nota del estudiante (`calificaciones` e intento), el intento vuelve a `en_curso` y, si el examen aún no ha finalizado, se rehabilita en la vista del estudiante mostrando el mensaje **`Se canceló la anulacion de su parcial`** para que pueda seguir respondiendo con normalidad.
+   - **Notificación flotante global al docente por actividad sospechosa (ajuste 4 del 2026-11-24):**
+     - Cuando un estudiante realiza una actividad sospechosa durante su examen (`cambio_pestana`, `perdida_foco`, `pegar`, `copiar`), el docente recibe una notificación flotante en la esquina inferior derecha con el texto `"El estudiante: [Nombre]."` y debajo la acción (ej. `"Navegó fuera de la pestaña"`, `"Intento de pegado detectado - Portapapeles"`).
+     - La notificación aparece sin importar en qué apartado del panel docente se encuentre (`layouts/docente.blade.php`, componente `App\Livewire\Docente\NotificacionesMonitoreo`).
+     - Al hacer clic sobre la notificación, redirige a `/docente/quizzes/monitoreo?evaluacion={evaluacion_id}&estudiante={estudiante_id}`, abriendo directamente el monitoreo y el detalle del estudiante que cometió la infracción.
+
+### 3. Persistencia y arquitectura técnica planeada
+
+#### A. Esquema de base de datos (Migración y Modelo)
+- **Nueva tabla `evaluacion_digital_monitoreo_logs`** (modelo `App\Models\EvaluacionDigitalMonitoreoLog`):
+  - `id` (PK)
+  - `evaluacion_digital_id` (`FK -> evaluaciones_digitales.id`, `cascadeOnDelete`, indexado)
+  - `intento_id` (`FK -> evaluacion_digital_intentos.id`, `cascadeOnDelete`, nullable/indexado)
+  - `estudiante_id` (`FK -> estudiantes.id`, `cascadeOnDelete`, indexado)
+  - `tipo_evento` (`string(40)`: `inicio_examen`, `cambio_pestana`, `perdida_foco`, `copiar`, `pegar`, `respuesta_guardada`, `guardado_progreso`, `entrega_examen`, `heartbeat`)
+  - `es_alerta` (`boolean`, default `false`)
+  - `descripcion` (`string(500)`) — texto legible para el log (ej. `Inició el Parcial`, `Navegó fuera de la pestaña`, `Respondió Pregunta 18 (Opción A)`, `Intento de copia detectado - Portapapeles`, `Entregó Examen`)
+  - `pregunta_id` (`nullable FK -> evaluacion_digital_preguntas.id`, `nullOnDelete`)
+  - `opcion_id` (`nullable FK -> evaluacion_digital_opciones.id`, `nullOnDelete`)
+  - `ip_address` (`string(45)`, nullable)
+  - `metadata` (`json`, nullable — número de pregunta, letra de opción `A`/`B`/`C`..., texto resumido, etc.)
+  - `created_at` / `updated_at` (timestamps, indexado por `(intento_id, created_at)` y `(evaluacion_digital_id, estudiante_id, created_at)`).
+- **Conservación histórica:** Todos los eventos quedan almacenados de forma permanente en `evaluacion_digital_monitoreo_logs` para que el docente pueda consultar el historial de cualquier estudiante tanto durante el examen como después de que haya finalizado.
+
+#### B. Señales desde el navegador del estudiante (`EvaluacionesDigitales` + Alpine.js)
+- En `resources/views/components/estudiante/⚡evaluaciones-digitales.blade.php` (activo únicamente mientras el estudiante tiene un intento `en_curso` y la ventana no se ha cerrado):
+  - **Detección de cambio de pestaña y foco:** listeners en Alpine/JS sobre `document.addEventListener('visibilitychange')` (cuando `document.hidden` pasa a `true`) y `window.addEventListener('blur')` (cuando la ventana pierde el foco, con control de enfriamiento/debounce para no duplicar el mismo evento al cambiar de pestaña).
+  - **Detección de `Ctrl + C` y `Ctrl + V`:** listeners sobre `copy`, `paste` y `keydown` (`(e.ctrlKey || e.metaKey) && ['c', 'v'].includes(e.key.toLowerCase())`).
+  - **Señal periódica (heartbeat):** envío periódico ligero desde el navegador del estudiante mientras permanece en la pestaña del examen para confirmar conexión activa y dirección IP.
+  - **Acciones en servidor (`EvaluacionesDigitales.php` / `MonitoreoDigitalService`):**
+    - Al ejecutar `iniciarIntento()`: registra el evento `inicio_examen` con la IP del estudiante (`request()->ip()`) solo cuando se inicia el intento.
+    - Al ejecutar `guardarRespuesta($preguntaId)`: registra el evento `respuesta_guardada` calculando el número de pregunta (`orden`) y la letra de la opción seleccionada (`Opción A`, `Opción B`, etc. según su posición ordenada, o `Respuesta abierta`) junto con el guardado de progreso.
+    - Al ejecutar `enviarIntento()`: registra el evento `entrega_examen` (`Entregó Examen`).
+    - Nuevo método Livewire en `EvaluacionesDigitales`: `registrarSenalMonitoreo(string $tipo, ?array $contexto = null)` que valida que el intento pertenezca al estudiante autenticado y esté `en_curso` antes de guardar la señal.
+
+### 4. Plan de implementación por fases (para ejecución por agentes)
+1. **Fase 1 — Base de datos, modelo y servicio de monitoreo:**
+   - Crear migración para `evaluacion_digital_monitoreo_logs` y modelo `EvaluacionDigitalMonitoreoLog` con relaciones en `EvaluacionDigital`, `EvaluacionDigitalIntento` y `Estudiante`.
+   - Crear `App\Services\MonitoreoDigitalService` para registrar eventos (`registrarInicio()`, `registrarRespuesta()`, `registrarSenalNavegador()`, `registrarEntrega()`) y consultar el resumen/historial por evaluación y estudiante.
+   - Pruebas unitarias/feature del esquema y del servicio en SQLite.
+2. **Fase 2 — Captura de eventos y señales en la vista del estudiante:**
+   - Integrar en `EvaluacionesDigitales.php` y `RespuestasDigitalesService.php` el registro automático al iniciar intento, guardar respuesta (con número de pregunta y opción escogida) y enviar evaluación.
+   - Añadir el componente Alpine.js en `⚡evaluaciones-digitales.blade.php` para capturar cambios de pestaña (`visibilitychange`), pérdida de foco (`blur`), `Ctrl + C` (`copy`), `Ctrl + V` (`paste`) y señales periódicas hacia `registrarSenalMonitoreo()`.
+   - Pruebas feature verificando que cada acción del estudiante y cada señal del navegador persistan en `evaluacion_digital_monitoreo_logs` y que intentos ajenos o cerrados sean rechazados.
+3. **Fase 3 — Accesos al apartado «Monitoreo» (Layout y «Publicadas»):**
+   - Registrar la ruta `GET /docente/quizzes/monitoreo` (`docente.quizzes.monitoreo`) en `routes/web.php`.
+   - Actualizar `resources/views/layouts/docente.blade.php` para mostrar el sub-enlace `Monitoreo` debajo de `Quiz / Parciales`.
+   - Actualizar `QuizParciales.php` y `⚡quiz-parciales.blade.php` en la sección «Publicadas» para:
+     1. Ordenar primero las evaluaciones publicadas que están **en curso** (`America/Bogota`).
+     2. Mostrar el botón **«Monitoreo»** junto al botón **«Ver»** únicamente en las evaluaciones que se encuentran **en curso**.
+   - Pruebas feature de ordenamiento de publicadas en curso y visibilidad del botón «Monitoreo».
+4. **Fase 4 — Componente y vista docente «Monitoreo» (`MonitoreoQuizParciales`):**
+   - Implementar `App\Livewire\Docente\MonitoreoQuizParciales` y `resources/views/components/docente/⚡monitoreo-quiz-parciales.blade.php`.
+   - Panel izquierdo «Panel de Control» con selector de materia/grupo (y evaluación publicada), lista de estudiantes del grupo con estado `● Activo` (verde, si dio clic en «Iniciar examen») e `● Inactivo` (rojo, si no ha iniciado).
+   - Panel derecho «Detalle del Estudiante» con las 4 tarjetas (`Información General`, `Estado de Conexión`, `Progreso del Examen` con gráfico circular `%` y `X de Y`, `Alertas Activas`) y el panel `Actividad Reciente (Log de Acciones)` consultable en vivo (con actualización periódica / botón actualizar) y como historial persistido.
+   - Validar estrictamente que un docente solo pueda monitorear sus propios grupos y evaluaciones (grupos ajenos → error/404).
+5. **Fase 5 — Suite de pruebas integral, Pint y verificación:**
+   - Pruebas completas en `tests/Feature/Docente/MonitoreoQuizParcialesTest.php` y `tests/Feature/Estudiante/MonitoreoSenalesEstudianteTest.php`.
+   - Ejecución de Pint (`--test`), `php -l`, suite completa de pruebas y confirmación del usuario en navegador antes de documentar el cierre.
+6. **Ajustes adicionales en Monitoreo (Puntos 1–4) y corrección del Paso 2 de Quiz/Parciales (implementados y verificados en pruebas, 2026-11-23 / 2026-11-24):**
+   - **Punto 1:** `Actividad Reciente (Log de Acciones)` muestra solo las 5 actividades más recientes por defecto con botón `Ver más (N)` / `Ver menos` (`toggleVerTodasActividades()`).
+   - **Punto 2:** Al entregar la evaluación (`enviada` / `calificada`), el estado del estudiante en Monitoreo pasa de `Activo` a `Finalizado` (azul).
+   - **Punto 3:** Botón `Anular` en la esquina superior derecha de `Detalle del Estudiante` con modal flotante de mensaje para el estudiante (`Anular` / `Cancelar`), calificación automática `1.00` en `calificaciones` con `comentario` visible en hover (`title`) en las vistas de Notas (`/estudiante/notas` y `/docente/grupo/{grupoId}/notas`), aviso `Examen anulado` con el mensaje del docente en la vista del estudiante, y reemplazo del botón `Anular` por `Cancelar` en Monitoreo para cancelar la nulidad (retirando el `1` y mostrando `Se canceló la anulacion de su parcial` si el examen sigue vigente).
+   - **Corrección Paso 2 de Quiz/Parciales:** Inputs de `preguntaActual.enunciado`, `preguntaActual.opciones.{{ $indice }}.texto` e `indiceCorrecto` migrados a `wire:model` diferido con `wire:key` por opción y `sincronizarOpcionCorrecta()` al guardar/agregar pregunta, evitando borrados o truncamientos al escribir respuestas múltiples.
+   - **Punto 4:** Componente global `App\Livewire\Docente\NotificacionesMonitoreo` (`resources/views/components/docente/⚡notificaciones-monitoreo.blade.php`) montado en `resources/views/layouts/docente.blade.php` que muestra notificaciones flotantes en la esquina inferior derecha (`"El estudiante: [Nombre].\n[Acción]"`) ante actividad sospechosa (`cambio_pestana`, `perdida_foco`, `copiar`, `pegar`) sin importar en qué página del panel docente esté el profesor, redirigiendo al hacer clic a `/docente/quizzes/monitoreo?evaluacion={id}&estudiante={id}` con preselección directa del estudiante infractor en `MonitoreoQuizParciales::mount()`.
+
 ## Próximos pasos
-1. **Cierre formal del Paso 5.6.** Auditoría y correcciones hechas; verificación final y aprobación del usuario pendientes. No declararlo cerrado todavía.
-2. **Etapa 6 restante:** archivos privados y seguridad.
-3. **Detalle por pregunta/retroalimentación al estudiante (si se requiere):** la nota final en Historial y detalle ya está implementada y confirmada en navegador (2026-11-20).
-4. **Traslado a A:** extender el traslado a evaluaciones de tipo A (no soportado hoy).
-5. **Backfill:** permitir trasladar notas de intentos ya calificados sin volver a guardar manualmente (no implementado).
-6. **Confirmación en navegador de los flujos pendientes de UI del 2026-11-19:** bloque C del segundo bloque (retiro de «Guardar borrador», autoguardado, modal al eliminar pregunta y horario en «Mis borradores») y flujos del primer bloque por validar (bloques A y B del segundo bloque ya confirmados).
-7. **Validación de concurrencia en PostgreSQL** (hoy solo SQLite).
-8. **Decidir la recalificación** de intentos `calificada` si se necesita.
-9. **Confirmación en navegador** de la interfaz de revisión y del traslado.
+1. **Ejecutar la planeación del nuevo apartado «Monitoreo» (Fases 1 a 5):** esquema de logs, señales del estudiante, accesos desde Layout y «Publicadas» (con parciales en curso primero), y panel docente de Monitoreo.
+2. **Cierre formal del Paso 5.6.** Auditoría y correcciones hechas; verificación final y aprobación del usuario pendientes. No declararlo cerrado todavía.
+3. **Etapa 6 restante:** archivos privados y seguridad.
+4. **Detalle por pregunta/retroalimentación al estudiante (si se requiere):** la nota final en Historial y detalle ya está implementada y confirmada en navegador (2026-11-20).
+5. **Traslado a A:** extender el traslado a evaluaciones de tipo A (no soportado hoy).
+6. **Backfill:** permitir trasladar notas de intentos ya calificados sin volver a guardar manualmente (no implementado).
+7. **Confirmación en navegador de los flujos pendientes de UI del 2026-11-19:** bloque C del segundo bloque (retiro de «Guardar borrador», autoguardado, modal al eliminar pregunta y horario en «Mis borradores») y flujos del primer bloque por validar (bloques A y B del segundo bloque ya confirmados).
+8. **Validación de concurrencia en PostgreSQL** (hoy solo SQLite).
+9. **Decidir la recalificación** de intentos `calificada` si se necesita.
+10. **Confirmación en navegador** de la interfaz de revisión y del traslado.
 No declarar cerradas las Etapas 6–7 ni los Pasos 7.5–7.7 sin aprobación del usuario.
 
 ## Por confirmar
+- Inicio de la implementación por fases (Fase 1 a Fase 5) del apartado «Monitoreo» según la planeación registrada el 2026-11-20.
 - Cierre del Paso 5.6: auditoría y correcciones aplicadas, verificación final y aprobación pendientes.
 - Aprobación formal de la Etapa 6 (revisión 6.3, «aprobado con observaciones») y de las Etapas 7.1–7.7.
-- Confirmación del usuario en navegador para el traslado de nota y para los flujos pendientes de UI de Quiz/Parciales del 2026-11-19 (bloque C del segundo bloque y primer bloque por validar; bloques A y B y la interfaz del estudiante del 2026-11-20 ya están confirmados).
+- Confirmación del usuario en navegador para el traslado de nota, para el botón «Guardar todo» y el toast flotante con chulo en `/docente/quizzes/revision` (2026-11-23, también pendiente de commit), y para los flujos pendientes de UI de Quiz/Parciales del 2026-11-19 (bloque C del segundo bloque y primer bloque por validar; bloques A y B y la interfaz del estudiante del 2026-11-20 ya están confirmados).
 - La numeración anterior de la memoria llamaba «Etapa 4» a la interfaz del estudiante; corresponde a la Etapa 7 actual. Confirmar la renumeración.
-- Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo.
+- Migraciones aplicadas en Supabase/PostgreSQL; no quedan migraciones pendientes del módulo (la migración de `evaluacion_digital_monitoreo_logs` se creará en la Fase 1 de Monitoreo).
 - Comportamiento en PostgreSQL bajo concurrencia real (incluido el traslado y `con_notas`).
 - Necesidad de recalificación de intentos `calificada`.
 - Si se requiere detalle por pregunta/retroalimentación para el estudiante además de la nota final.

@@ -43,6 +43,14 @@ class Estudiante extends Model
         return $this->hasMany(EvaluacionDigitalIntento::class);
     }
 
+    public function monitoreoLogs(): HasMany
+    {
+        return $this->hasMany(
+            EvaluacionDigitalMonitoreoLog::class,
+            'estudiante_id'
+        );
+    }
+
     /**
      * Calcula la nota final del estudiante.
      */

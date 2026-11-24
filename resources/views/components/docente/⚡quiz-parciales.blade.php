@@ -448,7 +448,7 @@
                                     <textarea
                                         id="pregunta-enunciado"
                                         rows="3"
-                                        wire:model.live.debounce.500ms="preguntaActual.enunciado"
+                                        wire:model="preguntaActual.enunciado"
                                         placeholder="1. Escribe tu pregunta"
                                         class="w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                     ></textarea>
@@ -497,19 +497,22 @@
                                     <div class="space-y-2">
                                         @if (is_array($preguntaActual['opciones']))
                                             @foreach ($preguntaActual['opciones'] as $indice => $opcion)
-                                                <div class="flex items-center gap-2">
+                                                <div
+                                                    wire:key="pregunta-opcion-multiple-{{ $indiceEditandoPregunta ?? 'nueva' }}-{{ $indice }}"
+                                                    class="flex items-center gap-2"
+                                                >
                                                     <input
                                                         type="radio"
                                                         name="opcion-correcta"
                                                         value="{{ $indice }}"
-                                                        wire:model.live="indiceCorrecto"
+                                                        wire:model="indiceCorrecto"
                                                         class="h-4 w-4 shrink-0 border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                                         aria-label="Marcar opción {{ $indice + 1 }} como correcta"
                                                     >
 
                                                     <input
                                                         type="text"
-                                                        wire:model.live.debounce.500ms="preguntaActual.opciones.{{ $indice }}.texto"
+                                                        wire:model="preguntaActual.opciones.{{ $indice }}.texto"
                                                         placeholder="Opción {{ $indice + 1 }}"
                                                         class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                                                     >
@@ -525,12 +528,15 @@
                                     <div class="space-y-2">
                                         @if (is_array($preguntaActual['opciones']))
                                             @foreach ($preguntaActual['opciones'] as $indice => $opcion)
-                                                <label class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                                                <label
+                                                    wire:key="pregunta-opcion-vf-{{ $indiceEditandoPregunta ?? 'nueva' }}-{{ $indice }}"
+                                                    class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                                                >
                                                     <input
                                                         type="radio"
                                                         name="opcion-correcta"
                                                         value="{{ $indice }}"
-                                                        wire:model.live="indiceCorrecto"
+                                                        wire:model="indiceCorrecto"
                                                         class="h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500"
                                                     >
                                                     {{ is_array($opcion) ? ($opcion['texto'] ?? '') : '' }}
@@ -1260,13 +1266,24 @@
                                 </p>
                             </div>
 
-                            <button
-                                type="button"
-                                wire:click="abrirPublicacion({{ $publicacion->id }})"
-                                class="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Ver
-                            </button>
+                            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                @if ($publicacion->en_curso)
+                                    <a
+                                        href="{{ route('docente.quizzes.monitoreo', ['evaluacion' => $publicacion->id]) }}"
+                                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                                    >
+                                        Monitoreo
+                                    </a>
+                                @endif
+
+                                <button
+                                    type="button"
+                                    wire:click="abrirPublicacion({{ $publicacion->id }})"
+                                    class="shrink-0 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    Ver
+                                </button>
+                            </div>
                         </div>
                     @endforeach
                 </div>

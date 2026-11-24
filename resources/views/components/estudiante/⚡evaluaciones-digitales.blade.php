@@ -168,6 +168,7 @@
                                             'en_curso' => 'En curso',
                                             'enviada' => 'Enviada',
                                             'calificada' => 'Calificada',
+                                            'anulada' => 'Anulada',
                                             default => null,
                                         };
                                     @endphp
@@ -188,7 +189,7 @@
                                             </span>
 
                                             @if ($estadoIntento)
-                                                <span class="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                <span class="rounded-md px-2 py-0.5 text-xs font-semibold {{ $evaluacion['intento_estado'] === 'anulada' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700' }}">
                                                     {{ $estadoIntento }}
                                                 </span>
                                             @endif
@@ -250,6 +251,7 @@
                                     'en_curso' => 'En curso',
                                     'enviada' => 'Enviada',
                                     'calificada' => 'Calificada',
+                                    'anulada' => 'Anulada',
                                     default => $intentoActual['estado'],
                                 };
 
@@ -354,31 +356,50 @@
                                     </div>
                                 @endif
                             @else
-                                @if ($intentoActual['editable'])
-                                    <p class="mt-4 text-sm text-slate-600">
-                                        Tu intento está en curso. Guarda cada respuesta antes de enviar la evaluación.
-                                    </p>
-                                @elseif ($intentoActual['vencido'])
-                                    <div id="estado-tiempo-agotado" class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                                        <p class="font-semibold">Se acabó el tiempo</p>
-                                        <p class="mt-1">
-                                            Ya no puedes responder más preguntas. Pulsa «Enviar evaluación» para entregar las respuestas que alcanzaste a guardar.
+                                @if ($intentoActual['anulada'] ?? false)
+                                    <div class="mt-4 rounded-xl border border-red-300 bg-red-50 px-5 py-4 text-sm text-red-800">
+                                        <p class="text-base font-bold text-red-700">
+                                            Examen anulado
                                         </p>
+                                        @if (! empty($intentoActual['motivo_anulacion']))
+                                            <p class="mt-1.5 text-sm text-red-700">
+                                                {{ $intentoActual['motivo_anulacion'] }}
+                                            </p>
+                                        @endif
                                     </div>
                                 @else
-                                    <div class="mt-4 flex flex-wrap items-center gap-3">
-                                        <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
-                                            Solo lectura
-                                        </span>
+                                    @if ($intentoActual['anulacion_cancelada'] ?? false)
+                                        <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                                            {{ $intentoActual['mensaje_anulacion_cancelada'] }}
+                                        </div>
+                                    @endif
 
-                                        <p class="text-sm text-slate-600">
-                                            @if (in_array($intentoActual['estado'], ['enviada', 'calificada'], true))
-                                                Este intento ya fue {{ $intentoActual['estado'] === 'calificada' ? 'calificado' : 'enviado' }} y no admite modificaciones.
-                                            @else
-                                                El período de acceso terminó; el intento queda en solo lectura.
-                                            @endif
+                                    @if ($intentoActual['editable'])
+                                        <p class="mt-4 text-sm text-slate-600">
+                                            Tu intento está en curso. Guarda cada respuesta antes de enviar la evaluación.
                                         </p>
-                                    </div>
+                                    @elseif ($intentoActual['vencido'])
+                                        <div id="estado-tiempo-agotado" class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                                            <p class="font-semibold">Se acabó el tiempo</p>
+                                            <p class="mt-1">
+                                                Ya no puedes responder más preguntas. Pulsa «Enviar evaluación» para entregar las respuestas que alcanzaste a guardar.
+                                            </p>
+                                        </div>
+                                    @else
+                                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                                            <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                                                Solo lectura
+                                            </span>
+
+                                            <p class="text-sm text-slate-600">
+                                                @if (in_array($intentoActual['estado'], ['enviada', 'calificada'], true))
+                                                    Este intento ya fue {{ $intentoActual['estado'] === 'calificada' ? 'calificado' : 'enviado' }} y no admite modificaciones.
+                                                @else
+                                                    El período de acceso terminó; el intento queda en solo lectura.
+                                                @endif
+                                            </p>
+                                        </div>
+                                    @endif
                                 @endif
                             @endif
 
@@ -721,6 +742,136 @@
                                     </div>
                                 </div>
                             </div>
+                        @endif
+
+                        {{-- MONITOREO SILENCIOSO DEL NAVEGADOR (SOLO INTENTO EN CURSO Y EDITABLE) --}}
+                        @if ($intentoActual !== null && $intentoActual['editable'])
+                            <div
+                                id="monitoreo-navegador-activo"
+                                wire:ignore
+                                wire:key="monitoreo-señales-intento-{{ $intentoActual['id'] }}"
+                                class="hidden"
+                                x-data="{
+                                    ultimoFocoMs: 0,
+                                    ultimoCopiarMs: 0,
+                                    ultimoPegarMs: 0,
+                                    intervaloHeartbeatId: null,
+                                    onVisibilityChange: null,
+                                    onWindowBlur: null,
+                                    onCopy: null,
+                                    onPaste: null,
+                                    onKeyDown: null,
+                                    init() {
+                                        this.onVisibilityChange = () => {
+                                            if (document.hidden === true) {
+                                                this.ultimoFocoMs = Date.now();
+                                                this.$wire.registrarSenalMonitoreo('cambio_pestana', { origen: 'visibilitychange' });
+                                            }
+                                        };
+
+                                        this.onWindowBlur = () => {
+                                            const ahora = Date.now();
+                                            if (ahora - this.ultimoFocoMs > 800) {
+                                                this.ultimoFocoMs = ahora;
+                                                this.$wire.registrarSenalMonitoreo('perdida_foco', { origen: 'blur' });
+                                            }
+                                        };
+
+                                        this.onCopy = () => {
+                                            this.registrarCopiar('copy');
+                                        };
+
+                                        this.onPaste = () => {
+                                            this.registrarPegar('paste');
+                                        };
+
+                                        this.onKeyDown = (e) => {
+                                            if (! (e.ctrlKey || e.metaKey) || ! e.key) {
+                                                return;
+                                            }
+
+                                            const tecla = e.key.toLowerCase();
+                                            if (tecla === 'c') {
+                                                this.registrarCopiar('keydown');
+                                            } else if (tecla === 'v') {
+                                                this.registrarPegar('keydown');
+                                            }
+                                        };
+
+                                        document.addEventListener('visibilitychange', this.onVisibilityChange);
+                                        window.addEventListener('blur', this.onWindowBlur);
+                                        document.addEventListener('copy', this.onCopy);
+                                        document.addEventListener('paste', this.onPaste);
+                                        document.addEventListener('keydown', this.onKeyDown);
+
+                                        this.intervaloHeartbeatId = setInterval(() => {
+                                            if (! document.hidden) {
+                                                this.$wire.registrarSenalMonitoreo('heartbeat');
+                                            }
+                                        }, 30000);
+                                    },
+                                    registrarCopiar(origen) {
+                                        const ahora = Date.now();
+                                        if (ahora - this.ultimoCopiarMs <= 500) {
+                                            return;
+                                        }
+                                        this.ultimoCopiarMs = ahora;
+                                        this.$wire.registrarSenalMonitoreo('copiar', { origen });
+                                    },
+                                    registrarPegar(origen) {
+                                        const ahora = Date.now();
+                                        if (ahora - this.ultimoPegarMs <= 500) {
+                                            return;
+                                        }
+                                        this.ultimoPegarMs = ahora;
+                                        this.$wire.registrarSenalMonitoreo('pegar', { origen });
+                                    },
+                                    destroy() {
+                                        if (this.onVisibilityChange) {
+                                            document.removeEventListener('visibilitychange', this.onVisibilityChange);
+                                        }
+                                        if (this.onWindowBlur) {
+                                            window.removeEventListener('blur', this.onWindowBlur);
+                                        }
+                                        if (this.onCopy) {
+                                            document.removeEventListener('copy', this.onCopy);
+                                        }
+                                        if (this.onPaste) {
+                                            document.removeEventListener('paste', this.onPaste);
+                                        }
+                                        if (this.onKeyDown) {
+                                            document.removeEventListener('keydown', this.onKeyDown);
+                                        }
+                                        if (this.intervaloHeartbeatId !== null) {
+                                            clearInterval(this.intervaloHeartbeatId);
+                                            this.intervaloHeartbeatId = null;
+                                        }
+                                    }
+                                }"
+                            ></div>
+                        @endif
+
+                        {{-- SINCRONIZACIÓN DE ESTADO DEL INTENTO --}}
+                        @if ($intentoActual !== null && in_array($intentoActual['estado'], ['en_curso', 'anulada'], true))
+                            <div
+                                wire:ignore
+                                wire:key="sync-estado-intento-{{ $intentoActual['id'] }}"
+                                class="hidden"
+                                x-data="{
+                                    intervaloEstadoId: null,
+                                    init() {
+                                        this.intervaloEstadoId = setInterval(() => {
+                                            this.$wire.verificarEstadoIntento();
+                                        }, 4000);
+                                    },
+                                    destroy() {
+                                        if (this.intervaloEstadoId !== null) {
+                                            clearInterval(this.intervaloEstadoId);
+                                            this.intervaloEstadoId = null;
+                                        }
+                                    }
+                                }"
+                            ></div>
                         @endif
                     @endif
                 </div>
