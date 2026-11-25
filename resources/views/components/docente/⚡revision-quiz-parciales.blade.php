@@ -364,11 +364,15 @@
             <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-6">
                 <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
                     <h3 class="text-lg font-bold text-slate-900">
-                        Reemplazar nota oficial
+                        {{ ($trasladoPendiente['es_quiz'] ?? false) ? 'Reemplazar nota en Notas' : 'Reemplazar nota oficial' }}
                     </h3>
 
                     <p class="mt-3 text-sm text-slate-600">
-                        El parcial {{ $trasladoPendiente['parcial'] }} ya tiene una nota oficial registrada para este estudiante.
+                        @if ($trasladoPendiente['es_quiz'] ?? false)
+                            El quiz {{ $trasladoPendiente['parcial'] }} ya tiene una nota registrada para este estudiante.
+                        @else
+                            El parcial {{ $trasladoPendiente['parcial'] }} ya tiene una nota oficial registrada para este estudiante.
+                        @endif
                     </p>
 
                     <div class="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 text-sm">

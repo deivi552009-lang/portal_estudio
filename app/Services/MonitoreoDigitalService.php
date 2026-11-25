@@ -10,6 +10,7 @@ use App\Models\EvaluacionDigitalIntento;
 use App\Models\EvaluacionDigitalMonitoreoLog;
 use App\Models\EvaluacionDigitalPregunta;
 use App\Models\EvaluacionDigitalRespuesta;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,41 @@ use Illuminate\Validation\ValidationException;
 class MonitoreoDigitalService
 {
     public const ZONA_HORARIA = 'America/Bogota';
+
+    /**
+     * @var array<string, bool>
+     */
+    private static array $tablaLogsDisponibleCache = [];
+
+    public static function tablaLogsDisponible(): bool
+    {
+        if (app()->runningUnitTests()) {
+            return Schema::hasTable('evaluacion_digital_monitoreo_logs');
+        }
+
+        $connection = (string) config('database.default', 'pgsql');
+        $schema = (string) config("database.connections.{$connection}.search_path", 'public');
+        $clave = "schema_has_table:{$connection}:{$schema}:evaluacion_digital_monitoreo_logs";
+
+        if (self::$tablaLogsDisponibleCache[$clave] ?? false) {
+            return true;
+        }
+
+        if (Cache::get($clave) === true) {
+            self::$tablaLogsDisponibleCache[$clave] = true;
+
+            return true;
+        }
+
+        $existe = Schema::hasTable('evaluacion_digital_monitoreo_logs');
+
+        if ($existe) {
+            Cache::put($clave, true, now()->addHours(12));
+            self::$tablaLogsDisponibleCache[$clave] = true;
+        }
+
+        return $existe;
+    }
 
     /**
      * Registra el inicio de un intento de evaluación de forma idempotente.
@@ -495,14 +531,18 @@ class MonitoreoDigitalService
      */
     public function resumenEstudiante(
         EvaluacionDigital $evaluacion,
-        Estudiante $estudiante
+        Estudiante $estudiante,
+        ?EvaluacionDigitalIntento $intentoPrecargado = null,
+        bool $usarIntentoPrecargado = false
     ): array {
-        $intento = EvaluacionDigitalIntento::query()
-            ->where('evaluacion_digital_id', $evaluacion->id)
-            ->where('estudiante_id', $estudiante->id)
-            ->first();
+        $intento = $usarIntentoPrecargado
+            ? $intentoPrecargado
+            : EvaluacionDigitalIntento::query()
+                ->where('evaluacion_digital_id', $evaluacion->id)
+                ->where('estudiante_id', $estudiante->id)
+                ->first();
 
-        $todosLogs = Schema::hasTable('evaluacion_digital_monitoreo_logs')
+        $todosLogs = self::tablaLogsDisponible()
             ? EvaluacionDigitalMonitoreoLog::query()
                 ->where('evaluacion_digital_id', $evaluacion->id)
                 ->where('estudiante_id', $estudiante->id)

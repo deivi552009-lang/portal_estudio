@@ -11,9 +11,9 @@ use App\Services\RespuestasDigitalesService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -50,6 +50,18 @@ class EvaluacionesDigitales extends Component
 
     #[Locked]
     public bool $tiempoAgotadoNotificado = false;
+
+    /**
+     * @var Collection<int, Grupo>|null
+     */
+    private ?Collection $gruposPropiosCache = null;
+
+    private ?EvaluacionDigital $evaluacionSeleccionadaCache = null;
+
+    /**
+     * @var array<int, EvaluacionDigitalIntento|null>
+     */
+    private array $intentoPorEvaluacionCache = [];
 
     public function mount(): void
     {
@@ -129,9 +141,11 @@ class EvaluacionesDigitales extends Component
         $this->resetValidation();
         $this->mensajeEnvio = null;
         $this->tiempoAgotadoNotificado = false;
+        $this->evaluacionSeleccionadaCache = null;
+        $this->intentoPorEvaluacionCache = [];
 
         try {
-            $evaluacion = $this->buscarEvaluacionPropia($evaluacionId);
+            $evaluacion = $this->buscarEvaluacionPropiaConPreguntas($evaluacionId);
         } catch (ModelNotFoundException) {
             $this->addError(
                 'evaluacion',
@@ -154,8 +168,9 @@ class EvaluacionesDigitales extends Component
         }
 
         $this->evaluacionSeleccionadaId = $evaluacion->id;
+        $this->evaluacionSeleccionadaCache = $evaluacion;
 
-        $intento = $this->buscarIntentoDeEvaluacion($evaluacion->id);
+        $intento = $this->buscarIntentoDeEvaluacion($evaluacion->id, true);
 
         $this->intentoActualId = $intento?->id;
 
@@ -171,6 +186,8 @@ class EvaluacionesDigitales extends Component
     private function limpiarSeleccion(): void
     {
         $this->evaluacionSeleccionadaId = null;
+        $this->evaluacionSeleccionadaCache = null;
+        $this->intentoPorEvaluacionCache = [];
         $this->intentoActualId = null;
         $this->respuestasOpciones = [];
         $this->respuestasTexto = [];
@@ -291,6 +308,7 @@ class EvaluacionesDigitales extends Component
         $this->tiempoAgotadoNotificado = false;
         $this->evaluacionSeleccionadaId = $intento->evaluacion_digital_id;
         $this->intentoActualId = $intento->id;
+        $this->intentoPorEvaluacionCache = [];
         $this->cargarRespuestasDelIntento($intento);
         $this->cargarEvaluacionesEnMemoria();
     }
@@ -321,6 +339,7 @@ class EvaluacionesDigitales extends Component
         $this->tiempoAgotadoNotificado = false;
         $this->evaluacionSeleccionadaId = $intento->evaluacion_digital_id;
         $this->intentoActualId = $intento->id;
+        $this->intentoPorEvaluacionCache = [];
         $this->cargarRespuestasDelIntento($intento);
         $this->cargarEvaluacionesEnMemoria();
     }
@@ -434,6 +453,7 @@ class EvaluacionesDigitales extends Component
             report($e);
         }
 
+        $this->intentoPorEvaluacionCache = [];
         $this->respuestaGuardadaId = $preguntaId;
     }
 
@@ -523,6 +543,7 @@ class EvaluacionesDigitales extends Component
         }
 
         $this->intentoActualId = $enviado->id;
+        $this->intentoPorEvaluacionCache = [];
         $this->cargarRespuestasDelIntento($enviado);
         $this->mensajeEnvio = 'Evaluación enviada correctamente.';
         $this->cargarEvaluacionesEnMemoria();
@@ -582,7 +603,7 @@ class EvaluacionesDigitales extends Component
             return;
         }
 
-        $intento = $this->buscarIntentoDeEvaluacion($this->evaluacionSeleccionadaId);
+        $intento = $this->buscarIntentoDeEvaluacion($this->evaluacionSeleccionadaId, true);
         $estadoActual = $intento?->estado;
 
         $evaluacionCacheada = collect($this->evaluacionesCargadas)
@@ -613,45 +634,67 @@ class EvaluacionesDigitales extends Component
         }
 
         $grupos = $this->gruposPropios();
-        $grupoSeleccionado = $grupos->firstWhere(
-            'id',
-            $this->grupoSeleccionadoId
-        );
+        $gruposPorId = $grupos->keyBy('id');
+        $grupoSeleccionado = $this->grupoSeleccionadoId !== null
+            ? $gruposPorId->get($this->grupoSeleccionadoId)
+            : null;
         $evaluaciones = collect($this->evaluacionesCargadas);
 
         $detalle = null;
         $intentoActual = null;
 
         if ($this->evaluacionSeleccionadaId !== null) {
-            $seleccionada = $this->consultaPublicadas($estudiante->id)
-                ->when(
-                    $this->grupoSeleccionadoId !== null,
-                    fn ($query) => $query->where(
-                        'grupo_id',
-                        $this->grupoSeleccionadoId
-                    )
-                )
-                ->with([
-                    'grupo.materia',
-                    'preguntas' => fn ($query) => $query->select(
-                        'id',
-                        'evaluacion_digital_id',
-                        'orden',
-                        'enunciado',
-                        'tipo'
-                    ),
-                    'preguntas.opciones' => fn ($query) => $query->select(
-                        'id',
-                        'pregunta_id',
-                        'texto',
-                        'orden'
-                    ),
-                ])
-                ->whereKey($this->evaluacionSeleccionadaId)
-                ->first();
+            $seleccionada = null;
+
+            if (
+                $this->evaluacionSeleccionadaCache !== null
+                && $this->evaluacionSeleccionadaCache->id === $this->evaluacionSeleccionadaId
+                && ($this->grupoSeleccionadoId === null
+                    || $this->evaluacionSeleccionadaCache->grupo_id === $this->grupoSeleccionadoId)
+            ) {
+                $seleccionada = $this->evaluacionSeleccionadaCache;
+            } else {
+                $grupoIds = $gruposPorId->keys()->all();
+
+                $seleccionada = $grupoIds === []
+                    ? null
+                    : EvaluacionDigital::query()
+                        ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
+                        ->whereIn('grupo_id', $grupoIds)
+                        ->when(
+                            $this->grupoSeleccionadoId !== null,
+                            fn ($query) => $query->where(
+                                'grupo_id',
+                                $this->grupoSeleccionadoId
+                            )
+                        )
+                        ->with([
+                            'preguntas' => fn ($query) => $query->select(
+                                'id',
+                                'evaluacion_digital_id',
+                                'orden',
+                                'enunciado',
+                                'tipo'
+                            ),
+                            'preguntas.opciones' => fn ($query) => $query->select(
+                                'id',
+                                'pregunta_id',
+                                'texto',
+                                'orden'
+                            ),
+                        ])
+                        ->whereKey($this->evaluacionSeleccionadaId)
+                        ->first();
+
+                if ($seleccionada !== null) {
+                    $seleccionada->setRelation('grupo', $gruposPorId->get($seleccionada->grupo_id));
+                    $this->evaluacionSeleccionadaCache = $seleccionada;
+                }
+            }
 
             if ($seleccionada === null) {
                 $this->evaluacionSeleccionadaId = null;
+                $this->evaluacionSeleccionadaCache = null;
                 $this->intentoActualId = null;
             } else {
                 $cierreSeleccionada = $this->cierreDisponibilidad($seleccionada);
@@ -670,7 +713,7 @@ class EvaluacionesDigitales extends Component
                     $anulada = $intento->estado === EvaluacionDigitalIntento::ESTADO_ANULADA;
                     $editable = $enCurso
                         && ! $tiempoVencido
-                        && $this->errorDisponibilidad($intento->evaluacionDigital) === null;
+                        && $this->errorDisponibilidad($seleccionada) === null;
                     $vencido = $enCurso && ! $editable && $tiempoVencido;
                     $notaIntento = in_array($intento->estado, [
                         EvaluacionDigitalIntento::ESTADO_CALIFICADA,
@@ -684,7 +727,7 @@ class EvaluacionesDigitales extends Component
                     $anulacionCancelada = false;
                     $mensajeAnulacionCancelada = null;
 
-                    if (Schema::hasTable('evaluacion_digital_monitoreo_logs')) {
+                    if (MonitoreoDigitalService::tablaLogsDisponible()) {
                         if ($anulada) {
                             $logAnulacion = EvaluacionDigitalMonitoreoLog::query()
                                 ->where('intento_id', $intento->id)
@@ -785,8 +828,12 @@ class EvaluacionesDigitales extends Component
         ];
     }
 
-    private function gruposPropios()
+    private function gruposPropios(): Collection
     {
+        if ($this->gruposPropiosCache !== null) {
+            return $this->gruposPropiosCache;
+        }
+
         $estudiante = Auth::user()?->estudiante;
 
         abort_unless(
@@ -795,7 +842,7 @@ class EvaluacionesDigitales extends Component
             'El usuario no tiene un registro de estudiante.'
         );
 
-        return $estudiante->grupos()
+        return $this->gruposPropiosCache = $estudiante->grupos()
             ->with('materia')
             ->get()
             ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
@@ -808,8 +855,16 @@ class EvaluacionesDigitales extends Component
     private function evaluacionesFiltradas(int $estudianteId)
     {
         $ahora = Carbon::now(self::ZONA_HORARIA);
+        $gruposPorId = $this->gruposPropios()->keyBy('id');
+        $grupoIds = $gruposPorId->keys()->all();
 
-        return $this->consultaPublicadas($estudianteId)
+        if ($grupoIds === []) {
+            return collect();
+        }
+
+        return EvaluacionDigital::query()
+            ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
+            ->whereIn('grupo_id', $grupoIds)
             ->when(
                 $this->grupoSeleccionadoId !== null,
                 fn ($query) => $query->where(
@@ -818,7 +873,6 @@ class EvaluacionesDigitales extends Component
                 )
             )
             ->with([
-                'grupo.materia',
                 'intentos' => fn ($query) => $query->where(
                     'estudiante_id',
                     $estudianteId
@@ -828,6 +882,7 @@ class EvaluacionesDigitales extends Component
             ->orderBy('hora_inicio', 'asc')
             ->orderBy('id', 'asc')
             ->get()
+            ->each(fn (EvaluacionDigital $ev) => $ev->setRelation('grupo', $gruposPorId->get($ev->grupo_id)))
             ->map(function (EvaluacionDigital $evaluacion) use ($ahora) {
                 $intento = $evaluacion->intentos->first();
                 $disponibilidad = $this->estadoDisponibilidad(
@@ -907,6 +962,37 @@ class EvaluacionesDigitales extends Component
             });
     }
 
+    private function buscarEvaluacionPropiaConPreguntas(int $evaluacionId): EvaluacionDigital
+    {
+        $gruposPorId = $this->gruposPropios()->keyBy('id');
+        $grupoIds = $gruposPorId->keys()->all();
+
+        $evaluacion = EvaluacionDigital::query()
+            ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
+            ->whereIn('grupo_id', $grupoIds)
+            ->with([
+                'preguntas' => fn ($query) => $query->select(
+                    'id',
+                    'evaluacion_digital_id',
+                    'orden',
+                    'enunciado',
+                    'tipo'
+                ),
+                'preguntas.opciones' => fn ($query) => $query->select(
+                    'id',
+                    'pregunta_id',
+                    'texto',
+                    'orden'
+                ),
+            ])
+            ->whereKey($evaluacionId)
+            ->firstOrFail();
+
+        $evaluacion->setRelation('grupo', $gruposPorId->get($evaluacion->grupo_id));
+
+        return $evaluacion;
+    }
+
     private function buscarEvaluacionPropia(int $evaluacionId): EvaluacionDigital
     {
         $estudiante = Auth::user()?->estudiante;
@@ -958,8 +1044,13 @@ class EvaluacionesDigitales extends Component
     }
 
     private function buscarIntentoDeEvaluacion(
-        int $evaluacionId
+        int $evaluacionId,
+        bool $forzarRefresco = false
     ): ?EvaluacionDigitalIntento {
+        if (! $forzarRefresco && array_key_exists($evaluacionId, $this->intentoPorEvaluacionCache)) {
+            return $this->intentoPorEvaluacionCache[$evaluacionId];
+        }
+
         $estudiante = Auth::user()?->estudiante;
 
         abort_unless(
@@ -968,28 +1059,21 @@ class EvaluacionesDigitales extends Component
             'El usuario no tiene un registro de estudiante.'
         );
 
-        return EvaluacionDigitalIntento::query()
-            ->with([
-                'evaluacionDigital.grupo.materia',
-                'respuestas',
-            ])
+        $grupoIds = $this->gruposPropios()->pluck('id')->all();
+
+        if ($grupoIds === []) {
+            return $this->intentoPorEvaluacionCache[$evaluacionId] = null;
+        }
+
+        return $this->intentoPorEvaluacionCache[$evaluacionId] = EvaluacionDigitalIntento::query()
+            ->with('respuestas')
             ->where('evaluacion_digital_id', $evaluacionId)
             ->where('estudiante_id', $estudiante->id)
             ->whereHas(
                 'evaluacionDigital',
-                function ($query) use ($estudiante) {
-                    $query->where(
-                        'estado',
-                        EvaluacionDigital::ESTADO_PUBLICADA
-                    )->whereHas(
-                        'grupo.estudiantes',
-                        function ($query) use ($estudiante) {
-                            $query->where(
-                                'estudiantes.id',
-                                $estudiante->id
-                            );
-                        }
-                    );
+                function ($query) use ($grupoIds) {
+                    $query->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
+                        ->whereIn('grupo_id', $grupoIds);
                 }
             )
             ->first();

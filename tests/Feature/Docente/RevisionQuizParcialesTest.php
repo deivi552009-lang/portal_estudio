@@ -370,7 +370,124 @@ class RevisionQuizParcialesTest extends TestCase
         $this->assertDatabaseCount('calificaciones', 1);
     }
 
-    public function test_no_traslada_la_nota_de_un_quiz_personalizado(): void
+    public function test_traslada_la_nota_de_un_quiz_vinculado_a_notas_si_no_hay_nota_previa(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $evaluacionQuiz] =
+            $this->crearExamenQuizVinculado($this->grupoA, 'pruebaQuiz');
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors()
+            ->assertSet('trasladoPendiente', null)
+            ->assertSee('Nota trasladada a pruebaQuiz: 3.75.');
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $evaluacionQuiz->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.75,
+        ]);
+        $this->assertDatabaseCount('calificaciones', 1);
+    }
+
+    public function test_pide_confirmacion_antes_de_reemplazar_una_nota_existente_de_quiz(): void
+    {
+        [$digital, $objetiva, $abierta, $correcta, $evaluacionQuiz] =
+            $this->crearExamenQuizVinculado($this->grupoA, 'pruebaQuiz');
+
+        $intento = $this->crearIntentoEnviado($digital);
+        $this->crearRespuestaOpcion($intento, $objetiva, $correcta);
+        $respuestaAbierta = $this->crearRespuestaTexto(
+            $intento,
+            $abierta,
+            'Respuesta abierta'
+        );
+
+        Calificacion::create([
+            'evaluacion_id' => $evaluacionQuiz->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 2.50,
+        ]);
+
+        $componente = Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('seleccionarIntento', $intento->id)
+            ->set("valoraciones.{$respuestaAbierta->id}", 5)
+            ->call('guardarCalificacion')
+            ->assertHasNoErrors()
+            ->assertSee('La nota de pruebaQuiz no se reemplazó; confirma el reemplazo.');
+
+        $pendiente = $componente->get('trasladoPendiente');
+
+        $this->assertIsArray($pendiente);
+        $this->assertSame('pruebaQuiz', $pendiente['parcial']);
+        $this->assertTrue($pendiente['es_quiz']);
+        $this->assertSame(2.5, $pendiente['nota_anterior']);
+        $this->assertSame(3.75, $pendiente['nota_nueva']);
+
+        $componente
+            ->call('confirmarTrasladoNota')
+            ->assertHasNoErrors()
+            ->assertSet('trasladoPendiente', null)
+            ->assertSee('Nota de pruebaQuiz actualizada a 3.75.');
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $evaluacionQuiz->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.75,
+        ]);
+        $this->assertDatabaseCount('calificaciones', 1);
+    }
+
+    public function test_guardar_todo_traslada_quiz_vinculado_sin_sobrescribir_nota_distinta(): void
+    {
+        [$quizNuevo, $pregNuevo, $corrNuevo, $evalNuevo] =
+            $this->crearQuizObjetivoVinculado($this->grupoA, 'Quiz nuevo');
+        $intentoNuevo = $this->crearIntentoEnviado($quizNuevo);
+        $this->crearRespuestaOpcion($intentoNuevo, $pregNuevo, $corrNuevo);
+        app(CorreccionDigitalService::class)->corregir($intentoNuevo);
+
+        [$quizConNota, $pregConNota, $corrConNota, $evalConNota] =
+            $this->crearQuizObjetivoVinculado($this->grupoA, 'Quiz con nota');
+        $intentoConNota = $this->crearIntentoEnviado($quizConNota);
+        $this->crearRespuestaOpcion($intentoConNota, $pregConNota, $corrConNota);
+        app(CorreccionDigitalService::class)->corregir($intentoConNota);
+
+        Calificacion::create([
+            'evaluacion_id' => $evalConNota->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.00,
+        ]);
+
+        Livewire::test(RevisionQuizParciales::class)
+            ->set('grupoSeleccionadoId', $this->grupoA->id)
+            ->call('guardarTodo')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $evalNuevo->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 5.00,
+        ]);
+        $this->assertDatabaseHas('calificaciones', [
+            'evaluacion_id' => $evalConNota->id,
+            'estudiante_id' => $this->estudiante->id,
+            'nota' => 3.00,
+        ]);
+        $this->assertDatabaseCount('calificaciones', 2);
+    }
+
+    public function test_no_traslada_la_nota_de_un_quiz_sin_evaluacion_vinculada(): void
     {
         [$digital, $objetiva, $abierta, $correcta] = $this->crearExamenMixto(
             $this->grupoA
@@ -933,6 +1050,63 @@ class RevisionQuizParcialesTest extends TestCase
             'estado' => EvaluacionDigital::ESTADO_PUBLICADA,
             'publicada_at' => now(),
         ]);
+    }
+
+    /**
+     * @return array{0: EvaluacionDigital, 1: EvaluacionDigitalPregunta, 2: EvaluacionDigitalPregunta, 3: EvaluacionDigitalOpcion, 4: Evaluacion}
+     */
+    private function crearExamenQuizVinculado(
+        Grupo $grupo,
+        string $titulo = 'Quiz vinculado'
+    ): array {
+        [$digital, $objetiva, $abierta, $correcta] = $this->crearExamenMixto(
+            $grupo
+        );
+
+        $evaluacion = Evaluacion::create([
+            'grupo_id' => $grupo->id,
+            'nombre' => $titulo,
+            'tipo' => 'personalizada',
+            'porcentaje' => null,
+        ]);
+
+        $digital->update([
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'evaluacion_id' => $evaluacion->id,
+            'titulo' => $titulo,
+        ]);
+
+        return [$digital, $objetiva, $abierta, $correcta, $evaluacion];
+    }
+
+    /**
+     * @return array{0: EvaluacionDigital, 1: EvaluacionDigitalPregunta, 2: EvaluacionDigitalOpcion, 3: Evaluacion}
+     */
+    private function crearQuizObjetivoVinculado(
+        Grupo $grupo,
+        string $titulo = 'Quiz objetivo vinculado'
+    ): array {
+        [$digital, $objetiva, $correcta] = $this->crearExamenObjetivo(
+            $grupo,
+            $titulo
+        );
+
+        $evaluacion = Evaluacion::create([
+            'grupo_id' => $grupo->id,
+            'nombre' => $titulo,
+            'tipo' => 'personalizada',
+            'porcentaje' => null,
+        ]);
+
+        $digital->update([
+            'tipo' => EvaluacionDigital::TIPO_QUIZ,
+            'parcial' => null,
+            'evaluacion_id' => $evaluacion->id,
+            'titulo' => $titulo,
+        ]);
+
+        return [$digital, $objetiva, $correcta, $evaluacion];
     }
 
     /**

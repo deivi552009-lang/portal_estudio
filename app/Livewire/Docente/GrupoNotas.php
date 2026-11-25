@@ -225,20 +225,25 @@ class GrupoNotas extends Component
 
     public function render()
     {
-        $grupos = Grupo::query()
-            ->with('materia')
-            ->whereHas('docente', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->orderBy('anio')
-            ->orderBy('semestre')
-            ->orderBy('id')
-            ->get()
-            ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
-                .'|'.$grupo->anio
-                .'|'.$grupo->semestre
-                .'|'.$grupo->id)
-            ->values();
+        $docente = Auth::user()?->docente;
+
+        $grupos = $docente
+            ? $docente->grupos()
+                ->with('materia')
+                ->orderBy('anio')
+                ->orderBy('semestre')
+                ->orderBy('id')
+                ->get()
+                ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
+                    .'|'.$grupo->anio
+                    .'|'.$grupo->semestre
+                    .'|'.$grupo->id)
+                ->values()
+            : collect();
+
+        if ($docente) {
+            $docente->setRelation('grupos', $grupos);
+        }
 
         $comentariosNotas = [];
         $evaluacionIds = $this->grupo->evaluaciones->pluck('id')->all();

@@ -45,23 +45,41 @@
                 @php
                     $docente = auth()->user()?->docente;
 
-                    $grupoNavId = request()->route('grupoId')
+                    $candidatoGrupoNavId = request()->route('grupoId')
                         ?? session('docente_ultimo_grupo');
 
                     /*
                      * Solo se usa el grupo de la sesión si pertenece al docente.
-                     * Si no hay grupo activo ni visitado, se toma el primero.
+                     * Si el componente de la página ya cargó los grupos del docente
+                     * en memoria, se resuelve sin una consulta SQL adicional.
                      */
-                    $grupoNavId = $docente && $grupoNavId
-                        ? $docente->grupos()->whereKey($grupoNavId)->value('id')
-                        : null;
+                    if ($docente && $docente->relationLoaded('grupos')) {
+                        $gruposNav = $docente->getRelation('grupos');
+                        $grupoNavId = is_numeric($candidatoGrupoNavId)
+                            && $gruposNav->contains('id', (int) $candidatoGrupoNavId)
+                            ? (int) $candidatoGrupoNavId
+                            : null;
 
-                    if (!$grupoNavId && $docente) {
-                        $grupoNavId = $docente->grupos()
-                            ->orderByDesc('anio')
-                            ->orderBy('semestre')
-                            ->orderBy('id')
-                            ->value('id');
+                        if (!$grupoNavId && $gruposNav->isNotEmpty()) {
+                            $grupoNavId = $gruposNav
+                                ->sort(function ($a, $b) {
+                                    return [$b->anio, $a->semestre, $a->id]
+                                        <=> [$a->anio, $b->semestre, $b->id];
+                                })
+                                ->first()?->id;
+                        }
+                    } else {
+                        $grupoNavId = $docente && $candidatoGrupoNavId
+                            ? $docente->grupos()->whereKey($candidatoGrupoNavId)->value('id')
+                            : null;
+
+                        if (!$grupoNavId && $docente) {
+                            $grupoNavId = $docente->grupos()
+                                ->orderByDesc('anio')
+                                ->orderBy('semestre')
+                                ->orderBy('id')
+                                ->value('id');
+                        }
                     }
                 @endphp
 

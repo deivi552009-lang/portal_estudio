@@ -34,6 +34,23 @@ class MonitoreoQuizParciales extends Component
 
     public string $mensajeAnulacion = '';
 
+    private ?Docente $docenteCache = null;
+
+    /**
+     * @var Collection<int, Grupo>|null
+     */
+    private ?Collection $gruposPropiosCache = null;
+
+    /**
+     * @var array<int, Collection<int, EvaluacionDigital>>
+     */
+    private array $evaluacionesGrupoCache = [];
+
+    /**
+     * @var array<int, Collection<int, Estudiante>>
+     */
+    private array $estudiantesGrupoCache = [];
+
     public function mount(): void
     {
         $docente = $this->docente();
@@ -329,17 +346,17 @@ class MonitoreoQuizParciales extends Component
             ? $this->estudiantesDelGrupo($grupoSeleccionado->id)
             : collect();
 
-        $estadosIntentos = $evaluacionSeleccionada !== null
+        $intentosPorEstudiante = $evaluacionSeleccionada !== null
             ? EvaluacionDigitalIntento::query()
                 ->where('evaluacion_digital_id', $evaluacionSeleccionada->id)
-                ->pluck('estado', 'estudiante_id')
-                ->all()
-            : [];
+                ->get()
+                ->keyBy('estudiante_id')
+            : collect();
 
-        $estudiantes = $estudiantesModelos->map(function (Estudiante $estudiante) use ($estadosIntentos): array {
+        $estudiantes = $estudiantesModelos->map(function (Estudiante $estudiante) use ($intentosPorEstudiante): array {
             $nombre = trim((string) ($estudiante->user?->name ?? 'Estudiante'));
             $nombreMostrar = $nombre !== '' ? $nombre : 'Estudiante';
-            $estadoIntento = $estadosIntentos[$estudiante->id] ?? null;
+            $estadoIntento = $intentosPorEstudiante->get($estudiante->id)?->estado;
 
             $activo = $estadoIntento === EvaluacionDigitalIntento::ESTADO_EN_CURSO;
             $finalizado = in_array($estadoIntento, [
@@ -382,7 +399,9 @@ class MonitoreoQuizParciales extends Component
                 $resumen = $evaluacionSeleccionada !== null
                     ? app(MonitoreoDigitalService::class)->resumenEstudiante(
                         $evaluacionSeleccionada,
-                        $estudianteActual
+                        $estudianteActual,
+                        $intentosPorEstudiante->get($estudianteActual->id),
+                        true
                     )
                     : $this->resumenVacio();
 
@@ -447,7 +466,13 @@ class MonitoreoQuizParciales extends Component
      */
     private function gruposPropios(): Collection
     {
-        return $this->docente()
+        if ($this->gruposPropiosCache !== null) {
+            return $this->gruposPropiosCache;
+        }
+
+        $docente = $this->docente();
+
+        $grupos = $docente
             ->grupos()
             ->with('materia')
             ->get()
@@ -456,6 +481,10 @@ class MonitoreoQuizParciales extends Component
                 .'|'.$grupo->semestre
                 .'|'.$grupo->id)
             ->values();
+
+        $docente->setRelation('grupos', $grupos);
+
+        return $this->gruposPropiosCache = $grupos;
     }
 
     /**
@@ -463,6 +492,10 @@ class MonitoreoQuizParciales extends Component
      */
     private function evaluacionesPublicadasDelGrupo(int $grupoId): Collection
     {
+        if (array_key_exists($grupoId, $this->evaluacionesGrupoCache)) {
+            return $this->evaluacionesGrupoCache[$grupoId];
+        }
+
         $docenteId = $this->docente()->id;
         $ahora = Carbon::now(MonitoreoDigitalService::ZONA_HORARIA);
 
@@ -482,7 +515,7 @@ class MonitoreoQuizParciales extends Component
                 fn (EvaluacionDigital $evaluacion): bool => (bool) $evaluacion->getAttribute('en_curso')
             );
 
-        return $enCurso->concat($otras)->values();
+        return $this->evaluacionesGrupoCache[$grupoId] = $enCurso->concat($otras)->values();
     }
 
     /**
@@ -490,16 +523,17 @@ class MonitoreoQuizParciales extends Component
      */
     private function estudiantesDelGrupo(int $grupoId): Collection
     {
-        $grupo = $this->docente()
-            ->grupos()
-            ->whereKey($grupoId)
-            ->first();
-
-        if ($grupo === null) {
-            return collect();
+        if (array_key_exists($grupoId, $this->estudiantesGrupoCache)) {
+            return $this->estudiantesGrupoCache[$grupoId];
         }
 
-        return $grupo->estudiantes()
+        $grupo = $this->gruposPropios()->firstWhere('id', $grupoId);
+
+        if ($grupo === null) {
+            return $this->estudiantesGrupoCache[$grupoId] = collect();
+        }
+
+        return $this->estudiantesGrupoCache[$grupoId] = $grupo->estudiantes()
             ->with('user')
             ->get()
             ->sortBy(fn (Estudiante $estudiante): string => mb_strtolower((string) ($estudiante->user?->name ?? ''))
@@ -597,6 +631,10 @@ class MonitoreoQuizParciales extends Component
 
     private function docente(): Docente
     {
+        if ($this->docenteCache !== null) {
+            return $this->docenteCache;
+        }
+
         $docente = Auth::user()?->docente;
 
         abort_unless(
@@ -605,6 +643,6 @@ class MonitoreoQuizParciales extends Component
             'El usuario no tiene un registro de docente.'
         );
 
-        return $docente;
+        return $this->docenteCache = $docente;
     }
 }

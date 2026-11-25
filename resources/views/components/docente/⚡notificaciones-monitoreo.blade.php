@@ -8,7 +8,7 @@
             consultando: false,
             init() {
                 this.intervaloAlertasId = setInterval(() => {
-                    if (this.consultando) {
+                    if (document.hidden || this.consultando) {
                         return;
                     }
 

@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-slate-50" @if (! $mostrarModalAnular) wire:poll.5s @endif>
+<div class="min-h-screen bg-slate-50" @if (! $mostrarModalAnular) wire:poll.visible.5s @endif>
     <div class="mx-auto max-w-7xl px-6 py-6">
 
         {{-- ENCABEZADO --}}

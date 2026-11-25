@@ -96,7 +96,21 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => env('DB_SCHEMA', 'public'),
+            'search_path_in_dsn' => filter_var(
+                env('DB_PGSQL_SEARCH_PATH_IN_DSN', false),
+                FILTER_VALIDATE_BOOLEAN
+            ),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'options' => extension_loaded('pdo_pgsql') ? [
+                PDO::ATTR_EMULATE_PREPARES => filter_var(
+                    env('DB_PGSQL_EMULATE_PREPARES', false),
+                    FILTER_VALIDATE_BOOLEAN
+                ),
+                PDO::ATTR_PERSISTENT => filter_var(
+                    env('DB_PGSQL_PERSISTENT', false),
+                    FILTER_VALIDATE_BOOLEAN
+                ),
+            ] : [],
         ],
 
         'sqlsrv' => [

@@ -30,6 +30,13 @@ class RevisionQuizParciales extends Component
     #[Locked]
     public ?array $trasladoPendiente = null;
 
+    private ?Docente $docenteCache = null;
+
+    /**
+     * @var Collection<int, Grupo>|null
+     */
+    private ?Collection $gruposPropiosCache = null;
+
     public function mount(): void
     {
         $this->docente();
@@ -156,6 +163,7 @@ class RevisionQuizParciales extends Component
 
         if ($destino !== null) {
             $nota = number_format($destino['nota'], 2);
+            $etiquetaNota = $destino['es_quiz'] ? 'nota' : 'nota oficial';
 
             if ($destino['nota_anterior'] === null) {
                 $servicio->guardar($intento);
@@ -163,16 +171,17 @@ class RevisionQuizParciales extends Component
             } elseif (
                 abs($destino['nota_anterior'] - $destino['nota']) < 0.005
             ) {
-                $mensaje .= " La nota oficial de {$destino['parcial']} ya coincidía ({$nota}).";
+                $mensaje .= " La {$etiquetaNota} de {$destino['parcial']} ya coincidía ({$nota}).";
             } else {
                 $this->trasladoPendiente = [
                     'intento_id' => $intento->id,
                     'parcial' => $destino['parcial'],
+                    'es_quiz' => $destino['es_quiz'],
                     'nota_anterior' => $destino['nota_anterior'],
                     'nota_nueva' => $destino['nota'],
                 ];
 
-                $mensaje .= " La nota oficial de {$destino['parcial']} no se reemplazó; confirma el reemplazo.";
+                $mensaje .= " La {$etiquetaNota} de {$destino['parcial']} no se reemplazó; confirma el reemplazo.";
             }
         }
 
@@ -216,7 +225,7 @@ class RevisionQuizParciales extends Component
             $this->trasladoPendiente = null;
             $this->addError(
                 'traslado',
-                'El intento no corresponde a un parcial P1-P4 con nota.'
+                'El intento no corresponde a un parcial P1-P4 ni a un quiz vinculado con nota.'
             );
 
             return;
@@ -225,10 +234,11 @@ class RevisionQuizParciales extends Component
         $servicio->guardar($intento);
 
         $this->trasladoPendiente = null;
+        $prefijoNota = $destino['es_quiz'] ? 'Nota' : 'Nota oficial';
 
         session()->flash(
             'mensaje',
-            "Nota oficial de {$destino['parcial']} actualizada a "
+            "{$prefijoNota} de {$destino['parcial']} actualizada a "
                 .number_format($destino['nota'], 2).'.'
         );
     }
@@ -377,6 +387,10 @@ class RevisionQuizParciales extends Component
 
     private function docente(): Docente
     {
+        if ($this->docenteCache !== null) {
+            return $this->docenteCache;
+        }
+
         $docente = Auth::user()?->docente;
 
         abort_unless(
@@ -385,14 +399,22 @@ class RevisionQuizParciales extends Component
             'El usuario no tiene un registro de docente.'
         );
 
-        return $docente;
+        return $this->docenteCache = $docente;
     }
 
     private function gruposPropios(?Docente $docente = null)
     {
+        if ($docente === null && $this->gruposPropiosCache !== null) {
+            return $this->gruposPropiosCache;
+        }
+
         $docente ??= $this->docente();
 
-        return $docente
+        if ($this->gruposPropiosCache !== null && $docente->id === $this->docenteCache?->id) {
+            return $this->gruposPropiosCache;
+        }
+
+        $grupos = $docente
             ->grupos()
             ->with('materia')
             ->get()
@@ -401,6 +423,10 @@ class RevisionQuizParciales extends Component
                 .'|'.$grupo->semestre
                 .'|'.$grupo->id)
             ->values();
+
+        $docente->setRelation('grupos', $grupos);
+
+        return $this->gruposPropiosCache = $grupos;
     }
 
     private function intentosDelGrupo(Docente $docente)

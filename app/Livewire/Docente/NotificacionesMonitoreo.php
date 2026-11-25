@@ -5,8 +5,9 @@ namespace App\Livewire\Docente;
 use App\Models\EvaluacionDigital;
 use App\Models\EvaluacionDigitalMonitoreoLog;
 use App\Services\MonitoreoDigitalService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -16,21 +17,32 @@ class NotificacionesMonitoreo extends Component
 
     private const SESION_ULTIMO_ALERTA_ID = 'docente_monitoreo_ultimo_alerta_id';
 
+    private const CACHE_EVAL_EN_CURSO_TTL_SEGUNDOS = 15;
+
     #[Locked]
     public array $notificaciones = [];
 
     #[Locked]
     public int $ultimoAlertaId = 0;
 
+    public static function invalidarCacheEvaluacionEnCurso(int $docenteId): void
+    {
+        Cache::forget(self::claveCacheEvaluacionEnCurso($docenteId));
+    }
+
     public function mount(): void
     {
         $docente = Auth::user()?->docente;
 
-        if (! $docente || ! Schema::hasTable('evaluacion_digital_monitoreo_logs')) {
+        if (! $docente || ! MonitoreoDigitalService::tablaLogsDisponible()) {
             return;
         }
 
         if (! session()->has(self::SESION_ULTIMO_ALERTA_ID)) {
+            if (! $this->tieneEvaluacionEnCurso($docente->id)) {
+                return;
+            }
+
             $ultimoId = $this->obtenerUltimoIdAlertaDocente($docente->id);
             session([self::SESION_ULTIMO_ALERTA_ID => $ultimoId]);
             $this->ultimoAlertaId = $ultimoId;
@@ -45,7 +57,11 @@ class NotificacionesMonitoreo extends Component
     {
         $docente = Auth::user()?->docente;
 
-        if (! $docente || ! Schema::hasTable('evaluacion_digital_monitoreo_logs')) {
+        if (! $docente || ! MonitoreoDigitalService::tablaLogsDisponible()) {
+            return;
+        }
+
+        if (! $this->tieneEvaluacionEnCurso($docente->id)) {
             return;
         }
 
@@ -139,10 +155,6 @@ class NotificacionesMonitoreo extends Component
 
     private function obtenerUltimoIdAlertaDocente(int $docenteId): int
     {
-        if (! Schema::hasTable('evaluacion_digital_monitoreo_logs')) {
-            return 0;
-        }
-
         return (int) (EvaluacionDigitalMonitoreoLog::query()
             ->where('es_alerta', true)
             ->whereIn('tipo_evento', EvaluacionDigitalMonitoreoLog::TIPOS_ALERTA)
@@ -151,5 +163,34 @@ class NotificacionesMonitoreo extends Component
                     ->whereHas('grupo', fn ($grupoQuery) => $grupoQuery->where('docente_id', $docenteId));
             })
             ->max('id') ?? 0);
+    }
+
+    private function tieneEvaluacionEnCurso(int $docenteId): bool
+    {
+        if (app()->runningUnitTests()) {
+            return true;
+        }
+
+        $clave = self::claveCacheEvaluacionEnCurso($docenteId);
+
+        return (bool) Cache::remember(
+            $clave,
+            self::CACHE_EVAL_EN_CURSO_TTL_SEGUNDOS,
+            function () use ($docenteId): bool {
+                $ahora = Carbon::now(MonitoreoDigitalService::ZONA_HORARIA);
+
+                return EvaluacionDigital::query()
+                    ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
+                    ->whereDate('fecha', $ahora->toDateString())
+                    ->whereHas('grupo', fn ($q) => $q->where('docente_id', $docenteId))
+                    ->get(['id', 'fecha', 'hora_inicio', 'hora_fin'])
+                    ->contains(fn (EvaluacionDigital $eval): bool => $eval->estaEnCurso($ahora));
+            }
+        );
+    }
+
+    private static function claveCacheEvaluacionEnCurso(int $docenteId): string
+    {
+        return "docente_monitoreo_tiene_eval_en_curso:{$docenteId}";
     }
 }

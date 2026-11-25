@@ -12,6 +12,7 @@ use App\Services\EvaluacionesDigitalesService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use JsonException;
@@ -21,6 +22,13 @@ use Livewire\Component;
 class QuizParciales extends Component
 {
     public ?int $grupoSeleccionadoId = null;
+
+    private ?Docente $docenteCache = null;
+
+    /**
+     * @var Collection<int, Grupo>|null
+     */
+    private ?Collection $gruposPropiosCache = null;
 
     public string $tipo = 'quiz';
 
@@ -937,6 +945,7 @@ class QuizParciales extends Component
 
             $this->borradorPublicado = true;
             $this->evaluacionPublicadaId = $publicada->id;
+            NotificacionesMonitoreo::invalidarCacheEvaluacionEnCurso($this->docente()->id);
             $this->solicitudPublicacionPreparada = false;
             $this->solicitudPublicacionHuella = '';
             $this->solicitudPublicacionBorradorId = null;
@@ -2756,45 +2765,42 @@ class QuizParciales extends Component
             $this->invalidarSolicitudPublicacion();
         }
 
-        $docente = $this->docente();
+        $this->docente();
 
-        $grupos = $docente->grupos()
-            ->with('materia')
-            ->get()
-            ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
-                .'|'.$grupo->anio
-                .'|'.$grupo->semestre
-                .'|'.$grupo->id)
-            ->values();
+        $grupos = $this->gruposPropios();
+        $gruposPorId = $grupos->keyBy('id');
+        $grupoIds = $gruposPorId->keys()->all();
 
-        $grupoSeleccionado = $grupos->firstWhere(
-            'id',
-            $this->grupoSeleccionadoId
-        );
+        $grupoSeleccionado = $this->grupoSeleccionadoId !== null
+            ? $gruposPorId->get($this->grupoSeleccionadoId)
+            : null;
 
-        $borradores = EvaluacionDigital::query()
-            ->with('grupo.materia')
-            ->where('estado', EvaluacionDigital::ESTADO_BORRADOR)
-            ->whereHas('grupo.docente', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->orderByDesc('updated_at')
-            ->get();
+        $borradores = $grupoIds === []
+            ? collect()
+            : EvaluacionDigital::query()
+                ->where('estado', EvaluacionDigital::ESTADO_BORRADOR)
+                ->whereIn('grupo_id', $grupoIds)
+                ->orderByDesc('updated_at')
+                ->get()
+                ->each(fn (EvaluacionDigital $item) => $item->setRelation(
+                    'grupo',
+                    $gruposPorId->get($item->grupo_id)
+                ));
 
         $ahora = Carbon::now('America/Bogota');
 
-        [$enCurso, $otras] = EvaluacionDigital::query()
-            ->with('grupo.materia')
-            ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
-            ->whereHas('grupo.docente', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->orderByDesc('publicada_at')
-            ->orderByDesc('id')
-            ->get()
-            ->each(function (EvaluacionDigital $publicacion) use ($ahora): void {
-                $publicacion->setAttribute('en_curso', $publicacion->estaEnCurso($ahora));
-            })
+        [$enCurso, $otras] = ($grupoIds === []
+            ? collect()
+            : EvaluacionDigital::query()
+                ->where('estado', EvaluacionDigital::ESTADO_PUBLICADA)
+                ->whereIn('grupo_id', $grupoIds)
+                ->orderByDesc('publicada_at')
+                ->orderByDesc('id')
+                ->get()
+                ->each(function (EvaluacionDigital $publicacion) use ($ahora, $gruposPorId): void {
+                    $publicacion->setRelation('grupo', $gruposPorId->get($publicacion->grupo_id));
+                    $publicacion->setAttribute('en_curso', $publicacion->estaEnCurso($ahora));
+                }))
             ->partition(
                 fn (EvaluacionDigital $publicacion): bool => (bool) $publicacion->getAttribute('en_curso')
             );
@@ -2985,19 +2991,43 @@ class QuizParciales extends Component
         return $estados;
     }
 
+    /**
+     * @return Collection<int, Grupo>
+     */
+    private function gruposPropios(): Collection
+    {
+        if ($this->gruposPropiosCache !== null) {
+            return $this->gruposPropiosCache;
+        }
+
+        $docente = $this->docente();
+
+        $grupos = $docente
+            ->grupos()
+            ->with('materia')
+            ->get()
+            ->sortBy(fn (Grupo $grupo) => mb_strtolower($grupo->materia->nombre)
+                .'|'.$grupo->anio
+                .'|'.$grupo->semestre
+                .'|'.$grupo->id)
+            ->values();
+
+        $docente->setRelation('grupos', $grupos);
+
+        return $this->gruposPropiosCache = $grupos;
+    }
+
     private function grupoPropio(int $grupoId): ?Grupo
     {
-        return Grupo::query()
-            ->whereKey($grupoId)
-            ->whereHas('docente', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->with('materia')
-            ->first();
+        return $this->gruposPropios()->firstWhere('id', $grupoId);
     }
 
     private function docente(): Docente
     {
+        if ($this->docenteCache !== null) {
+            return $this->docenteCache;
+        }
+
         $docente = Auth::user()?->docente;
 
         abort_unless(
@@ -3006,6 +3036,6 @@ class QuizParciales extends Component
             'El usuario no tiene un registro de docente.'
         );
 
-        return $docente;
+        return $this->docenteCache = $docente;
     }
 }

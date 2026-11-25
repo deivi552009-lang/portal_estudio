@@ -3,7 +3,6 @@
 namespace App\Livewire\Docente;
 
 use App\Models\Actividad;
-use App\Models\Grupo;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -17,15 +16,20 @@ class Dashboard extends Component
 
     public function mount(): void
     {
-        $this->grupos = Grupo::query()
-            ->with([
-                'materia',
-                'estudiantes',
-            ])
-            ->whereHas('docente', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->get();
+        $docente = Auth::user()?->docente;
+
+        $this->grupos = $docente
+            ? $docente->grupos()
+                ->with([
+                    'materia',
+                    'estudiantes',
+                ])
+                ->get()
+            : collect();
+
+        if ($docente) {
+            $docente->setRelation('grupos', $this->grupos);
+        }
 
         $this->totalEstudiantes = $this->grupos
             ->flatMap(fn ($grupo) => $grupo->estudiantes)

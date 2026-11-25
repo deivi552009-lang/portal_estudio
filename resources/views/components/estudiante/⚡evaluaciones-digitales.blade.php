@@ -859,9 +859,20 @@
                                 class="hidden"
                                 x-data="{
                                     intervaloEstadoId: null,
+                                    consultandoEstado: false,
                                     init() {
                                         this.intervaloEstadoId = setInterval(() => {
-                                            this.$wire.verificarEstadoIntento();
+                                            if (document.hidden || this.consultandoEstado) {
+                                                return;
+                                            }
+
+                                            this.consultandoEstado = true;
+
+                                            Promise.resolve(this.$wire.verificarEstadoIntento())
+                                                .catch(() => {})
+                                                .finally(() => {
+                                                    this.consultandoEstado = false;
+                                                });
                                         }, 4000);
                                     },
                                     destroy() {
