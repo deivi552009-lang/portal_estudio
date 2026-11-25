@@ -1,5 +1,5 @@
 # Agentes de documentación — evaluación y prioridad
-Última actualización: 2026-11-23
+Última actualización: 2026-11-24
 
 ## Objetivo
 Registrar qué modelo documenta con menos errores y en qué orden usarlos en las próximas tareas.
@@ -65,6 +65,7 @@ Registrar qué modelo documenta con menos errores y en qué orden usarlos en las
 | `flash` (subagente Antigravity) | Quiz/Parciales UX 2026-11-19, segundo bloque (8 archivos de `docs/memoria`) | Completado en 1 ejecución | 0 de contenido; el coordinador actualizó el estado de «pendiente de commit» a «integrado en `main`» en `relevo.md` y `pendientes.md` antes del commit/push. |
 | `flash` (subagente Antigravity) | Evaluaciones digitales del estudiante 2026-11-20 (8 archivos de `docs/memoria`, incluida `bitacora/2026-11-20.md`) | Completado en 1 ejecución | 1 menor: en `relevo.md` seguía la frase «resultados/nota al estudiante» en la línea de pendientes; ajustada a «detalle por pregunta/retroalimentación». |
 | `flash` (subagente Antigravity) | Revisión de Quiz/Parciales 2026-11-23 (8 archivos de `docs/memoria`, incluida `bitacora/2026-11-23.md`) | Completado en 1 ejecución | 0 correcciones. Conservó intactas las entradas previas de otras tareas sin commitear. |
+| `flash` (subagente Antigravity) | Cierre e integración en `main` (`397e47a`, 2026-11-24): Monitoreo (Fases 1–5 + ajustes 1–4), corrección Paso 2 y Revisión 2026-11-23 (10 archivos de `docs/memoria`, incluida `bitacora/2026-11-24.md`) | Completado en 1 ejecución | 3 menores: encabezados duplicados en `relevo.md`, «siete migraciones» → «ocho migraciones» en `modulos/quiz-parciales.md` y columna extra (`|`) en la tabla de `pendientes.md`. |
 
 **Conclusión:** Los cuatro primeros modelos no pudieron documentar por límite de uso gratuito el 2026-11-16; `opencode/beam-free` fue el único operativo y completó panel, Quiz/Parciales, relevo/índice/arquitectura/bitácora, estado/pendientes y decisiones, con límite de pasos y correcciones del orquestador. La documentación de cierre de Quiz/Parciales se completó con Beam, hubo límite de pasos y correcciones del orquestador; Beam sigue como primera opción operativa mientras tenga cuota y no se marca «recomendado» por cero errores. El 2026-11-17 Beam completó módulos, decisiones, pendientes, estado, relevo e índice con límite de pasos y correcciones del orquestador; la bitácora la completó Big Pickle. El 2026-11-19 Beam completó los ajustes de UX en módulos, decisiones, pendientes, estado, relevo, índice y bitácora con límite de pasos y correcciones del orquestador. La revisión del orquestador sigue siendo obligatoria.
 
